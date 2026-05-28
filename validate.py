@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from anchors import ANCHORS, load
@@ -27,6 +28,48 @@ from features import FEATURES, ordered_core_full_ids
 from protofilaments import count_protofilaments
 
 RESULTS_DIR = Path(__file__).parent / "results"
+
+PALETTE = {
+    "inert":         "#2f6f96",
+    "graded-active": "#e08134",
+    "active":        "#c1432d",
+}
+
+PRETTY_FEATURE = {
+    "exposed_hydrophobic_beta_sasa": "exposed hydrophobic β-SASA",
+    "membrane_insertion_propensity": "membrane-insertion propensity",
+    "nac_active_score":              "NAC β-accessibility",
+    "contact_density":               "contact density (signed −)",
+    "disordered_hydrophobic_exposure": "disordered hydrophobic exposure",
+}
+
+
+def _pairwise_auc(active_scores, inert_scores) -> float:
+    a = np.asarray(active_scores, dtype=float)
+    i = np.asarray(inert_scores, dtype=float)
+    if a.size == 0 or i.size == 0:
+        return float("nan")
+    wins = (a[:, None] > i[None, :]).sum() + 0.5 * (a[:, None] == i[None, :]).sum()
+    return float(wins) / (a.size * i.size)
+
+
+def _stagger_label_offsets(values, gap: float = 0.35):
+    """Vertical pt offsets for crowded scatter labels along x.
+    Adjacent points within `gap` cycle through above/below levels."""
+    order = sorted(range(len(values)), key=lambda k: values[k])
+    cycle = (24, -24, 42, -42)
+    offsets = [0] * len(values)
+    cursor = 0
+    last_v = float("-inf")
+    for rank, k in enumerate(order):
+        v = values[k]
+        if v - last_v < gap:
+            cursor = (cursor + 1) % len(cycle)
+        else:
+            cursor = 0
+        offsets[k] = cycle[cursor]
+        last_v = v
+    return offsets
 
 
 def _chain_ids_for(mode: str, structure) -> list[str] | None:
@@ -105,50 +148,173 @@ def compute_features(mode: str = "assembly_inner", use_core_mask: bool = True) -
 
 def plot_features(df: pd.DataFrame, suffix: str = "") -> Path:
     feats = list(FEATURES.keys())
-    fig, axes = plt.subplots(1, len(feats), figsize=(3.2 * len(feats), 4.2))
-    colors = {"inert": "tab:blue", "active": "tab:red", "graded-active": "tab:orange"}
-    for ax, feat in zip(axes, feats):
-        for label, color in colors.items():
-            sub = df[df.label == label]
-            if sub.empty:
-                continue
-            ax.scatter([0] * len(sub), sub[feat], c=color, label=label, s=80, alpha=0.7)
-            for _, row in sub.iterrows():
-                ax.annotate(
-                    row.pdb_id,
-                    (0, row[feat]),
-                    xytext=(6, 0),
-                    textcoords="offset points",
-                    fontsize=8,
-                )
-        ax.set_title(feat, fontsize=9)
-        ax.set_xticks([])
-    axes[-1].legend(loc="best", fontsize=8)
-    fig.suptitle(f"Stage 2 features across anchors{suffix}", fontsize=11)
-    fig.tight_layout()
+    n_cols = 2
+    n_rows = (len(feats) + n_cols) // n_cols  # reserve last cell for legend/summary
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(13.0, 4.6 * n_rows), dpi=160)
+    axes_flat = axes.flatten() if n_rows * n_cols > 1 else [axes]
+
+    inert_mask = df.label == "inert"
+    active_mask = df.label.isin(["active", "graded-active"])
+
+    for ax, feat in zip(axes_flat, feats):
+        sub = df[df[feat].notna()].sort_values(feat).reset_index(drop=True)
+        y_pos = np.arange(len(sub))
+        point_colors = [PALETTE.get(c, "#888") for c in sub.label]
+
+        # Faint per-class mean lines
+        for cls in ("inert", "graded-active", "active"):
+            m_vals = df.loc[df.label == cls, feat].dropna()
+            if not m_vals.empty:
+                ax.axvline(m_vals.mean(), color=PALETTE[cls],
+                           linewidth=1.2, alpha=0.35, zorder=1)
+
+        ax.scatter(sub[feat], y_pos, c=point_colors, s=78, alpha=0.95,
+                   edgecolors="white", linewidths=1.1, zorder=3)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(sub.pdb_id, fontsize=8.5)
+        ax.set_title(PRETTY_FEATURE.get(feat, feat),
+                     fontsize=10.5, fontweight="semibold", pad=6, loc="left")
+        ax.grid(True, axis="x", alpha=0.22, linewidth=0.6)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.tick_params(axis="both", length=3, color="#999")
+
+        auc_f = _pairwise_auc(
+            df.loc[active_mask, feat].dropna().tolist(),
+            df.loc[inert_mask, feat].dropna().tolist(),
+        )
+        if not np.isnan(auc_f):
+            ax.text(0.985, 0.04, f"AUC  {auc_f:.2f}", transform=ax.transAxes,
+                    ha="right", va="bottom", fontsize=9, color="#333",
+                    bbox=dict(boxstyle="round,pad=0.32", facecolor="white",
+                              edgecolor="#d0d0d0", linewidth=0.8))
+
+    # Legend / summary in the trailing empty cell(s)
+    for empty_ax in axes_flat[len(feats):]:
+        empty_ax.axis("off")
+    if len(axes_flat) > len(feats):
+        legend_ax = axes_flat[len(feats)]
+        used = [c for c in ("inert", "graded-active", "active") if c in df.label.values]
+        handles = [plt.Line2D([0], [0], marker="o", color="w",
+                              markerfacecolor=PALETTE[c], markeredgecolor="white",
+                              markeredgewidth=1.1, markersize=12,
+                              label=c.replace("-", " "))
+                   for c in used]
+        leg = legend_ax.legend(handles=handles, loc="upper center", fontsize=11,
+                               frameon=False, title="anchor class",
+                               title_fontsize=11, borderpad=1)
+        leg.get_title().set_fontweight("semibold")
+        legend_ax.text(
+            0.5, 0.42,
+            "points sorted by feature value\nvertical lines: per-class mean\n"
+            "AUC: pairwise Mann–Whitney\n(graded-active vs inert)",
+            ha="center", va="top", fontsize=9.5, color="#444",
+            transform=legend_ax.transAxes,
+        )
+
+    fig.suptitle(f"Per-feature anchor profiles{suffix}",
+                 fontsize=13.5, fontweight="bold", x=0.01, ha="left")
+    fig.tight_layout(rect=[0, 0, 1, 0.955])
     path = RESULTS_DIR / f"anchor_features{suffix.replace(' ', '_')}.png"
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=160, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return path
 
 
 def plot_activity(df: pd.DataFrame, suffix: str = "") -> Path:
-    fig, ax = plt.subplots(figsize=(8, 4.2))
-    colors = {"inert": "tab:blue", "active": "tab:red", "graded-active": "tab:orange"}
-    for label, color in colors.items():
-        sub = df[df.label == label]
+    class_order = [c for c in ("inert", "graded-active", "active")
+                   if not df[df.label == c].empty]
+    y_base = {label: i for i, label in enumerate(class_order)}
+
+    fig, ax = plt.subplots(figsize=(12.5, 5.4), dpi=160)
+
+    # Distribution underlay
+    for cls in class_order:
+        sub = df[df.label == cls]
         if sub.empty:
             continue
-        ax.scatter(sub["activity"], [label] * len(sub), c=color, s=120, alpha=0.7)
-        for _, row in sub.iterrows():
-            ax.annotate(row.pdb_id, (row["activity"], label), xytext=(4, 6),
-                        textcoords="offset points", fontsize=8)
-    ax.set_xlabel("activity score (weighted z-sum)")
-    ax.axvline(0, color="grey", linewidth=0.5)
-    ax.set_title(f"Anchor separation along the activity axis{suffix}")
+        y = y_base[cls]
+        bp = ax.boxplot(
+            sub.activity, vert=False, positions=[y], widths=0.50,
+            whis=(0, 100), showfliers=False, patch_artist=True,
+            manage_ticks=False, zorder=1,
+        )
+        for box in bp["boxes"]:
+            box.set(facecolor=PALETTE[cls], alpha=0.13,
+                    edgecolor=PALETTE[cls], linewidth=1.0)
+        for w in bp["whiskers"] + bp["caps"]:
+            w.set(color=PALETTE[cls], linewidth=0.9, alpha=0.55)
+        for m in bp["medians"]:
+            m.set(color=PALETTE[cls], linewidth=2.0)
+
+    # Class-mean marker + label below the row
+    for cls in class_order:
+        sub = df[df.label == cls]
+        if sub.empty:
+            continue
+        m = sub.activity.mean()
+        y = y_base[cls]
+        ax.scatter([m], [y - 0.34], marker="v", s=90, color=PALETTE[cls],
+                   edgecolor="white", linewidth=1.0, zorder=4)
+        ax.text(m, y - 0.46, f"μ = {m:+.2f}", ha="center", va="top",
+                fontsize=9, color=PALETTE[cls], fontweight="semibold")
+
+    # Points and staggered labels
+    for cls in class_order:
+        sub = df[df.label == cls].sort_values("activity").reset_index(drop=True)
+        if sub.empty:
+            continue
+        y_c = y_base[cls]
+        jitters = [((i % 2) * 2 - 1) * 0.045 for i in range(len(sub))]
+        ys = [y_c + j for j in jitters]
+        offsets = _stagger_label_offsets(sub.activity.tolist(), gap=0.40)
+        for i, (_, row) in enumerate(sub.iterrows()):
+            ax.scatter(row.activity, ys[i], c=PALETTE[cls], s=145,
+                       alpha=0.96, edgecolor="white", linewidth=1.4, zorder=5)
+            ax.annotate(
+                row.pdb_id, (row.activity, ys[i]),
+                xytext=(0, offsets[i]), textcoords="offset points",
+                ha="center", va="bottom" if offsets[i] > 0 else "top",
+                fontsize=9, color="#1f1f1f", zorder=6,
+                arrowprops=dict(arrowstyle="-", color="#bbbbbb", linewidth=0.7,
+                                shrinkA=2, shrinkB=4)
+                if abs(offsets[i]) > 25 else None,
+            )
+
+    # Classifier zero
+    ax.axvline(0, color="#9a9a9a", linewidth=0.9, linestyle=(0, (4, 4)), zorder=2)
+
+    # AUC callout
+    inert_vals = df.loc[df.label == "inert", "activity"].tolist()
+    active_vals = df.loc[df.label.isin(["graded-active", "active"]), "activity"].tolist()
+    auc = _pairwise_auc(active_vals, inert_vals)
+    if not np.isnan(auc):
+        ax.text(0.987, 0.965,
+                f"pairwise AUC  {auc:.2f}\n"
+                f"n = {len(active_vals)} active · {len(inert_vals)} inert",
+                transform=ax.transAxes, ha="right", va="top",
+                fontsize=10.5, fontweight="semibold", color="#222",
+                bbox=dict(boxstyle="round,pad=0.55", facecolor="white",
+                          edgecolor="#cccccc", linewidth=1.0))
+
+    ax.set_yticks(list(y_base.values()))
+    ax.set_yticklabels([c.replace("-", " ") for c in class_order],
+                       fontsize=11.5, fontweight="medium")
+    ax.set_xlabel("activity score   (weighted z-sum of five surface-biophysics features)",
+                  fontsize=10.5)
+    ax.set_title("Anchor separation along the activity axis",
+                 fontsize=13.5, fontweight="bold", loc="left", pad=10)
+    ax.grid(True, axis="x", alpha=0.22, linewidth=0.6)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", length=3, color="#999")
+    ax.set_ylim(-0.95, len(class_order) - 0.15)
+
     fig.tight_layout()
     path = RESULTS_DIR / f"anchor_activity{suffix.replace(' ', '_')}.png"
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=160, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return path
 

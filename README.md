@@ -99,7 +99,15 @@ Inert anchors comprise mature fibril polymorphs (which neurons coexist with for 
 
 ### 2.3 Calibration result
 
-Pairwise Mann–Whitney AUC for graded-active vs inert: **0.84** (graded-active mean +1.04, inert mean −0.68; `results/anchor_scores.csv`, `results/anchor_activity.png`). Within-class protofilament-count correlation: ρ = −0.76 (inert, n=8) and ρ = −0.35 (graded-active, n=5), with single-protofilament fibrils ranking systematically higher than their paired-protofilament class-mates — consistent with the elongation-competent growing end being more conformationally available in single-protofilament polymorphs.
+Pairwise Mann–Whitney AUC for graded-active vs inert: **0.84** (graded-active mean +1.04, inert mean −0.58; `results/anchor_scores.csv`). Within-class protofilament-count correlation: ρ = −0.76 (inert, n=8) and ρ = −0.35 (graded-active, n=5), with single-protofilament fibrils ranking systematically higher than their paired-protofilament class-mates — consistent with the elongation-competent growing end being more conformationally available in single-protofilament polymorphs.
+
+![Anchor separation along the activity axis](results/anchor_activity.png)
+
+*Activity score by anchor class. Each point is a deposited α-syn structure; boxes show the class IQR with median, triangles mark class means. Graded-active fibrils (familial mutants) sit systematically above inert polymorphs, with one inert outlier — the Tuttle Greek-key ssNMR fibril (2N0A) — whose disordered-tail content inflates its score.*
+
+![Per-feature anchor profiles](results/anchor_features.png)
+
+*Per-feature breakdown. Each panel sorts the 14 anchors along one of the five raw features; vertical lines mark per-class means; AUC is the pairwise Mann–Whitney score for graded-active vs inert on that feature alone. `exposed_hydrophobic_beta_sasa` and `nac_active_score` carry most of the separation; `contact_density` is the weakest single feature and enters the composite score with a negative weight (tertiary compactness suppresses activity).*
 
 ## 3. Toxic-oligomer model construction
 
@@ -362,6 +370,7 @@ data/anchors/                          PDB cache (gitignored; auto-populated)
 results/anchor_features.csv            anchor-calibration features
 results/anchor_scores.csv              anchor activity scores
 results/anchor_activity.png            activity-vs-class plot
+results/anchor_features.png            per-feature anchor profiles
 results/oligomers/*_relaxed.pdb        11 relaxed oligomer structures
 results/oligomers/ensemble_summary.csv ensemble activity scores
 results/sweep/fusco_*_sweep.csv        127-molecule perturbation screen
