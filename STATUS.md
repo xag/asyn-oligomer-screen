@@ -10,7 +10,7 @@ The proposal is a three-step pipeline:
 
 1. **Generate** candidate toxic α-syn oligomer conformations — the structures the PDB does not provide.
 2. **Score** which generated shapes have toxicity features (exposed hydrophobic β-SASA, NAC accessibility, membrane-disruption geometry).
-3. **Destabilise** — find ligands that raise the free energy of the toxic shapes so they dissipate or revert to inert fibrils.
+3. **Modulate** — find ligands that raise the free energy of the toxic shapes so they dissipate or revert to inert fibrils, and flag ligands that do the opposite (lower the free energy of toxic shapes and stabilise them) as anti-targets to avoid.
 
 Current state: Track A (topology-prior coarse build + MD relaxation) produces step 1; Stage 2 features and ordered-core mask score step 2 with AUC 0.84 on 14 fibril anchors; Stage 3 docks vicinity-list molecules against the generated oligomer for step 3, with three orthogonal channels (`delta_activity_gated` for non-covalent rearrangement, `aspr_score` for covalent adduct propensity, affinity gate for absolute-affinity cutoff).
 
