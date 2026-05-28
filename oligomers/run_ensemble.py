@@ -42,6 +42,12 @@ import sys
 import time
 from pathlib import Path
 
+# Docstrings and help strings contain non-ASCII (α, β, →, Å, …) which would
+# otherwise crash --help on Windows consoles defaulting to cp1252.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import numpy as np
 
 PIPELINE   = Path(__file__).resolve().parents[1]           # pipeline/
@@ -50,14 +56,25 @@ RESULTS    = PIPELINE / "results" / "oligomers"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
 VENV_PY = sys.executable                                    # this interpreter
-_MD_PY_ENV = os.environ.get("ASYN_MD_PYTHON")
-if not _MD_PY_ENV:
-    raise RuntimeError(
-        "Set ASYN_MD_PYTHON to the python interpreter of a conda env that has "
-        "OpenMM + openff-toolkit + openmmforcefields installed. "
-        "See README.md (Reproduction / MD relaxation)."
-    )
-MD_PY   = Path(_MD_PY_ENV)
+# MD_PY is only needed for the build/relax subprocesses. `--summary-only`
+# re-scores existing relaxed PDBs and never invokes MD, so the env-var
+# check is deferred into _require_md_py() and called from main() only when
+# MD work will actually be performed.
+MD_PY: Path | None = (
+    Path(os.environ["ASYN_MD_PYTHON"]) if os.environ.get("ASYN_MD_PYTHON") else None
+)
+
+
+def _require_md_py() -> Path:
+    if MD_PY is None:
+        sys.exit(
+            "ERROR: Set ASYN_MD_PYTHON to the python interpreter of a conda env that "
+            "has OpenMM + openff-toolkit + openmmforcefields installed. "
+            "See README.md (Reproduction / MD relaxation)."
+        )
+    if not MD_PY.exists():
+        sys.exit(f"ERROR: ASYN_MD_PYTHON points to {MD_PY}, which does not exist.")
+    return MD_PY
 
 # ---------------------------------------------------------------------------
 # Topology grid
@@ -149,7 +166,7 @@ def build_cmd(topo: dict) -> list[str]:
 def relax_cmd(topo: dict, starting_pdb: Path, relaxed_pdb: Path) -> list[str]:
     cs, ce = topo["core"]
     cmd = [
-        str(MD_PY),
+        str(_require_md_py()),
         str(PIPELINE / "md_relax.py"),
         "--apo-pdb",         str(starting_pdb),
         "--out-pdb",         str(relaxed_pdb),
@@ -210,9 +227,8 @@ def main() -> None:
     args = ap.parse_args()
     skip_existing = not args.no_skip
 
-    if not MD_PY.exists():
-        sys.exit(f"ERROR: MD_PY not found at {MD_PY}\n"
-                 f"Edit the MD_PY constant at the top of this script.")
+    if not args.summary_only:
+        _require_md_py()
 
     results: list[dict] = []
     total_t0 = time.time()

@@ -37,6 +37,12 @@ import numpy as np
 import pandas as pd
 from Bio.PDB import PDBParser
 
+# Docstrings and help strings contain non-ASCII (β, …) which would
+# otherwise crash --help on Windows consoles defaulting to cp1252.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 PIPELINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PIPELINE))
 

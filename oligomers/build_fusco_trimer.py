@@ -34,12 +34,19 @@ from __future__ import annotations
 import argparse
 import copy
 import random
+import sys
 from pathlib import Path
 
 import numpy as np
 from Bio.PDB import PDBIO
 from Bio.PDB.StructureBuilder import StructureBuilder
 from PeptideBuilder import Geometry, PeptideBuilder
+
+# Docstrings and help strings contain non-ASCII (α, β, …) which would
+# otherwise crash --help on Windows consoles defaulting to cp1252.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ALPHA_SYN_SEQ = (
     "MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYV"   # 1-40
