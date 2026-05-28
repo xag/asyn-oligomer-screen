@@ -1,0 +1,19 @@
+biopython>=1.81
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+pydssp>=0.9.1
+# Stage 3 (stage3.py, sweep_oligomer.py) only — Stage 2 doesn't need these:
+rdkit>=2024.3
+meeko>=0.7
+scipy>=1.11
+gemmi>=0.6
+# Track A oligomer build:
+PeptideBuilder>=1.1
+# AutoDock Vina 1.2.5 binary lives at bin/vina.exe (Windows) and is downloaded
+# once from github.com/ccsb-scripps/AutoDock-Vina/releases. On Linux/macOS,
+# adapt the binary name and path in stage3.py.
+#
+# OpenMM-based MD relaxation (md_relax.py, md_stage3.py, oligomers/run_ensemble.py)
+# uses a SEPARATE conda env pointed at via the ASYN_MD_PYTHON env var. See README.md
+# (Reproduction / MD relaxation).

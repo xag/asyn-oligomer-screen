@@ -1,0 +1,13 @@
+tag,label,n_mers,core,arrangement,seed,activity,status
+fusco_parallel_3mer_core70-88,parallel 3mer 70-88 s42 [ref],3,70-88,parallel,42,17.775,ok
+fusco_parallel_3mer_core70-88_s123,parallel 3mer 70-88 s123,3,70-88,parallel,123,14.148,ok
+fusco_parallel_3mer_core70-88_s777,parallel 3mer 70-88 s777,3,70-88,parallel,777,22.114,ok
+fusco_antiparallel_3mer_core70-88,antiparallel 3mer 70-88 s42,3,70-88,antiparallel,42,12.954,ok
+fusco_antiparallel_3mer_core70-88_s123,antiparallel 3mer 70-88 s123,3,70-88,antiparallel,123,10.596,ok
+fusco_parallel_2mer_core70-88,parallel 2mer 70-88 s42,2,70-88,parallel,42,16.135,ok
+fusco_parallel_4mer_core70-88,parallel 4mer 70-88 s42,4,70-88,parallel,42,18.171,ok
+fusco_parallel_3mer_core65-83,parallel 3mer 65-83 s42,3,65-83,parallel,42,11.607,ok
+fusco_parallel_3mer_core73-91,parallel 3mer 73-91 s42,3,73-91,parallel,42,12.825,ok
+ctrl_coil_3mer,[ctrl] all-coil 3mer,3,200-0,parallel,42,5.777,ok
+ctrl_coil_monomer,[ctrl] all-coil monomer,1,200-0,parallel,42,0.0,ok
+ctrl_trunc_3mer_res60-100,[ctrl] truncated trimer res60-100,3,70-88,parallel,42,16.569,ok

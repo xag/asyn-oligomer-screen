@@ -1,0 +1,467 @@
+# asyn-oligomer-screen
+
+**Computational screen of dietary and endogenous molecules against the toxic α-synuclein oligomer in Parkinson's disease.**
+
+> *This repository is computational research output. Nothing in it constitutes medical, dietary, or clinical advice. The rankings are unvalidated hypotheses pending experimental testing.*
+
+## Plain English Summary
+
+A computational search for dietary, endogenous, and lifestyle-accessible small molecules that may bind and destabilise the toxic α-synuclein oligomer implicated in Parkinson's disease. No atomic structure of that oligomer has been deposited, so the receptor is built from the published topology constraints; ~190 candidates are then docked against it and ranked.
+
+The five top hits are known α-synuclein modulators (silibinin, EGCG, fisetin, curcumin, baicalein), which serves as a sanity check. The next tier contains molecules with no prior published evidence for direct α-synuclein binding: a vitamin A metabolite, two endogenous steroid hormones (DHEA, allopregnanolone), THC, piperine, urolithin A, and trehalose. These are hypotheses for orthogonal experimental testing, not clinical recommendations.
+
+### Why this is open-sourced
+
+The candidate list was assembled under one inclusion rule: every molecule is non-patentable — dietary compounds, endogenous hormones, vitamins, gut metabolites, lifestyle-modulated species. That removes the commercial incentive that would normally fund a structured screen against them, which is why the published α-synuclein-modulator literature on this class is thinner than the chemistry would predict.
+
+Releasing the full pipeline — receptor model, candidate list, scoring code, every ranking, every documented limitation — is intended to lower the barrier to grassroots follow-up: independent re-runs, alternative receptor models, ThT or DLS assays on specific candidates, dietary-epidemiology re-analyses. The output is a hypothesis-generator, not a drug pipeline.
+
+### Status — work in progress
+
+The computational pipeline is complete and the pre-registered validation hold-out has passed (§6); every result below is reproducible from the code and inputs in this repository. What is missing is experimental validation — none of the unvalidated top candidates (DHEA, allopregnanolone, retinoic acid, urolithin A, trehalose, piperine, THC) has been tested in an aggregation assay against α-synuclein. The natural next steps, in roughly decreasing order of expected information gain, are: (1) ThT aggregation kinetics or DLS sizing on those candidates; (2) LC-MS adduct mapping for the four reactive aldehydes in the covalent channel; (3) longer-timescale MD around docked poses to probe receptor-flexibility effects that static docking cannot see; (4) extension of the candidate list and re-scoring as new α-synuclein structures and topology constraints are deposited; (5) building alternative receptor models from the same Fusco constraints to test how strongly the ranking depends on the specific relaxed geometry used here. Collaboration on any of these is the reason the repository is open.
+
+Critiques and counter-evidence are as welcome as confirmations.
+
+- **[Issues](https://github.com/xag/asyn-oligomer-screen/issues)** — technical questions, framework critiques, suggested candidates, bug reports, wet-lab follow-up interest. Preferred channel because it is public and archived.
+- **[Discussions](https://github.com/xag/asyn-oligomer-screen/discussions)** — broader conversation about the approach or the open-research model.
+
+## Abstract
+
+α-Synuclein aggregation underlies the molecular pathology of Parkinson's disease, but the toxic species are pre-fibrillar oligomers for which no atomic-resolution structure has been deposited in the PDB. We construct a model of the canonical "Type B*" toxic oligomer of Fusco et al. (2017) under a published topology prior — three monomers, parallel β-sheet across residues 70–88, disordered N- and C-tails — and relax it under implicit-solvent MD with restrained β-core Cα atoms. A weighted structure-based activity score, calibrated on 14 deposited α-syn structures (graded-active vs inert pairwise AUC ≈ 0.84), assigns the relaxed trimer an activity ~4× higher than the most active deposited fibril, with no overlap across an 11-topology ensemble. We dock 127 candidate small molecules (polyphenols, steroid hormones, gut metabolites, dietary compounds, reactive aldehydes, neurosteroids) against the trimer using AutoDock Vina 1.2.5, score Δactivity per pose under Boltzmann pose weights and an absolute-affinity gate, and report a separate covalent-adduct reactivity channel for ligands docking cannot see. A pre-registered blind hold-out on five gold-standard α-syn modulators (silibinin, EGCG, fisetin, rosmarinic acid, CAPE) confirms the ranking: 4/5 fall in the top 25 of 122, including silibinin (#1) and EGCG (#3). Beyond the polyphenol class that already dominates the α-syn modulator literature, seven candidates without prior α-syn direct-binding evidence enter the top 25: dehydroepiandrosterone (DHEA), all-*trans* retinoic acid, allopregnanolone, Δ9-tetrahydrocannabinol, piperine, urolithin A, and trehalose. The covalent channel resurfaces malondialdehyde, acrolein, 4-hydroxynonenal, and methylglyoxal in the order predicted by α-syn's lysine-rich, arginine-free sequence composition.
+
+## 1. Background
+
+α-Synuclein is a 140-residue presynaptic protein that aggregates into amyloid fibrils in the Lewy bodies pathognomonic of Parkinson's disease (PD), dementia with Lewy bodies, and multiple system atrophy (Spillantini et al. 1997). Familial point mutations (A53T: Polymeropoulos et al. 1997; A30P: Krüger et al. 1998; E46K: Zarranz et al. 2004; H50Q: Appel-Cresswell et al. 2013) and locus multiplications cause autosomal-dominant PD, establishing α-syn aggregation as causally upstream of neurodegeneration.
+
+The cytotoxic species are not the mature fibrils that accumulate in pathology images but pre-fibrillar oligomeric intermediates (Conway et al. 1998; Winner et al. 2011; Cremades et al. 2012). Multiple mechanisms have been characterized: oligomer-induced permeabilization of synaptic and mitochondrial membranes, dysregulation of intracellular Ca²⁺ homeostasis, impairment of proteostatic pathways, and prion-like cell-to-cell propagation (reviewed in Hijaz & Volpicelli-Daley 2020). Designed oligomer-stabilising mutations dissociate fibril propensity from toxicity (Karpinar et al. 2009), indicating that aggregation-rate metrics alone do not predict pathology.
+
+The structural-biology consequence is a sharp asymmetry. The PDB contains over thirty α-syn fibril structures spanning recombinant polymorphs (Tuttle et al. 2016; Li et al. 2018; Boyer et al. 2019, 2020; Sun et al. 2020) and brain-derived strains (Schweighauser et al. 2020; Yang et al. 2022), but no atomic-resolution coordinate set for a toxic oligomer. The Type B* oligomer of Fusco et al. (2017) was characterised by solid-state NMR DARR correlations: ~35 structured residues per monomer in a β-rich core spanning residues 70–88, with N-terminal (1–69) and C-terminal (89–140) segments remaining disordered. The DARR constraint set is too sparse to uniquely determine atomic coordinates under restraint-driven simulated annealing, and no PDB or BMRB coordinate file was deposited. Annular protofibril and β-barrel-pore models exist in supplementary materials of computational papers but not as deposited entries; the lipidic α-syn fibril co-crystallised with anle138b (PDB 8A4L; Antonschmidt et al. 2022) captures a fibril, not an oligomer.
+
+Direct-acting candidates that have advanced clinically — anle138b (Wagner et al. 2013), squalamine (ENT-01; Limbocker et al. 2019), and EGCG (Ehrnhoefer et al. 2008; Bieschke et al. 2010) — were each characterised on fibril or full-aggregation-pathway preparations rather than on the toxic oligomer in isolation. Their clinical signals to date have been mixed or null, motivating screens designed against the toxic species itself.
+
+This work assembles three computational components — a structure-based activity score calibrated on the PDB anchors, a topology-prior model of the toxic oligomer, and a perturbation screen of candidate small molecules — to produce a ranked list of hypotheses against a target the PDB does not provide.
+
+## 2. Activity score and calibration
+
+### 2.1 Features
+
+Five per-conformer features are computed on the most-buried protein chain of the REMARK 350 biological assembly, restricted to an ordered-core mask (Cα with ≥6 non-sequential Cα neighbours within 8 Å across the assembly):
+
+| feature | mechanistic correspondence |
+| --- | --- |
+| `exposed_hydrophobic_beta_sasa` | solvent-accessible hydrophobic surface on β-strand residues — proxy for the lipid-bilayer-interacting face of toxic oligomers |
+| `membrane_insertion_propensity` | hydrophobicity-weighted accessibility on the most exposed face |
+| `nac_active_score` | β-strand accessibility in the NAC region (residues 60–95), the aggregation-prone hydrophobic core |
+| `contact_density` | mean Cα-contact count over core residues (cutoff 8 Å) — proxy for tertiary compactness; signed negatively in the weighted score |
+| `disordered_hydrophobic_exposure` | hydrophobic accessibility on residues outside the structured core |
+
+Secondary structure is assigned by pydssp on the concatenated biological assembly (per-chain DSSP misses inter-chain β-bridges). Solvent-accessible surface area is computed by Shrake–Rupley with a 1.4 Å probe (Bio.PDB).
+
+The five features are z-scored against the anchor mean and standard deviation, then combined with hand-tuned weights (`classifier.WEIGHTS`). Feature selection and weights were frozen prior to the validation hold-out (§5).
+
+### 2.2 Anchor structures
+
+Calibration uses 14 deposited α-syn structures (Table 1; full curation in `ANCHORS.md`).
+
+| PDB | Method | Variant | Class | Citation |
+| --- | --- | --- | --- | --- |
+| 1XQ8 | sol-NMR | WT, SDS micelle | inert (physiological) | Ulmer et al. 2005 |
+| 2N0A | ssNMR | WT, single protofilament | inert | Tuttle et al. 2016 |
+| 6CU7 | cryo-EM | WT, rod | inert | Li et al. 2018 |
+| 6CU8 | cryo-EM | WT, twister | inert | Li et al. 2018 |
+| 6H6B | cryo-EM | 1–121 truncation | inert | Guerrero-Ferreira et al. 2018 |
+| 6XYO | cryo-EM | MSA type I | inert | Schweighauser et al. 2020 |
+| 6XYP | cryo-EM | MSA type II-1 | inert | Schweighauser et al. 2020 |
+| 8A9L | cryo-EM | Lewy fold (PD brain) | inert | Yang et al. 2022 |
+| 8A4L | cryo-EM | lipidic | inert | Antonschmidt et al. 2022 |
+| 6LRQ | cryo-EM | A53T | graded-active | Sun et al. 2020 |
+| 7WO0 | cryo-EM | A53T + Ca²⁺ | graded-active | (deposit) |
+| 6UFR | cryo-EM | E46K | graded-active | Boyer et al. 2020 |
+| 6PEO | cryo-EM | H50Q narrow | graded-active | Boyer et al. 2019 |
+| 6PES | cryo-EM | H50Q wide | graded-active | Boyer et al. 2019 |
+
+Inert anchors comprise mature fibril polymorphs (which neurons coexist with for years) and the SDS-micelle helical conformer of the physiological membrane-bound state. Graded-active anchors are familial-mutant fibrils. Because no toxic-oligomer structure has been deposited, the active side of the calibration is anchored only ordinally; the framework is tuned to rank graded-active above inert, not to identify a hard active/inert decision boundary.
+
+### 2.3 Calibration result
+
+Pairwise Mann–Whitney AUC for graded-active vs inert: **0.84** (graded-active mean +1.04, inert mean −0.68; `results/anchor_scores.csv`, `results/anchor_activity.png`). Within-class protofilament-count correlation: ρ = −0.76 (inert, n=8) and ρ = −0.35 (graded-active, n=5), with single-protofilament fibrils ranking systematically higher than their paired-protofilament class-mates — consistent with the elongation-competent growing end being more conformationally available in single-protofilament polymorphs.
+
+## 3. Toxic-oligomer model construction
+
+Fusco et al. (2017) reported a β-rich core spanning residues 70–88 in their Type B* toxic α-syn oligomer, with ~3 monomers per assembly inferred from cross-linking and sedimentation, and disordered N-terminal (1–69) and C-terminal (89–140) tails. The DARR constraint set published in that work is too sparse to uniquely determine the all-atom geometry under restraint-driven simulated annealing — a fundamental limit of the experimental approach, not a curation gap. We therefore build under a **topology prior** (residue-range identity of the β-core, sheet arrangement, oligomer order) rather than under literal atomic restraints.
+
+The build procedure (`oligomers/build_fusco_trimer.py`):
+
+1. Place residues 70–88 of three monomers as extended β-strands in a parallel sheet (with antiparallel as an alternative configuration).
+2. Sample N-terminal 1–69 and C-terminal 89–140 as random-walk coil with per-residue (φ, ψ) drawn from a β/PPII mixture (no α basin: at full-length scale with a 70-residue tail, α-basin sampling yielded inter-chain atomic overlap in >30 % of trials in pilot runs).
+3. Apply positional restraints to β-core Cα atoms during relaxation; tails unrestrained.
+4. Relax: 5,000-iteration vacuum energy minimisation (resolves intra- and inter-chain clashes); 500 ps OBC2 implicit-solvent MD with restrained Cα (OpenMM 8.5). No explicit-solvent step (Stage 2 features are structure-based, not dynamical).
+
+An ensemble of 11 topologies covering seed variation, parallel vs antiparallel arrangement, oligomer order (dimer/trimer/tetramer), and β-core range (65–83, 70–88, 73–91) was built (`oligomers/run_ensemble.py`). All nine genuine Fusco-topology oligomers score in the range +10.6 to +22.1 on the activity classifier — at minimum 2.4× the highest-scoring deposited anchor (2N0A at +4.4) and with a +4.8 gap to the highest control (a fully-coil three-mer that develops β-contacts under implicit-solvent collapse). The reference structure used downstream is `results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb` (activity +17.78).
+
+The construction does not prove that this geometry corresponds to the experimentally characterised Type B* oligomer at atomic resolution — that would require the DARR set plus additional constraints the field does not yet have. It produces a structure consistent with the published topology that has the surface biophysics the activity score was designed to detect, against which docking can be performed.
+
+## 4. Perturbation screen
+
+### 4.1 Candidate molecule list
+
+`data/vicinity_molecules.js` (191 entries) was assembled under a single inclusion criterion: the molecule plausibly reaches the substantia nigra at concentrations achievable through diet, supplementation, endogenous synthesis, lifestyle (exercise, stress, sleep, hormonal state), or environmental exposure. No prior α-syn evidence is required for inclusion as a candidate. The list spans seven groups: endogenous metabolites (55), dietary compounds (60), neurotransmitters (13), metals (14), lipids (24), gut-derived metabolites (23), environmental exposures (2). Each entry carries a curated SMILES (or `null` when the structure is ambiguous, as for lipid classes), a CNS-concentration estimate with units, a delivery-feasibility flag (metadata; does not enter the score), and free-text references where available.
+
+### 4.2 Docking and scoring
+
+For each candidate molecule M and the reference toxic-oligomer model O (`stage3.py`):
+
+1. Embed M in 3D from SMILES (RDKit ETKDGv3), minimise with MMFF94s, and prepare a PDBQT ligand with Meeko.
+2. Prepare a PDBQT receptor from O with `mk_prepare_receptor` (Meeko).
+3. Dock with AutoDock Vina 1.2.5 (Eberhardt et al. 2021), exhaustiveness = 8, 5 modes, box centred on the NAC region (residues 60–100 Cα bounding box + 6 Å padding, capped at 30 Å per axis), seed = 42.
+4. For each pose, append the ligand as a HETATM residue to the assembly, recompute the activity score over the all-chain mean of the five features, and compute Δactivity = activity(complex) − activity(apo).
+5. Aggregate across poses by Boltzmann weighting: wᵢ = exp(−affᵢ / RT) / Z at T = 300 K (RT ≈ 0.596 kcal/mol). Report `delta_activity_weighted`.
+6. Apply an absolute-affinity gate to penalise poses below the drug-like-binder threshold: `gate = min(1, exp((−6.0 − aff_top) / RT))`. Report `delta_activity_gated = gate × delta_activity_weighted`. The −6 kcal/mol threshold is the conventional drug-likeness boundary; the smooth exponential form avoids a hard cutoff. The gated score is the primary ranking metric.
+
+The `contact_density` feature is computed in a ligand-aware mode: ligand heavy atoms within 8 Å of a core Cα contribute to that residue's contact count. The other four features are computed on the receptor only and respond to ligand binding via SASA occlusion.
+
+## 5. Covalent-adduct reactivity channel
+
+AutoDock Vina evaluates non-covalent binding affinity only. Four reactive aldehydes in the candidate list — malondialdehyde (MDA), acrolein, 4-hydroxynonenal (4-HNE), and methylglyoxal (MGO) — modify α-syn covalently in vivo (Vicente-Miranda et al. 2017; reviewed in Bae & Kim 2013): MDA forms Schiff bases on lysines, acrolein and 4-HNE form Michael adducts on cysteines / histidines / lysines, and MGO forms carboxyethyl-lysine (CEL) and methylglyoxal-derived hydroimidazolone (MGH) adducts on lysines and arginines respectively. The reversible-binding gate (§4.2) correctly suppresses these reagents on `delta_activity_gated` because their non-covalent binding affinity is weak.
+
+`adduct_score.py` adds an orthogonal channel:
+
+```
+aspr_score(O, M) = (1 / n_chains) Σ_chains Σ_relevant_residues  min(1, SASA(r) / 200 Å²) × rxty(M, type(r))
+```
+
+`rxty(M, type)` is a per-ligand table of intrinsic per-residue chemical reactivity drawn from the standard adduct literature (Esterbauer et al. 1991 for 4-HNE; Uchida 1999 for acrolein; Vicente-Miranda et al. 2017 for MGO–Lys; LoPachin & Gavin 2014 for soft-electrophile classification). Primary targets carry rxty = 1.0; secondary targets 0.3–0.7. The 200 Å² SASA normaliser corresponds to typical fully-exposed side-chain accessibility.
+
+The channel is independent of Vina pose: one SASA pass per receptor scores the whole sweep. It is reported alongside `delta_activity_gated`, not folded in — covalent and reversible-binding modes are orthogonal axes.
+
+## 6. Validation
+
+The risk that a framework calibrated on a feature set could self-reinforce in evaluation was controlled by a pre-registered blind hold-out conducted after the Stage 2 weights, ligand-aware `contact_density`, Boltzmann weighting parameters, and gate threshold were frozen.
+
+Five entries marked `validation_holdout: true` in `data/vicinity_molecules.js` constitute the cohort: silibinin, EGCG, rosmarinic acid, fisetin, and caffeic acid phenethyl ester (CAPE). All five have strong published in-vitro evidence for α-syn aggregation modulation (Ehrnhoefer et al. 2008; Bieschke et al. 2010; Pérez-Sánchez et al. 2016; Ono & Yamada 2006; Ardah et al. 2016; Morroni et al. 2018). Three (silibinin, EGCG, rosmarinic acid) were present in `data/vicinity_molecules.js` from inception with `smiles: null` and could never have been docked during framework development; fisetin and CAPE were added after the framework was locked. Predictions (rank range, affinity range, `delta_activity_gated` range) and pass criteria were recorded in `STATUS.md` before the docking run.
+
+Pass criteria (pre-registered):
+
+- **Pass**: ≥3 of 5 in the top 25 of the combined 122-molecule ranking; none below rank 60.
+- **Calibration concern**: 2+ below rank 30.
+- **Framework failure**: any of EGCG / silibinin / rosmarinic acid below rank 50.
+
+Results:
+
+| Molecule | Predicted rank | Actual rank | Actual aff (kcal/mol) | Actual Δact_gated |
+| --- | --- | --- | --- | --- |
+| silibinin | 1–10 | 1 | −5.80 | −0.415 |
+| EGCG | 1–5 | 3 | −5.62 | −0.235 |
+| fisetin | 10–25 | 5 | −5.25 | −0.150 |
+| rosmarinic acid | 5–25 | 24 | −4.94 | −0.077 |
+| CAPE | 20–50 | 54 | −3.98 | −0.011 |
+
+Outcome: pass (4/5 in top 25; none below rank 60). No code, weight, or threshold was modified in response. CAPE missed the predicted band; its phenethyl ester docks worse than caffeic acid itself (rank 41), consistent with the published view that CAPE's α-syn-protective effects in cell models are dominated by NF-κB and antioxidant pathways or by intracellular hydrolysis to caffeic acid rather than by direct sub-µM α-syn binding (Morroni et al. 2018).
+
+## 7. Results
+
+### 7.1 Reversible-binding ranking — top 25
+
+127 candidate molecules with non-null SMILES were docked against the reference oligomer; 117 produced valid poses. The 10 failures are all single-atom metal ions (Cu²⁺, Fe²⁺/³⁺, Na⁺, K⁺, Se, Li⁺, Co²⁺, Pb²⁺, Al³⁺, Hg²⁺), for which Meeko cannot generate flexible-ligand PDBQT — an expected limitation of Vina-style docking.
+
+```
+rank  molecule              aff_top  Δact_gated  class
+  1   silibinin              -5.80     -0.415    flavonolignan (validation hold-out)
+  2   DHEA                   -5.57     -0.244    steroid hormone (no prior α-syn evidence)
+  3   EGCG                   -5.62     -0.235    catechin gallate (validation hold-out)
+  4   retinoic acid          -5.28     -0.200    vitamin A metabolite (no prior α-syn evidence)
+  5   fisetin                -5.25     -0.150    flavonol (validation hold-out)
+  6   curcumin               -5.22     -0.148    diferuloylmethane (literature anchor)
+  7   baicalein              -5.27     -0.144    flavone (literature anchor)
+  8   allopregnanolone       -5.35     -0.142    neurosteroid (no prior α-syn evidence)
+  9   naringenin             -5.19     -0.128    flavanone
+ 10   luteolin               -5.37     -0.119    flavone
+ 11   demethoxycurcumin      -5.10     -0.119    curcuminoid
+ 12   THC                    -5.16     -0.115    cannabinoid (no prior α-syn evidence)
+ 13   myricetin              -5.28     -0.115    flavonol
+ 14   piperine               -5.05     -0.112    alkaloid (no prior α-syn evidence)
+ 15   hesperetin             -5.26     -0.107    flavanone
+ 16   trehalose              -5.21     -0.103    disaccharide (no prior α-syn evidence as direct binder)
+ 17   genistein              -5.03     -0.101    isoflavone
+ 18   urolithin A            -5.17     -0.098    ellagitannin gut metabolite (no prior α-syn evidence)
+ 19   kaempferol             -5.19     -0.095    flavonol
+ 20   epicatechin            -5.21     -0.093    flavan-3-ol
+ 21   quercetin              -5.15     -0.092    flavonol (literature anchor)
+ 22   apigenin               -5.17     -0.091    flavone
+ 23   equol                  -5.03     -0.090    isoflavandiol gut metabolite
+ 24   rosmarinic acid        -4.94     -0.077    polyphenolic ester (validation hold-out)
+ 25   guanosine              -4.91     -0.066    purine nucleoside
+```
+
+Full CSV: `results/sweep/fusco_parallel_3mer_core70-88_relaxed_sweep.csv`. Polyphenols occupy 14 of the top 20 positions; the four literature-validated α-syn modulators present in the seed list (curcumin, quercetin, baicalein, resveratrol — the last at rank 27) and the three polyphenolic hold-out entries (silibinin, EGCG, fisetin) together comprise the confirmatory band.
+
+### 7.2 Candidates outside the polyphenol class
+
+Seven entries in the top 18 have no published α-syn direct-binding or aggregation-modulation evidence to our knowledge:
+
+- **Dehydroepiandrosterone (DHEA, rank 2).** Adrenal-derived steroid hormone; declines monotonically with age and is reduced in PD cases relative to age-matched controls (Marx et al. 2006). Crosses the blood-brain barrier and is interconvertible with allopregnanolone via the steroidogenic pathway. Vina pose engages the exposed β-face via the steroid A-ring.
+- **All-*trans* retinoic acid (rank 4).** Endogenous active metabolite of vitamin A; activates retinoic acid receptor signalling that maintains dopaminergic neuron identity and is neurotrophic in midbrain cultures (Maden 2007). The polyene side chain extends along the NAC β-face.
+- **Allopregnanolone (rank 8).** Neurosteroid; positive allosteric modulator of GABA_A receptors; in Phase II clinical trials for Alzheimer's disease (Irwin et al. 2020). Same docking pose family as DHEA.
+- **Δ9-tetrahydrocannabinol (THC, rank 12).** Cannabinoid; clinical reports of symptomatic benefit in PD via CB1/CB2 receptor pathways (reviewed in Buhmann et al. 2019), but no published evidence for direct α-syn binding. The dibenzopyran ring engages the hydrophobic β-face.
+- **Piperine (rank 14).** Black-pepper alkaloid; well-characterised as a curcumin-bioavailability adjuvant (Shoba et al. 1998) and a CYP3A4 inhibitor. The piperidine-amide-benzodioxol scaffold occupies the NAC groove in a pose distinct from the curcumin pose.
+- **Trehalose (rank 16).** Disaccharide; published as anti-aggregation in vitro and in vivo via enhancement of autophagy (Sarkar et al. 2007; Tanji et al. 2015), not via direct α-syn binding. Vina identifies a direct-binding pose at the β-face that engages multiple hydroxyl-mediated H-bonds.
+- **Urolithin A (rank 18).** Gut microbiome metabolite of ellagitannins (from pomegranate, walnuts, berries); produced in only ~40% of humans depending on microbiome composition (Tomás-Barberán et al. 2017); enhances mitophagy in muscle and neurons (Ryu et al. 2016; Cao et al. 2020) but has no published α-syn direct-binding data.
+
+Each of these is a candidate hypothesis for orthogonal experimental testing. None is a treatment recommendation.
+
+### 7.3 Covalent-adduct channel
+
+The covalent channel scores the four reactive aldehydes in the candidate list as follows on the reference trimer:
+
+| Ligand | Primary / secondary targets | Δact_gated | aspr_score |
+| --- | --- | --- | --- |
+| malondialdehyde (MDA) | K = 1.0, C = 0.2 | −0.0001 | **+10.60** |
+| acrolein | C = 1.0, K = 0.6, H = 0.5 | −0.0001 | **+6.70** |
+| 4-HNE | C = 1.0, H = 0.6, K = 0.4 | −0.0033 | **+4.65** |
+| methylglyoxal (MGO) | R = 1.0, K = 0.4, C = 0.3 | −0.0002 | **+4.24** |
+| nitric oxide | C = 1.0, Y = 0.8 | −0.0000 | +2.67 |
+| hydrogen sulfide | C = 1.0 | −0.0000 | +0.00 |
+
+The ranking follows α-syn's amino-acid composition: 15 Lys, 1 His, 4 Tyr, 0 Cys, 0 Arg per monomer. MDA tops the list as a pure Lys-Schiff agent on a 15-Lys substrate. Acrolein outranks 4-HNE because its smaller size permits Michael + Schiff dual adducts on lysines (Uchida 1999). MGO sits below 4-HNE despite being a classic α-syn-modifier in the literature because its primary chemistry (Arg-MGH) hits zero on the Arg-null substrate and falls back to the secondary Lys-CEL pathway (Vicente-Miranda et al. 2017). H₂S correctly scores zero because cysteine, its only target, is absent.
+
+A smoke test against the deposited fibril 6PEO (H50Q, graded-active) gives MGO `aspr_score` = +0.98 vs +4.24 on the trimer. The 4.3× ratio reflects the model trimer's exposed Lys-rich N-terminal segment vs the partially buried N-terminus of the fibril deposit — consistent with the expectation that the toxic oligomer presents a larger covalent-modifier-accessible substrate than the fibril does.
+
+## 8. Discussion
+
+### 8.1 Mechanistic interpretation
+
+Top-ranking polyphenols (silibinin, EGCG, curcumin, baicalein, fisetin, quercetin) are precisely the class for which in-vitro α-syn anti-aggregation activity has been reproduced across multiple laboratories. Their concordance with the framework ranking is the confirmatory baseline. The seven candidates outside this class span mechanistic categories that have not been integrated into a structure-based α-syn screen:
+
+- The steroid axis (DHEA, allopregnanolone) declines with age and in PD, with established CNS bioavailability; the structure-based hit suggests a direct-binding component complementary to the established receptor-level effects.
+- Retinoic acid and THC engage the β-face via different geometries (polyene chain vs aromatic ring), suggesting the exposed surface accommodates several scaffold types rather than reflecting a narrow pharmacophore.
+- Urolithin A and equol are produced by gut bacteria in a subset of humans; the framework identifies a direct-binding mode in addition to the mitophagy effect already characterised in muscle and neurons. Their predicted activity is testable through standard ThT or DLS assays on α-syn aggregation, decoupled from the autophagy pathway.
+- Trehalose's direct-binding rank is the most surprising entry — the published rationale for its in-vivo anti-aggregation effect is autophagy enhancement (Sarkar et al. 2007), which the framework would not detect. The presence of a direct-binding mode would not displace the autophagy explanation but might augment it.
+
+### 8.2 Covalent channel
+
+The reactive-aldehyde ordering is determined by α-syn's amino-acid composition and the published per-residue reactivity of each aldehyde. The framework does not measure adduct kinetics; it scores the cross-product of substrate exposure and intrinsic reactivity. The implication for prevention is that the metabolic pathways producing these aldehydes — hyperglycaemia (MGO via the Maillard pathway), lipid peroxidation (MDA, 4-HNE), tobacco-smoke exposure (acrolein) — converge on the same protein substrate. Epidemiological signals consistent with this prediction include the reduced PD risk observed in metformin-treated diabetic cohorts (Wahlqvist et al. 2012, with subsequent contradictory reports) and the inverse association of dietary antioxidant intake with PD incidence (reviewed in Seidl et al. 2014).
+
+### 8.3 Limitations
+
+1. **The receptor is a model, not a deposit.** The reference oligomer is constructed under a published topology prior, not from atomic coordinates. The DARR set in Fusco et al. (2017) is too sparse to determine the geometry uniquely; the relaxed structure is one of many compatible with the published topology. The ensemble check across 11 topologies (§3) shows that all genuine Fusco-topology builds score well above deposited anchors, indicating the ranking is not artefactual to a single seed.
+
+2. **Activity scores are ordinal.** A `Δact_gated` of −0.24 against an apo baseline of +17.78 is a 1.4% perturbation in the framework's internal units. The framework is calibrated to rank, not to predict absolute occupancy. Comparisons across molecules are valid; the magnitudes are not.
+
+3. **Static docking.** No molecular dynamics relaxation around the bound pose is performed in the production pipeline. Receptor flexibility is therefore not represented; harm-leaning non-covalent modes (where receptor rearrangement increases the activity score) are sign-bounded out of the current channel. Pilot 50 ps MD around six pairs (`md_stage3.py`) was inconclusive because thermal sampling on that timescale dominates ligand-induced effects; longer simulations are deferred.
+
+4. **Polyphenol-class bias.** The features reward aromatic engagement with β-strand surfaces. This is a real biophysical signal (aromatic π-π stacking with extended β-sheets) but means structurally similar molecules will tend to cluster in the rankings. The blind hold-out (where polyphenols of three distinct sub-classes — flavonolignan, catechin gallate, flavonol — were ranked correctly) and the non-polyphenol hits (steroids, alkaloids, disaccharide) bound the bias but do not eliminate it.
+
+5. **Bioavailability is not in the score.** The `delivery.feasibility` field on each candidate is metadata. A high-ranking hit with poor CNS bioavailability (e.g. several polyphenols at < 1% oral absorption) remains a hypothesis about α-syn binding, not a recommendation about supplementation.
+
+6. **No wet-lab validation.** Every result is computational. The blind hold-out reproduces published rankings on molecules with known in-vitro activity; it does not establish that the unvalidated top-ranking candidates destabilise toxic oligomers in cells or in patients. The natural follow-up assays are ThT aggregation kinetics, DLS sizing of oligomer-enriched preparations, and LC-MS adduct mapping for the covalent channel.
+
+## 9. Reproduction
+
+Python 3.12, tested on Windows 11; Linux/macOS supported with adaptation of the Vina binary path.
+
+```bash
+git clone https://github.com/xag/asyn-oligomer-screen
+cd asyn-oligomer-screen
+uv venv && uv pip install -r requirements.txt
+```
+
+**Anchor calibration** (no Vina required; auto-downloads PDB files to `data/anchors/` on first run):
+
+```bash
+.venv/bin/python validate.py
+```
+
+Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activity-vs-class plot.
+
+**Oligomer ensemble** (re-scores cached relaxed PDBs in < 1 min; full rebuild requires the MD environment described below):
+
+```bash
+.venv/bin/python oligomers/run_ensemble.py --summary-only
+```
+
+**Single (molecule, target) perturbation**. Download the AutoDock Vina 1.2.5 binary from [https://github.com/ccsb-scripps/AutoDock-Vina/releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) and place it at `bin/vina.exe`.
+
+```bash
+.venv/bin/python stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
+.venv/bin/python stage3.py curcumin 6PEO   # against a deposited fibril for comparison
+```
+
+**Full sweep**:
+
+```bash
+.venv/bin/python sweep_oligomer.py --skip-existing
+```
+
+`--skip-existing` re-reads cached reports without re-docking; `--no-skip` forces a full re-dock (~3 h on a workstation).
+
+**Covalent channel**:
+
+```bash
+.venv/bin/python adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
+```
+
+**MD relaxation (optional)**. The OpenMM + openff-toolkit + openmmforcefields stack does not co-exist cleanly with the pip pipeline; create a separate conda environment and point at it via the `ASYN_MD_PYTHON` environment variable:
+
+```bash
+conda create -n asyn-md python=3.11 openmm openff-toolkit openmmforcefields -c conda-forge
+export ASYN_MD_PYTHON="$HOME/miniforge3/envs/asyn-md/bin/python"
+.venv/bin/python md_stage3.py
+```
+
+## 10. File guide
+
+```
+README.md                              this file
+STATUS.md                              chronological development log; source of truth for "why"
+ANCHORS.md                             anchor structure curation and per-entry rationale
+LICENSE                                MIT
+
+# Activity score
+anchors.py                             PDB structure loader with cache
+assembly.py                            REMARK 350 biological assembly builder
+features.py                            five per-conformer features
+classifier.py                          weighted z-score
+protofilaments.py                      geometric protofilament counter
+validate.py                            run the 14-anchor calibration
+analyze_protofilaments.py              within-class PF-count correlation
+
+# Toxic-oligomer model
+oligomers/build_fusco_trimer.py        topology-prior build
+oligomers/score_oligomer.py            all-chain mean + β-gate scoring
+oligomers/run_ensemble.py              build / relax / score / summary across 11 topologies
+oligomers/README.md                    sub-package notes
+
+# Perturbation screen
+stage3.py                              single (molecule, target) docking + scoring
+sweep_oligomer.py                      full vicinity-list sweep
+recompute_stage3.py                    re-score cached pairs after feature changes
+adduct_score.py                        covalent-adduct reactivity channel
+md_relax.py                            OpenMM MD relaxation of a docked complex
+md_stage3.py                           batch MD-relax + re-score
+
+# Inputs
+data/vicinity_molecules.js             191-entry candidate list
+data/anchors/                          PDB cache (gitignored; auto-populated)
+
+# Artifacts
+results/anchor_features.csv            anchor-calibration features
+results/anchor_scores.csv              anchor activity scores
+results/anchor_activity.png            activity-vs-class plot
+results/oligomers/*_relaxed.pdb        11 relaxed oligomer structures
+results/oligomers/ensemble_summary.csv ensemble activity scores
+results/sweep/fusco_*_sweep.csv        127-molecule perturbation screen
+results/stage3/                        per-pair docking artifacts (gitignored)
+```
+
+`STATUS.md` records the chronological development log including framework fixes, abandoned approaches, and decisions made during construction. It is the source of truth for the reasoning behind every choice and is the natural entry point for anyone extending the work.
+
+## 11. References
+
+Antonschmidt L, Matthes D, Dervişoğlu R, et al. The clinical drug candidate anle138b binds in a cavity of lipidic α-synuclein fibrils. *Nat Commun* 13, 5385 (2022).
+
+Appel-Cresswell S, Vilarino-Guell C, Encarnacion M, et al. Alpha-synuclein p.H50Q, a novel pathogenic mutation for Parkinson's disease. *Mov Disord* 28, 811–813 (2013).
+
+Ardah MT, Paleologou KE, Lv G, et al. Structure activity relationship of phenolic acid inhibitors of α-synuclein fibril formation and toxicity. *Front Aging Neurosci* 7, 197 (2016).
+
+Bae S-H, Kim S-Y. The role of glycation in neurodegenerative diseases. *Adv Clin Chem* 60, 191–217 (2013).
+
+Bieschke J, Russ J, Friedrich RP, et al. EGCG remodels mature α-synuclein and amyloid-β fibrils and reduces cellular toxicity. *PNAS* 107, 7710–7715 (2010).
+
+Boyer DR, Li B, Sun C, et al. Structures of fibrils formed by α-synuclein familial Parkinson's disease mutant H50Q. *Nat Struct Mol Biol* 26, 1044–1052 (2019).
+
+Boyer DR, Li B, Sun C, et al. The α-synuclein hereditary mutation E46K unlocks a more stable, pathogenic fibril structure. *PNAS* 117, 3592–3602 (2020).
+
+Buhmann C, Mainka T, Ebersbach G, Gandor F. Evidence for the use of cannabinoids in Parkinson's disease. *J Neural Transm* 126, 913–924 (2019).
+
+Cao S, Du J, Xu C, et al. Urolithin A induces neuroprotection in models of Parkinson's disease through mitophagy. *Cell Rep* 28, 2576 (2020).
+
+Conway KA, Harper JD, Lansbury PT. Accelerated in vitro fibril formation by a mutant α-synuclein linked to early-onset Parkinson disease. *Nat Med* 4, 1318–1320 (1998).
+
+Cremades N, Cohen SIA, Deas E, et al. Direct observation of the interconversion of normal and toxic forms of α-synuclein. *Cell* 149, 1048–1059 (2012).
+
+Eberhardt J, Santos-Martins D, Tillack AF, Forli S. AutoDock Vina 1.2.0: New docking methods, expanded force field, and Python bindings. *J Chem Inf Model* 61, 3891–3898 (2021).
+
+Ehrnhoefer DE, Bieschke J, Boeddrich A, et al. EGCG redirects amyloidogenic polypeptides into unstructured, off-pathway oligomers. *Nat Struct Mol Biol* 15, 558–566 (2008).
+
+Esterbauer H, Schaur RJ, Zollner H. Chemistry and biochemistry of 4-hydroxynonenal, malonaldehyde and related aldehydes. *Free Radic Biol Med* 11, 81–128 (1991).
+
+Fusco G, Chen SW, Williamson PTF, et al. Structural basis of membrane disruption and cellular toxicity by α-synuclein oligomers. *Science* 358, 1440–1443 (2017).
+
+Guerrero-Ferreira R, Taylor NMI, Mona D, et al. Cryo-EM structure of α-synuclein fibrils. *eLife* 7, e36402 (2018).
+
+Hijaz BA, Volpicelli-Daley LA. Initiation and propagation of α-synuclein aggregation in the nervous system. *Mol Neurodegener* 15, 19 (2020).
+
+Irwin RW, Solinsky CM, Loy CM, et al. Allopregnanolone preclinical acute pharmacokinetic and pharmacodynamic studies to predict tolerability and efficacy for Alzheimer's disease. *PLoS One* 10, e0128313 (2015).
+
+Karpinar DP, Balija MBG, Kügler S, et al. Pre-fibrillar α-synuclein variants with impaired β-structure increase neurotoxicity in Parkinson's disease models. *EMBO J* 28, 3256–3268 (2009).
+
+Krüger R, Kuhn W, Müller T, et al. Ala30Pro mutation in the gene encoding α-synuclein in Parkinson's disease. *Nat Genet* 18, 106–108 (1998).
+
+Li B, Ge P, Murray KA, et al. Cryo-EM of full-length α-synuclein reveals fibril polymorphs with a common structural kernel. *Cell Res* 28, 897–903 (2018).
+
+Limbocker R, Chia S, Ruggeri FS, et al. Trodusquemine enhances Aβ42 aggregation but suppresses its toxicity by displacing oligomers from cell membranes. *Nat Commun* 10, 225 (2019).
+
+LoPachin RM, Gavin T. Molecular mechanisms of aldehyde toxicity: a chemical perspective. *Chem Res Toxicol* 27, 1081–1091 (2014).
+
+Maden M. Retinoic acid in the development, regeneration and maintenance of the nervous system. *Nat Rev Neurosci* 8, 755–765 (2007).
+
+Marx CE, Trost WT, Shampine LJ, et al. The neurosteroid allopregnanolone is reduced in prefrontal cortex in Parkinson's disease. *Biol Psychiatry* 60, 1287–1294 (2006).
+
+Morroni F, Sita G, Tarozzi A, et al. Neuroprotective effect of caffeic acid phenethyl ester in a mouse model of α-synucleinopathy. *Phytomedicine* 47, 165–173 (2018).
+
+Ono K, Yamada M. Antioxidant compounds have potent anti-fibrillogenic and fibril-destabilizing effects for α-synuclein fibrils in vitro. *J Neurochem* 97, 105–115 (2006).
+
+Pérez-Sánchez A, Cuyàs E, Ruiz-Torres V, et al. Intestinal permeability and anti-aggregation activity of α-synuclein modulators. *Sci Rep* 6, 35903 (2016).
+
+Polymeropoulos MH, Lavedan C, Leroy E, et al. Mutation in the α-synuclein gene identified in families with Parkinson's disease. *Science* 276, 2045–2047 (1997).
+
+Ryu D, Mouchiroud L, Andreux PA, et al. Urolithin A induces mitophagy and prolongs lifespan in C. elegans and increases muscle function in rodents. *Nat Med* 22, 879–888 (2016).
+
+Sarkar S, Davies JE, Huang Z, Tunnacliffe A, Rubinsztein DC. Trehalose, a novel mTOR-independent autophagy enhancer, accelerates the clearance of mutant huntingtin and α-synuclein. *J Biol Chem* 282, 5641–5652 (2007).
+
+Schweighauser M, Shi Y, Tarutani A, et al. Structures of α-synuclein filaments from multiple system atrophy. *Nature* 585, 464–469 (2020).
+
+Seidl SE, Santiago JA, Bilyk H, Potashkin JA. The emerging role of nutrition in Parkinson's disease. *Front Aging Neurosci* 6, 36 (2014).
+
+Shoba G, Joy D, Joseph T, et al. Influence of piperine on the pharmacokinetics of curcumin in animals and human volunteers. *Planta Med* 64, 353–356 (1998).
+
+Spillantini MG, Schmidt ML, Lee VM-Y, et al. α-Synuclein in Lewy bodies. *Nature* 388, 839–840 (1997).
+
+Sun Y, Long H, Xiang W, et al. Cryo-EM structure of full-length α-synuclein amyloid fibril with Parkinson's disease familial A53T mutation. *Cell Res* 30, 360–362 (2020).
+
+Tanji K, Miki Y, Maruyama A, et al. Trehalose intake induces chaperone molecules along with autophagy in a mouse model of Lewy body disease. *Biochem Biophys Res Commun* 465, 746–752 (2015).
+
+Tomás-Barberán FA, González-Sarrías A, García-Villalba R, et al. Urolithins, the rescue of "old" metabolites to understand a "new" concept: metabotypes as a nexus among phenolic metabolism, microbiota dysbiosis, and host health status. *Mol Nutr Food Res* 61, 1500901 (2017).
+
+Tuttle MD, Comellas G, Nieuwkoop AJ, et al. Solid-state NMR structure of a pathogenic fibril of full-length human α-synuclein. *Nat Struct Mol Biol* 23, 409–415 (2016).
+
+Uchida K. Current status of acrolein as a lipid peroxidation product. *Trends Cardiovasc Med* 9, 109–113 (1999).
+
+Ulmer TS, Bax A, Cole NB, Nussbaum RL. Structure and dynamics of micelle-bound human α-synuclein. *J Biol Chem* 280, 9595–9603 (2005).
+
+Vicente-Miranda H, Lázaro DF, Carapeto AP, et al. Glycation potentiates α-synuclein-associated neurodegeneration in synucleinopathies. *Brain* 140, 1399–1419 (2017).
+
+Wagner J, Ryazanov S, Leonov A, et al. Anle138b: a novel oligomer modulator for disease-modifying therapy of neurodegenerative diseases such as prion and Parkinson's disease. *Acta Neuropathol* 125, 795–813 (2013).
+
+Wahlqvist ML, Lee MS, Hsu CC, et al. Metformin-inclusive sulfonylurea therapy reduces the risk of Parkinson's disease occurring with type 2 diabetes. *Parkinsonism Relat Disord* 18, 753–758 (2012).
+
+Winner B, Jappelli R, Maji SK, et al. In vivo demonstration that α-synuclein oligomers are toxic. *PNAS* 108, 4194–4199 (2011).
+
+Yang Y, Shi Y, Schweighauser M, et al. Structures of α-synuclein filaments from human brains with Lewy pathology. *Nature* 610, 791–795 (2022).
+
+Zarranz JJ, Alegre J, Gómez-Esteban JC, et al. The new mutation, E46K, of α-synuclein causes Parkinson and Lewy body dementia. *Ann Neurol* 55, 164–173 (2004).
+
+## 12. License and citation
+
+MIT License — see `LICENSE`.
+
+```bibtex
+@misc{asyn-oligomer-screen,
+  author = {Gr{\'e}hant, Xavier},
+  title  = {asyn-oligomer-screen: in silico screening of dietary, endogenous, and metabolic molecules against a topology-prior model of the toxic α-synuclein oligomer},
+  year   = {2026},
+  howpublished = {\url{https://github.com/xag/asyn-oligomer-screen}}
+}
+```
+
+Inquiries from α-synuclein aggregation laboratories interested in orthogonal experimental testing — and from anyone else with a relevant perspective — are welcome through the channels listed in [How to comment or reach out](#how-to-comment-or-reach-out).

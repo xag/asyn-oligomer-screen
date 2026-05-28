@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Vina binary (download once from upstream release page)
+bin/vina*
+
+# PDB cache (auto-populated from RCSB on first run)
+data/anchors/
+
+# Per-pair Stage 3 artifacts — regenerable, large, many
+results/stage3/*.pdb
+results/stage3/*.pdbqt
+results/stage3/*.log
+# Keep the JSON reports if a contributor wants to inspect them; they are small.
+# To exclude reports too, uncomment:
+# results/stage3/*.json
+
+# Run logs
+results/_logs/
+
+# Per-topology oligomer build/relax logs (the relaxed PDBs are kept)
+results/oligomers/_*.log
+results/oligomers/*.log
+# The unrelaxed intermediates can be regenerated from the build script
+results/oligomers/fusco_*_3mer_core*.pdb
+!results/oligomers/*_relaxed.pdb
+
+# Conda env / lockfiles
+*.lock
+environment.yml.local
+
+# Misc transient
+*.tmp
+*.bak

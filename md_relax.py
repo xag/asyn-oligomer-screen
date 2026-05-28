@@ -1,0 +1,717 @@
+"""MD relaxation of a Stage 3 docked complex (OpenMM + OpenFF).
+
+Runs INSIDE a conda env with OpenMM + openff-toolkit + openmmforcefields
+installed (the interpreter is pointed at via the ASYN_MD_PYTHON env var;
+see README.md). Cannot be imported from the pip venv that runs the rest
+of the pipeline (those packages aren't installed there). `stage3.py` and
+`md_stage3.py` invoke this script via subprocess.
+
+Inputs:
+  --complex-pdb   apo + docked LIG on chain Z (what stage3 emits as
+                  `<pair>_complex.pdb`)
+  --ligand-smiles  SMILES used to dock the ligand; needed to assign
+                   bond orders to the docked PDB block
+  --out-pdb       where to write the relaxed protein + ligand PDB
+
+Defaults to 100 ps total equilibration (NVT + NPT) + 100 ps production
+NPT at 300 K, 1 atm, TIP3P, 0.15 M NaCl, 1 nm padding, 2 fs steps with
+HBonds constraints. Bumpable via flags.
+
+The point of this step is the same as STATUS.md "Recommended next moves
+#1": MD relaxation around the docked pose so the receptor side-chains
+and backbone can rearrange, which is the only mechanism through which
+Δactivity can flip positive under the Stage 2 feature weights
+(static-pose features only ever subtract from activity).
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+
+import openmm
+import openmm.app as app
+import openmm.unit as u
+from pdbfixer import PDBFixer
+
+from openff.toolkit import ForceField as OFFForceField, Molecule
+from openff.toolkit.utils.nagl_wrapper import NAGLToolkitWrapper
+
+from openmmforcefields.generators import SMIRNOFFTemplateGenerator
+
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+
+NAGL_MODEL = "openff-gnn-am1bcc-0.1.0-rc.3.pt"
+OFF_FF = "openff-2.2.0.offxml"
+
+LIGAND_CHAIN = "Z"
+LIGAND_RESNAME = "LIG"
+
+
+# -----------------------------------------------------------------------------
+# Split a complex PDB into protein-only and ligand-only PDB blocks.
+# -----------------------------------------------------------------------------
+
+def split_complex_pdb(complex_pdb: Path) -> tuple[str, str]:
+    """Return (protein_pdb_text, ligand_pdb_text). Splits on chain Z LIG."""
+    prot_lines: list[str] = []
+    lig_lines: list[str] = []
+    for raw in complex_pdb.read_text(encoding="utf-8").splitlines():
+        if raw.startswith(("ATOM", "HETATM", "TER")):
+            chain = raw[21:22]
+            if chain == LIGAND_CHAIN:
+                if raw.startswith("HETATM") or raw.startswith("ATOM"):
+                    lig_lines.append(raw)
+                # drop TER on Z (we wrap it ourselves)
+            else:
+                prot_lines.append(raw)
+        elif raw.startswith(("HEADER", "CRYST1", "REMARK")):
+            prot_lines.append(raw)
+        # END / others: drop, we wrap our own
+    prot_text = "\n".join(prot_lines) + "\nEND\n"
+    lig_text = "\n".join(lig_lines) + "\nEND\n"
+    return prot_text, lig_text
+
+
+def load_apo_pdb(apo_pdb: Path) -> str:
+    """Return protein-only PDB text from an apo PDB file (no LIG chain).
+    Used for the apo-MD baseline."""
+    lines: list[str] = []
+    for raw in apo_pdb.read_text(encoding="utf-8").splitlines():
+        if raw.startswith(("ATOM", "HETATM", "TER", "HEADER", "CRYST1", "REMARK")):
+            lines.append(raw)
+    return "\n".join(lines) + "\nEND\n"
+
+
+# -----------------------------------------------------------------------------
+# Build a properly bonded ligand RDKit Mol from (PDB block, reference SMILES).
+# The PDB block has only heavy atoms + a couple of polar Hs (Vina output) and
+# no CONECT records. We rely on RDKit's distance-based bond perception, then
+# transplant bond orders + formal charges from the SMILES template, then add
+# the missing hydrogens back with sensible 3D positions.
+# -----------------------------------------------------------------------------
+
+def ligand_from_pdb_and_smiles(ligand_pdb_text: str, smiles: str) -> Chem.Mol:
+    # Strip the PDB-block Hs — AssignBondOrdersFromTemplate matches heavy atoms.
+    pdb_mol_with_h = Chem.MolFromPDBBlock(ligand_pdb_text, removeHs=False, sanitize=False)
+    if pdb_mol_with_h is None:
+        raise ValueError("RDKit could not parse the ligand PDB block")
+    pdb_mol = Chem.RemoveHs(pdb_mol_with_h, sanitize=False)
+
+    template = Chem.MolFromSmiles(smiles)
+    if template is None:
+        raise ValueError(f"RDKit could not parse SMILES {smiles!r}")
+
+    fixed = AllChem.AssignBondOrdersFromTemplate(template, pdb_mol)
+    fixed = Chem.AddHs(fixed, addCoords=True)
+    # Light MMFF cleanup of H positions only — heavy atoms are frozen at the
+    # docked coords so the pose stays put while Hs settle into a sane geometry.
+    AllChem.MMFFOptimizeMolecule(fixed, maxIters=200)
+    # Drop per-atom PDB monomer info. AddHs leaves the new H atoms with no
+    # MonomerInfo, which makes openff.toolkit.Molecule.from_rdkit split the
+    # molecule into multiple residues (one per metadata cluster) on the way
+    # to OpenMM Topology — and SMIRNOFFTemplateGenerator then can't match
+    # the partial residue. Clearing the info forces a single-residue topology.
+    for atom in fixed.GetAtoms():
+        atom.SetMonomerInfo(None)
+    return fixed
+
+
+# -----------------------------------------------------------------------------
+# Build an OpenFF Molecule with NAGL charges from an RDKit Mol.
+# -----------------------------------------------------------------------------
+
+def offmol_from_rdkit(rdkit_mol: Chem.Mol) -> Molecule:
+    off = Molecule.from_rdkit(rdkit_mol, allow_undefined_stereo=True)
+    off.name = "LIG"
+    off.assign_partial_charges(NAGL_MODEL, toolkit_registry=NAGLToolkitWrapper())
+    return off
+
+
+# -----------------------------------------------------------------------------
+# Build the system: amber14 protein + TIP3P water + NaCl + SMIRNOFF ligand.
+# -----------------------------------------------------------------------------
+
+def build_system(
+    protein_pdb_text: str,
+    off_ligand: Molecule | None,
+    padding_nm: float,
+    salt_mol: float,
+):
+    # Use PDBFixer to add missing Hs to the protein. PDB chains here are
+    # rebuilt by stage3 and already have all heavy atoms.
+    fixer = PDBFixer(pdbfile=io.StringIO(protein_pdb_text))
+    fixer.findMissingResidues()
+    fixer.missingResidues.clear()  # don't model in loops we don't have
+    fixer.findNonstandardResidues()
+    fixer.replaceNonstandardResidues()
+    fixer.removeHeterogens(keepWater=False)
+    fixer.findMissingAtoms()
+    fixer.addMissingAtoms()
+    fixer.addMissingHydrogens(pH=7.0)
+
+    protein_topology = fixer.topology
+    protein_positions = fixer.positions
+
+    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
+
+    modeller = app.Modeller(protein_topology, protein_positions)
+
+    if off_ligand is not None:
+        smirnoff_gen = SMIRNOFFTemplateGenerator(molecules=[off_ligand], forcefield=OFF_FF.replace(".offxml", ""))
+        forcefield.registerTemplateGenerator(smirnoff_gen.generator)
+        lig_top = off_ligand.to_topology().to_openmm()
+        lig_pos = off_ligand.conformers[0].to_openmm()
+        modeller.add(lig_top, lig_pos)
+
+    # Box + solvent + ions.
+    modeller.addSolvent(
+        forcefield,
+        model="tip3p",
+        padding=padding_nm * u.nanometers,
+        ionicStrength=salt_mol * u.molar,
+        positiveIon="Na+",
+        negativeIon="Cl-",
+    )
+
+    system = forcefield.createSystem(
+        modeller.topology,
+        nonbondedMethod=app.PME,
+        nonbondedCutoff=1.0 * u.nanometers,
+        constraints=app.HBonds,
+        rigidWater=True,
+    )
+
+    n_atoms = modeller.topology.getNumAtoms()
+    n_prot = protein_topology.getNumAtoms()
+    n_lig = off_ligand.to_topology().to_openmm().getNumAtoms() if off_ligand is not None else 0
+    print(f"  system: {n_atoms} atoms (protein {n_prot}, ligand {n_lig}, solvent+ions {n_atoms - n_prot - n_lig})", flush=True)
+    return modeller, system
+
+
+# -----------------------------------------------------------------------------
+# Position restraints + implicit-solvent collapse (for oligomer hand-builds).
+# Extended-coil tails on a from-sequence-built oligomer would otherwise force
+# a huge explicit-solvent box; OBC2 GBSA collapses tails in a few ns at
+# minimal cost. Restraints on the β-core Cα atoms preserve the prescribed
+# topology while everything else relaxes.
+# -----------------------------------------------------------------------------
+
+
+def parse_residue_range(spec: str | None) -> tuple[int, int] | None:
+    if not spec:
+        return None
+    if "-" not in spec:
+        n = int(spec)
+        return (n, n)
+    lo, hi = spec.split("-", 1)
+    return (int(lo), int(hi))
+
+
+def parse_chain_set(spec: str | None) -> set[str] | None:
+    if not spec:
+        return None
+    return {c.strip() for c in spec.split(",") if c.strip()}
+
+
+def add_position_restraints(
+    system,
+    topology,
+    positions,
+    restrain_range: tuple[int, int] | None,
+    restrain_chains: set[str] | None,
+    k_kj_per_mol_nm2: float,
+) -> int:
+    """Pull Cα atoms in `restrain_range` (and `restrain_chains` if given)
+    back to their current positions with a harmonic spring of strength
+    `k_kj_per_mol_nm2` kJ/mol/nm². Returns the number of restrained
+    particles. No-op when `restrain_range is None`."""
+    if restrain_range is None:
+        return 0
+    lo, hi = restrain_range
+    force = openmm.CustomExternalForce("0.5*k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
+    force.addPerParticleParameter("k")
+    force.addPerParticleParameter("x0")
+    force.addPerParticleParameter("y0")
+    force.addPerParticleParameter("z0")
+    k = k_kj_per_mol_nm2 * u.kilojoule_per_mole / u.nanometer**2
+    k_val = k.value_in_unit_system(u.md_unit_system)
+    n = 0
+    for atom in topology.atoms():
+        if atom.name != "CA":
+            continue
+        res = atom.residue
+        if restrain_chains is not None and res.chain.id not in restrain_chains:
+            continue
+        try:
+            resid = int(res.id)
+        except (ValueError, TypeError):
+            continue
+        if not (lo <= resid <= hi):
+            continue
+        pos = positions[atom.index].value_in_unit(u.nanometer)
+        force.addParticle(atom.index, [k_val, pos[0], pos[1], pos[2]])
+        n += 1
+    if n > 0:
+        system.addForce(force)
+    return n
+
+
+def write_heavy_only_pdb(pdb_text: str, out_pdb: Path) -> None:
+    """Strip H atoms from a PDB text block and write to disk. Stage 2
+    features were calibrated on RCSB heavy-atom-only structures, so
+    relaxed-PDB outputs from md_relax need to match that convention
+    for downstream scoring."""
+    kept: list[str] = []
+    for line in pdb_text.splitlines():
+        if not (line.startswith("ATOM") or line.startswith("HETATM")):
+            kept.append(line)
+            continue
+        elem = line[76:78].strip() if len(line) >= 78 else line[12:16].strip()[0]
+        if elem == "H":
+            continue
+        kept.append(line)
+    out_pdb.parent.mkdir(parents=True, exist_ok=True)
+    out_pdb.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+
+def vacuum_minimize_apo(
+    prot_pdb_text: str,
+    max_iterations: int,
+    restrain_range: tuple[int, int] | None,
+    restrain_chains: set[str] | None,
+    restrain_k: float,
+) -> str:
+    """Energy-minimize the protein in vacuum (no waters) before solvation.
+    A hand-built oligomer with random-coil tails typically has both
+    intra-chain and inter-chain clashes that minimization-after-solvation
+    cannot resolve (the surrounding waters block atom rearrangement).
+    Vacuum minimization gives the tails free space to slide out of each
+    other's way. The β-core is held by Cα restraints so the prescribed
+    topology survives. Returns a PDB text block in the relaxed frame."""
+    fixer = PDBFixer(pdbfile=io.StringIO(prot_pdb_text))
+    fixer.findMissingResidues()
+    fixer.missingResidues.clear()
+    fixer.findNonstandardResidues()
+    fixer.replaceNonstandardResidues()
+    fixer.removeHeterogens(keepWater=False)
+    fixer.findMissingAtoms()
+    fixer.addMissingAtoms()
+    fixer.addMissingHydrogens(pH=7.0)
+
+    forcefield = app.ForceField("amber14-all.xml")
+    system = forcefield.createSystem(
+        fixer.topology,
+        nonbondedMethod=app.NoCutoff,
+        constraints=app.HBonds,
+    )
+    n_restr = add_position_restraints(
+        system, fixer.topology, fixer.positions,
+        restrain_range, restrain_chains, restrain_k,
+    )
+    print(f"  vacuum-minimize: {fixer.topology.getNumAtoms()} atoms, "
+          f"{n_restr} Cα restraints, up to {max_iterations} iter", flush=True)
+
+    integrator = openmm.VerletIntegrator(1.0 * u.femtosecond)  # unused
+    platform, props = pick_platform()
+    sim = app.Simulation(fixer.topology, system, integrator, platform, props)
+    sim.context.setPositions(fixer.positions)
+    e0 = sim.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(u.kilojoule_per_mole)
+    print(f"  vacuum pre-min energy: {e0:.1f} kJ/mol", flush=True)
+    sim.minimizeEnergy(maxIterations=max_iterations)
+    e1 = sim.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(u.kilojoule_per_mole)
+    print(f"  vacuum post-min energy: {e1:.1f} kJ/mol (delta {e1-e0:+.1f})", flush=True)
+
+    final = sim.context.getState(getPositions=True)
+    buf = io.StringIO()
+    app.PDBFile.writeFile(fixer.topology, final.getPositions(), buf)
+    return buf.getvalue()
+
+
+def implicit_collapse_apo(
+    prot_pdb_text: str,
+    collapse_ps: float,
+    temperature_k: float,
+    timestep_fs: float,
+    restrain_range: tuple[int, int] | None,
+    restrain_chains: set[str] | None,
+    restrain_k: float,
+) -> str:
+    """OBC2 implicit-solvent MD on protein only — collapses extended coil
+    regions before explicit solvation. Returns a PDB text block in the
+    collapsed coordinate frame, ready for the standard explicit-solvent
+    `build_system` + production path."""
+    fixer = PDBFixer(pdbfile=io.StringIO(prot_pdb_text))
+    fixer.findMissingResidues()
+    fixer.missingResidues.clear()
+    fixer.findNonstandardResidues()
+    fixer.replaceNonstandardResidues()
+    fixer.removeHeterogens(keepWater=False)
+    fixer.findMissingAtoms()
+    fixer.addMissingAtoms()
+    fixer.addMissingHydrogens(pH=7.0)
+
+    forcefield = app.ForceField("amber14-all.xml", "implicit/obc2.xml")
+    system = forcefield.createSystem(
+        fixer.topology,
+        nonbondedMethod=app.CutoffNonPeriodic,
+        nonbondedCutoff=2.0 * u.nanometers,
+        constraints=app.HBonds,
+    )
+    n_restr = add_position_restraints(
+        system, fixer.topology, fixer.positions,
+        restrain_range, restrain_chains, restrain_k,
+    )
+    print(f"  implicit-collapse: {fixer.topology.getNumAtoms()} atoms, "
+          f"{n_restr} Cα restraints, {collapse_ps:.0f} ps OBC2 MD", flush=True)
+
+    integrator = openmm.LangevinMiddleIntegrator(
+        temperature_k * u.kelvin, 1.0 / u.picosecond, timestep_fs * u.femtosecond,
+    )
+    platform, props = pick_platform()
+    sim = app.Simulation(fixer.topology, system, integrator, platform, props)
+    sim.context.setPositions(fixer.positions)
+    sim.minimizeEnergy(maxIterations=2000)
+    e0 = sim.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(u.kilojoule_per_mole)
+    print(f"  implicit post-min energy: {e0:.1f} kJ/mol", flush=True)
+    sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin)
+    steps = int(round(collapse_ps * 1000.0 / timestep_fs))
+    sim.reporters.append(app.StateDataReporter(
+        sys.stdout, max(1, steps // 10),
+        step=True, potentialEnergy=True, temperature=True, speed=True,
+    ))
+    sim.step(steps)
+
+    final = sim.context.getState(getPositions=True)
+    buf = io.StringIO()
+    app.PDBFile.writeFile(fixer.topology, final.getPositions(), buf)
+    return buf.getvalue()
+
+
+# -----------------------------------------------------------------------------
+# Pick the fastest OpenMM platform actually available.
+# -----------------------------------------------------------------------------
+
+def pick_platform() -> tuple[openmm.Platform, dict]:
+    priority = ["CUDA", "OpenCL", "CPU", "Reference"]
+    available = {openmm.Platform.getPlatform(i).getName() for i in range(openmm.Platform.getNumPlatforms())}
+    for name in priority:
+        if name in available:
+            plat = openmm.Platform.getPlatformByName(name)
+            props = {}
+            if name in ("CUDA", "OpenCL"):
+                props["Precision"] = "mixed"
+            return plat, props
+    raise RuntimeError("no OpenMM platforms available")
+
+
+# -----------------------------------------------------------------------------
+# Main relaxation pipeline.
+# -----------------------------------------------------------------------------
+
+def relax(
+    out_pdb: Path,
+    complex_pdb: Path | None = None,
+    ligand_smiles: str | None = None,
+    apo_pdb: Path | None = None,
+    equil_ps: float = 100.0,
+    prod_ps: float = 100.0,
+    temperature_k: float = 300.0,
+    pressure_atm: float = 1.0,
+    salt_mol: float = 0.15,
+    padding_nm: float = 1.0,
+    timestep_fs: float = 2.0,
+    report_interval_ps: float = 10.0,
+    collapse_ps: float = 0.0,
+    vacuum_min_iter: int = 0,
+    no_explicit: bool = False,
+    restrain_range: tuple[int, int] | None = None,
+    restrain_chains: set[str] | None = None,
+    restrain_k: float = 1000.0,
+):
+    t0 = time.time()
+    if complex_pdb is not None:
+        if collapse_ps > 0:
+            raise ValueError("--collapse-ps is apo-only (ligand has no OBC2 GB parameters)")
+        print(f"=== md_relax (complex): {complex_pdb.name} ===", flush=True)
+        prot_pdb_text, lig_pdb_text = split_complex_pdb(complex_pdb)
+        print("  parsed complex PDB", flush=True)
+        rdkit_lig = ligand_from_pdb_and_smiles(lig_pdb_text, ligand_smiles)
+        print(f"  ligand: {rdkit_lig.GetNumAtoms()} atoms (incl Hs); SMILES = {ligand_smiles}", flush=True)
+        off_lig = offmol_from_rdkit(rdkit_lig)
+        qsum = float(sum(c.m for c in off_lig.partial_charges))
+        print(f"  NAGL charges assigned, sum = {qsum:+.3f} e", flush=True)
+    elif apo_pdb is not None:
+        print(f"=== md_relax (apo): {apo_pdb.name} ===", flush=True)
+        prot_pdb_text = load_apo_pdb(apo_pdb)
+        print("  parsed apo PDB (no ligand)", flush=True)
+        off_lig = None
+        if vacuum_min_iter > 0:
+            prot_pdb_text = vacuum_minimize_apo(
+                prot_pdb_text,
+                max_iterations=vacuum_min_iter,
+                restrain_range=restrain_range,
+                restrain_chains=restrain_chains,
+                restrain_k=restrain_k,
+            )
+        if collapse_ps > 0:
+            prot_pdb_text = implicit_collapse_apo(
+                prot_pdb_text,
+                collapse_ps=collapse_ps,
+                temperature_k=temperature_k,
+                timestep_fs=timestep_fs,
+                restrain_range=restrain_range,
+                restrain_chains=restrain_chains,
+                restrain_k=restrain_k,
+            )
+        if no_explicit:
+            print("  --no-explicit: writing post-collapse structure (heavy atoms only)", flush=True)
+            write_heavy_only_pdb(prot_pdb_text, out_pdb)
+            print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
+            return
+    else:
+        raise ValueError("md_relax requires --complex-pdb (+ --ligand-smiles) or --apo-pdb")
+
+    modeller, system = build_system(prot_pdb_text, off_lig, padding_nm=padding_nm, salt_mol=salt_mol)
+
+    # Re-apply position restraints on the explicit-solvent system so the
+    # β-core topology survives equilibration + production at full T.
+    n_restr = add_position_restraints(
+        system, modeller.topology, modeller.positions,
+        restrain_range, restrain_chains, restrain_k,
+    )
+    if n_restr:
+        print(f"  explicit-solvent: {n_restr} Cα restraints carried over", flush=True)
+
+    # Build integrator + simulation WITHOUT a barostat first — we minimize and
+    # NVT-thermalize in a constant-volume box, then add the barostat for the
+    # actual NPT phases. Doing NPT immediately on a freshly-solvated, possibly
+    # strained protein (especially a hand-built oligomer with random-coil
+    # tails) makes the barostat react to a non-equilibrium pressure spike
+    # while the integrator tries to ramp T, and the combination crashes
+    # ("Particle coordinate is NaN").
+    integrator = openmm.LangevinMiddleIntegrator(
+        temperature_k * u.kelvin,
+        1.0 / u.picosecond,
+        timestep_fs * u.femtosecond,
+    )
+    platform, props = pick_platform()
+    print(f"  platform: {platform.getName()} (props={props})", flush=True)
+    sim = app.Simulation(modeller.topology, system, integrator, platform, props)
+    sim.context.setPositions(modeller.positions)
+
+    print("  minimizing...", flush=True)
+    sim.minimizeEnergy(maxIterations=10000)
+    state = sim.context.getState(getEnergy=True)
+    print(f"  post-min energy: {state.getPotentialEnergy().value_in_unit(u.kilojoule_per_mole):.1f} kJ/mol", flush=True)
+
+    # NVT thermalization ramp at small dt: 50 K → 150 K → 300 K, 1 ps each
+    # at 0.5 fs. Catches strained bonds before they NaN. Cheap (~2 sec).
+    warmup_dt_fs = 0.5
+    warmup_steps_per_ps = int(round(1000.0 / warmup_dt_fs))
+    integrator.setStepSize(warmup_dt_fs * u.femtosecond)
+    for warmup_t in (50.0, 150.0, temperature_k):
+        integrator.setTemperature(warmup_t * u.kelvin)
+        sim.context.setVelocitiesToTemperature(warmup_t * u.kelvin)
+        sim.step(warmup_steps_per_ps)  # 1 ps each
+    print(f"  warmup: 3 ps NVT ramp 50→150→{temperature_k:.0f} K at 0.5 fs", flush=True)
+
+    # Add barostat for NPT and restore the production timestep.
+    barostat = openmm.MonteCarloBarostat(pressure_atm * u.atmosphere, temperature_k * u.kelvin, 25)
+    system.addForce(barostat)
+    sim.context.reinitialize(preserveState=True)
+    integrator.setStepSize(timestep_fs * u.femtosecond)
+
+    sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin)
+
+    steps_per_ps = int(round(1000.0 / timestep_fs))
+    report_every = max(1, int(round(report_interval_ps * steps_per_ps)))
+
+    equil_steps = int(round(equil_ps * steps_per_ps))
+    prod_steps = int(round(prod_ps * steps_per_ps))
+
+    sim.reporters.append(
+        app.StateDataReporter(
+            sys.stdout,
+            report_every,
+            step=True,
+            potentialEnergy=True,
+            temperature=True,
+            volume=True,
+            speed=True,
+            elapsedTime=True,
+        )
+    )
+
+    print(f"  equilibration NPT ({equil_ps:.0f} ps, {equil_steps} steps)", flush=True)
+    sim.step(equil_steps)
+
+    print(f"  production NPT ({prod_ps:.0f} ps, {prod_steps} steps)", flush=True)
+    sim.step(prod_steps)
+
+    # Strip waters/ions/barostat, dump relaxed protein + ligand.
+    final = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+    positions = final.getPositions(asNumpy=True)
+    top = modeller.topology
+
+    write_protein_ligand_pdb(top, positions, out_pdb)
+    print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
+
+
+SOLVENT_RESNAMES = {"HOH", "WAT", "TIP3", "TIP", "NA", "CL", "Na+", "Cl-", "K+", "MG", "ZN", "CA"}
+
+
+def _is_ligand_residue(residue) -> bool:
+    """Detect the LIG residue regardless of whatever name openff/openmm gave it.
+    Anything that isn't a standard amino acid (recognised by having a Cα) and
+    isn't solvent/ion is treated as the ligand."""
+    if residue.name in SOLVENT_RESNAMES:
+        return False
+    atom_names = {a.name for a in residue.atoms()}
+    return "CA" not in atom_names
+
+
+def write_protein_ligand_pdb(topology: app.Topology, positions, out_pdb: Path) -> None:
+    """Write only protein chains + ligand renamed to chain Z residue LIG; drop
+    water/ions. The Stage 2 / Stage 3 feature recompute keys off chain Z
+    residue 'LIG' to detect appended ligand atoms (see features.py
+    _stage3_ligand_heavy_coords), so we restore that convention here."""
+    keep_atoms: list[int] = []
+    ligand_res_atoms: list = []
+    for residue in topology.residues():
+        if residue.name in SOLVENT_RESNAMES:
+            continue
+        if _is_ligand_residue(residue):
+            ligand_res_atoms.extend(residue.atoms())
+        else:
+            keep_atoms.extend(a.index for a in residue.atoms())
+
+    keep_set = set(keep_atoms) | {a.index for a in ligand_res_atoms}
+
+    # Stage 2 anchor features were calibrated on RCSB PDBs that have no
+    # explicit hydrogens (cryo-EM α-syn entries are heavy-atom only). Strip
+    # Hs from the relaxed output so SASA / contact computations remain on
+    # the same axis. MD ran with explicit Hs (correct physics); the saved
+    # PDB just drops them for downstream feature recompute.
+    def _heavy(atom) -> bool:
+        return atom.element is not None and atom.element.symbol != "H"
+
+    sub_top = app.Topology()
+    atom_map: dict[int, app.topology.Atom] = {}
+    add_order: list[int] = []
+    used_chain_ids: set[str] = set()
+    for chain in topology.chains():
+        chain_residues = [r for r in chain.residues() if not _is_ligand_residue(r) and r.name not in SOLVENT_RESNAMES]
+        if not chain_residues:
+            continue
+        new_chain = sub_top.addChain(chain.id)
+        used_chain_ids.add(chain.id)
+        for residue in chain_residues:
+            new_res = sub_top.addResidue(residue.name, new_chain, residue.id, residue.insertionCode)
+            for a in residue.atoms():
+                if not _heavy(a):
+                    continue
+                atom_map[a.index] = sub_top.addAtom(a.name, a.element, new_res)
+                add_order.append(a.index)
+
+    if ligand_res_atoms:
+        lig_chain_id = LIGAND_CHAIN
+        suffix = 0
+        while lig_chain_id in used_chain_ids:
+            suffix += 1
+            lig_chain_id = f"{LIGAND_CHAIN}{suffix}"
+        lig_chain = sub_top.addChain(lig_chain_id)
+        lig_res = sub_top.addResidue(LIGAND_RESNAME, lig_chain, "1", " ")
+        for a in ligand_res_atoms:
+            if not _heavy(a):
+                continue
+            atom_map[a.index] = sub_top.addAtom(a.name, a.element, lig_res)
+            add_order.append(a.index)
+
+    for bond in topology.bonds():
+        a, b = bond[0], bond[1]
+        if a.index in atom_map and b.index in atom_map:
+            sub_top.addBond(atom_map[a.index], atom_map[b.index])
+
+    sub_pos = np.array([positions[i].value_in_unit(u.nanometer) for i in add_order]) * u.nanometer
+
+    out_pdb.parent.mkdir(parents=True, exist_ok=True)
+    with out_pdb.open("w") as f:
+        app.PDBFile.writeFile(sub_top, sub_pos, f, keepIds=True)
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("--complex-pdb", type=Path, default=None,
+                   help="apo + docked LIG on chain Z (mutually exclusive with --apo-pdb)")
+    p.add_argument("--ligand-smiles", type=str, default=None,
+                   help="SMILES of the ligand; required with --complex-pdb")
+    p.add_argument("--apo-pdb", type=Path, default=None,
+                   help="protein-only PDB for apo MD baseline (mutually exclusive with --complex-pdb)")
+    p.add_argument("--out-pdb", type=Path, required=True)
+    p.add_argument("--equil-ps", type=float, default=100.0)
+    p.add_argument("--prod-ps", type=float, default=100.0)
+    p.add_argument("--temperature-k", type=float, default=300.0)
+    p.add_argument("--pressure-atm", type=float, default=1.0)
+    p.add_argument("--salt-mol", type=float, default=0.15)
+    p.add_argument("--padding-nm", type=float, default=1.0)
+    p.add_argument("--timestep-fs", type=float, default=2.0)
+    p.add_argument("--report-interval-ps", type=float, default=10.0)
+    p.add_argument("--vacuum-min-iter", type=int, default=0,
+                   help="iterations of vacuum (no solvent) energy minimization "
+                        "before solvation; resolves clashes that solvent-trapped "
+                        "minimization can't fix. Apo-mode only.")
+    p.add_argument("--no-explicit", action="store_true",
+                   help="skip explicit-solvent solvation + production. Outputs "
+                        "the structure after vacuum-min + implicit-collapse "
+                        "stages. Use for oligomer scoring where Stage 2 features "
+                        "only need a relaxed structure, not equilibrium dynamics.")
+    p.add_argument("--collapse-ps", type=float, default=0.0,
+                   help="ps of OBC2 implicit-solvent MD before explicit "
+                        "solvation; apo-mode only (no GB params for ligands)")
+    p.add_argument("--restrain-residues", type=str, default=None,
+                   help="restrain Cα of these residues (e.g. '70-88') to "
+                        "their initial positions during collapse and explicit "
+                        "MD; preserves a hand-built β-core")
+    p.add_argument("--restrain-chains", type=str, default=None,
+                   help="comma-separated chain ids the restraint applies to "
+                        "(default: all chains)")
+    p.add_argument("--restrain-k", type=float, default=1000.0,
+                   help="harmonic restraint constant in kJ/mol/nm²")
+    args = p.parse_args()
+
+    if (args.complex_pdb is None) == (args.apo_pdb is None):
+        p.error("exactly one of --complex-pdb or --apo-pdb must be provided")
+    if args.complex_pdb is not None and not args.ligand_smiles:
+        p.error("--ligand-smiles is required with --complex-pdb")
+
+    relax(
+        complex_pdb=args.complex_pdb,
+        ligand_smiles=args.ligand_smiles,
+        apo_pdb=args.apo_pdb,
+        out_pdb=args.out_pdb,
+        equil_ps=args.equil_ps,
+        prod_ps=args.prod_ps,
+        temperature_k=args.temperature_k,
+        pressure_atm=args.pressure_atm,
+        salt_mol=args.salt_mol,
+        padding_nm=args.padding_nm,
+        timestep_fs=args.timestep_fs,
+        report_interval_ps=args.report_interval_ps,
+        collapse_ps=args.collapse_ps,
+        vacuum_min_iter=args.vacuum_min_iter,
+        no_explicit=args.no_explicit,
+        restrain_range=parse_residue_range(args.restrain_residues),
+        restrain_chains=parse_chain_set(args.restrain_chains),
+        restrain_k=args.restrain_k,
+    )
+
+
+if __name__ == "__main__":
+    main()
