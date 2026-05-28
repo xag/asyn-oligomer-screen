@@ -488,5 +488,3 @@ MIT License — see `LICENSE`.
   howpublished = {\url{https://github.com/xag/asyn-oligomer-screen}}
 }
 ```
-
-Inquiries from α-synuclein aggregation laboratories interested in orthogonal experimental testing — and from anyone else with a relevant perspective — are welcome through the channels listed in [How to comment or reach out](#how-to-comment-or-reach-out).
