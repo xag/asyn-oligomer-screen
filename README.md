@@ -16,14 +16,29 @@ The candidate list was assembled under one inclusion rule: every molecule is non
 
 Releasing the full pipeline — receptor model, candidate list, scoring code, every ranking, every documented limitation — is intended to lower the barrier to grassroots follow-up: independent re-runs, alternative receptor models, ThT or DLS assays on specific candidates, dietary-epidemiology re-analyses. The output is a hypothesis-generator, not a drug pipeline.
 
-### Status — work in progress
-
-The computational pipeline is complete and the pre-registered validation hold-out has passed (§6); every result below is reproducible from the code and inputs in this repository. What is missing is experimental validation — none of the unvalidated top candidates (DHEA, allopregnanolone, retinoic acid, urolithin A, trehalose, piperine, THC) has been tested in an aggregation assay against α-synuclein. The natural next steps, in roughly decreasing order of expected information gain, are: (1) ThT aggregation kinetics or DLS sizing on those candidates; (2) LC-MS adduct mapping for the four reactive aldehydes in the covalent channel; (3) longer-timescale MD around docked poses to probe receptor-flexibility effects that static docking cannot see; (4) extension of the candidate list and re-scoring as new α-synuclein structures and topology constraints are deposited; (5) building alternative receptor models from the same Fusco constraints to test how strongly the ranking depends on the specific relaxed geometry used here. Collaboration on any of these is the reason the repository is open.
+### Get in touch
 
 Critiques and counter-evidence are as welcome as confirmations.
 
 - **[Issues](https://github.com/xag/asyn-oligomer-screen/issues)** — technical questions, framework critiques, suggested candidates, bug reports, wet-lab follow-up interest. Preferred channel because it is public and archived.
 - **[Discussions](https://github.com/xag/asyn-oligomer-screen/discussions)** — broader conversation about the approach or the open-research model.
+
+## Status — work in progress
+
+This is a first iteration. The pipeline runs end-to-end and every result below is reproducible from the code and inputs in this repository, but it is not a finished framework. The pre-registered hold-out (§6) is light — five polyphenols from the chemical class that already dominates the published α-syn modulator literature; it shows the framework can recover known hits within that class but says little about its accuracy outside it. Three known method gaps also systematically hide signal already present in the candidate list — the dopamine / catechol-quinone axis, the metals axis, and any stabilising binding mode that requires receptor rearrangement. Closing the gaps and broadening the validation is the next-steps queue.
+
+**In-repo, computational:**
+
+- **Add catechol-quinone covalent chemistry to `adduct_score.py`.** Extend the per-ligand `rxty` table with dopamine, DOPAC, norepinephrine, aminochrome, and 6-OHDA entries. Currently these score as weakly protective on the reversible channel, even though the published mechanism is α-syn oligomer stabilisation via quinone-mediated Lys-Schiff and Cys-Michael adducts — the same chemistry family the covalent channel already handles for MDA, acrolein, 4-HNE, and MGO (Conway et al. 2001; Norris et al. 2005; Mazzulli et al. 2006).
+- **Run longer-timescale MD around docked poses.** The pilot in `md_stage3.py` was inconclusive at 50 ps. ≥10 ns runs would let stabilising binders show positive Δact through receptor rearrangement, partly removing the §8.3 sign-bound.
+- **Build a metal-coordination scoring channel.** Cu²⁺, Fe²⁺/³⁺ currently fail at the Meeko PDBQT stage (single-atom-ligand limitation) and drop out of the rankings entirely. Replace with parametrised-ion MD against α-syn, or with a coordination-chemistry score against the N-terminal Cu/Fe sites (Rasia et al. 2005; Davies et al. 2011).
+- **Build alternative receptor models** under the same Fusco topology constraints, to test how strongly the ranking depends on the specific relaxed geometry used here.
+- **Re-score as new α-synuclein structures and topology constraints are deposited.**
+
+**Experimental, collaboration-dependent:**
+
+- **ThT aggregation kinetics or DLS sizing** on the unvalidated top candidates (DHEA, allopregnanolone, retinoic acid, urolithin A, trehalose, piperine, THC).
+- **LC-MS adduct mapping** for the four reactive aldehydes in the covalent channel.
 
 ## Abstract
 
@@ -377,7 +392,11 @@ Cao S, Du J, Xu C, et al. Urolithin A induces neuroprotection in models of Parki
 
 Conway KA, Harper JD, Lansbury PT. Accelerated in vitro fibril formation by a mutant α-synuclein linked to early-onset Parkinson disease. *Nat Med* 4, 1318–1320 (1998).
 
+Conway KA, Rochet J-C, Bieganski RM, Lansbury PT. Kinetic stabilization of the α-synuclein protofibril by a dopamine-α-synuclein adduct. *Science* 294, 1346–1349 (2001).
+
 Cremades N, Cohen SIA, Deas E, et al. Direct observation of the interconversion of normal and toxic forms of α-synuclein. *Cell* 149, 1048–1059 (2012).
+
+Davies P, Moualla D, Brown DR. Alpha-synuclein is a cellular ferrireductase. *PLoS ONE* 6, e15814 (2011).
 
 Eberhardt J, Santos-Martins D, Tillack AF, Forli S. AutoDock Vina 1.2.0: New docking methods, expanded force field, and Python bindings. *J Chem Inf Model* 61, 3891–3898 (2021).
 
@@ -407,13 +426,19 @@ Maden M. Retinoic acid in the development, regeneration and maintenance of the n
 
 Marx CE, Trost WT, Shampine LJ, et al. The neurosteroid allopregnanolone is reduced in prefrontal cortex in Parkinson's disease. *Biol Psychiatry* 60, 1287–1294 (2006).
 
+Mazzulli JR, Mishizen AJ, Giasson BI, et al. Cytosolic catechols inhibit α-synuclein aggregation and facilitate the formation of intracellular soluble oligomeric intermediates. *J Neurosci* 26, 10068–10078 (2006).
+
 Morroni F, Sita G, Tarozzi A, et al. Neuroprotective effect of caffeic acid phenethyl ester in a mouse model of α-synucleinopathy. *Phytomedicine* 47, 165–173 (2018).
+
+Norris EH, Giasson BI, Hodara R, et al. Reversible inhibition of α-synuclein fibrillization by dopaminochrome-mediated conformational alterations. *J Biol Chem* 280, 21212–21219 (2005).
 
 Ono K, Yamada M. Antioxidant compounds have potent anti-fibrillogenic and fibril-destabilizing effects for α-synuclein fibrils in vitro. *J Neurochem* 97, 105–115 (2006).
 
 Pérez-Sánchez A, Cuyàs E, Ruiz-Torres V, et al. Intestinal permeability and anti-aggregation activity of α-synuclein modulators. *Sci Rep* 6, 35903 (2016).
 
 Polymeropoulos MH, Lavedan C, Leroy E, et al. Mutation in the α-synuclein gene identified in families with Parkinson's disease. *Science* 276, 2045–2047 (1997).
+
+Rasia RM, Bertoncini CW, Marsh D, et al. Structural characterization of copper(II) binding to α-synuclein: insights into the bioinorganic chemistry of Parkinson's disease. *PNAS* 102, 4294–4299 (2005).
 
 Ryu D, Mouchiroud L, Andreux PA, et al. Urolithin A induces mitophagy and prolongs lifespan in C. elegans and increases muscle function in rodents. *Nat Med* 22, 879–888 (2016).
 
