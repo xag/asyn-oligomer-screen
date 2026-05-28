@@ -483,7 +483,7 @@ MIT License — see `LICENSE`.
 ```bibtex
 @misc{asyn-oligomer-screen,
   author = {Gr{\'e}hant, Xavier},
-  title  = {asyn-oligomer-screen: in silico screening of dietary, endogenous, and metabolic molecules against a topology-prior model of the toxic α-synuclein oligomer},
+  title  = {asyn-oligomer-screen: computational screen of dietary and endogenous molecules against the toxic α-synuclein oligomer in Parkinson's disease},
   year   = {2026},
   howpublished = {\url{https://github.com/xag/asyn-oligomer-screen}}
 }
