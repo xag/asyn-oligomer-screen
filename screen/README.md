@@ -11,6 +11,20 @@ under Boltzmann pose weights and an absolute-affinity gate. A separate
 covalent-adduct channel (`adduct_score.py`) handles reactive
 electrophiles that docking cannot see.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+This folder asks the central question of the project: for each candidate
+molecule, does sitting on the toxic α-syn oligomer make it look *less*
+toxic? It uses AutoDock Vina (a standard docking tool) to find the
+molecule's preferred binding spot, then recomputes the toxicity score on
+the resulting complex and compares it to the empty oligomer. Multiple
+binding spots are weighted by how energetically favourable they are, and
+weak binders are penalised. A second channel handles reactive molecules
+(damaging metabolic byproducts) that bind permanently rather than
+reversibly — these are anti-targets, not candidates.
+</details>
+
 ## Reversible-binding channel
 
 | file | role |

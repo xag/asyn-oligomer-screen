@@ -2,6 +2,20 @@
 
 Input files consumed by the pipeline.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+This folder holds the inputs: the list of ~190 candidate molecules to
+test (in `vicinity_molecules.js`) and a downloaded cache of the 14 known
+α-syn structures used for calibration (in `anchors/`). The candidate
+list was assembled under one rule: each molecule must plausibly reach
+the brain through diet, supplementation, the body's own metabolism,
+lifestyle (exercise, sleep, stress, hormones), or environmental
+exposure. No prior α-syn evidence is required — that's the *output* of
+the screen, not an input. Each entry carries a chemical-structure code
+(SMILES), a rough brain concentration estimate, and references.
+</details>
+
 | path | content |
 | --- | --- |
 | `vicinity_molecules.js` | 191-entry candidate-molecule list (id, SMILES, CNS-concentration estimate, references). The single inclusion criterion is that the molecule plausibly reaches the substantia nigra via diet, supplementation, endogenous synthesis, lifestyle, or environmental exposure. |

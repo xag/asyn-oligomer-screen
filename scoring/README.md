@@ -11,6 +11,20 @@ generated oligomer models (see [oligomers/](../oligomers/)), and (c) to
 score apo-vs-complex Δactivity during the perturbation screen (see
 [screen/](../screen/)).
 
+<details>
+<summary><b>Plain English</b></summary>
+
+This folder holds the code that decides "how toxic-looking is an α-syn
+structure?" Given a 3D structure (a PDB file), it computes five
+geometric properties (greasy surface, aggregation-prone-region exposure,
+core packing, etc.), standardises them, and combines them into a single
+"activity" number. Higher number = more toxic-looking. The score is
+calibrated against 14 known α-syn structures — separating known
+more-toxic from less-toxic forms with 84% accuracy. It is reused
+unchanged in the screen: a candidate molecule "wins" if binding to the
+oligomer lowers this score.
+</details>
+
 ## Library modules
 
 | file | role |

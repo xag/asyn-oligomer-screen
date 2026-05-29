@@ -3,6 +3,17 @@
 Pipeline artifacts. Most files here are regenerated from code +
 `data/` — do not hand-edit.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+This folder holds the *outputs* of the analysis: every chart and table
+shown in the main README, plus the relaxed 3D oligomer models and the
+full candidate-molecule rankings. Everything in here is reproducible
+from the code and the `data/` inputs — if you re-run the pipeline, these
+files get rebuilt. Don't edit them by hand; if you want to change a
+number, change the code or the inputs and re-run.
+</details>
+
 ## Top-level
 
 | path | source |

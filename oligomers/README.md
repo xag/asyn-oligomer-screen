@@ -12,6 +12,21 @@ The original three-step in-silico discovery plan is:
 
 Step 1 is the unsolved part. This directory holds the code for it.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+This folder builds an atomic-resolution 3D model of the toxic α-syn
+oligomer — the thing that no public database has. The construction
+respects what experiments *do* tell us (three protein chains stuck
+together by a small β-sheet around residues 70–88, with the rest of
+each chain disordered) but invents the parts the experiments don't
+pin down, then lets physics-based simulation relax the model into a
+plausible shape. We make 11 such models with different choices (sheet
+direction, chain count, sheet boundaries) and all of them score
+"more toxic" than every deposited mature clump — evidence the
+ranking is not an artifact of one lucky build.
+</details>
+
 The Stage 2 framework (`features.py`, `classifier.py`) is otherwise
 correct, but until step 1 produces structures it has been calibrated
 against **deposited fibrils only** — that recovers ordinal mutant

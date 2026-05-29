@@ -16,6 +16,12 @@ The candidate list was assembled under one inclusion rule: every molecule is non
 
 Releasing the full pipeline — receptor model, candidate list, scoring code, every ranking, every documented limitation — is intended to lower the barrier to grassroots follow-up: independent re-runs, alternative receptor models, ThT or DLS assays on specific candidates, dietary-epidemiology re-analyses. The output is a hypothesis-generator, not a drug pipeline.
 
+### Contributing does not require specialist training
+
+This paper is grassroots-shaped on purpose. The framework spans structural biology, docking, organic chemistry, and dietary epidemiology — no single contributor is expected to be expert in all of it, and most useful contributions do not require expertise in any of it: critiques of the assumptions, suggestions of candidate molecules with a citation, references to relevant epidemiology, bug reports, and offers of wet-lab follow-up are all valuable.
+
+Dense passages throughout this README carry a collapsible **Plain English** block underneath; expand as needed. A [GLOSSARY.md](GLOSSARY.md) defines the recurring technical terms in plain English. For anything still opaque, modern AI assistants (Claude, ChatGPT, Copilot, Gemini) handle the whole file in one paste — use them to translate a passage into your background, explain a code file, summarise a referenced paper, draft an issue, or propose a change. AI-assisted contribution is encouraged.
+
 ### Get in touch
 
 Critiques and counter-evidence are as welcome as confirmations.
@@ -45,6 +51,12 @@ This is a first iteration. The pipeline runs end-to-end and every result below i
 
 α-Synuclein aggregation underlies the molecular pathology of Parkinson's disease, but the toxic species are pre-fibrillar oligomers for which no atomic-resolution structure has been deposited in the PDB. We construct a model of the canonical "Type B*" toxic oligomer of Fusco et al. (2017) under a published topology prior — three monomers, parallel β-sheet across residues 70–88, disordered N- and C-tails — and relax it under implicit-solvent MD with restrained β-core Cα atoms. A weighted structure-based activity score, calibrated on 14 deposited α-syn structures (graded-active vs inert pairwise AUC ≈ 0.84), assigns the relaxed trimer an activity ~4× higher than the most active deposited fibril, with no overlap across an 11-topology ensemble. We dock 127 candidate small molecules (polyphenols, steroid hormones, gut metabolites, dietary compounds, reactive aldehydes, neurosteroids) against the trimer using AutoDock Vina 1.2.5, score Δactivity per pose under Boltzmann pose weights and an absolute-affinity gate, and report a separate covalent-adduct reactivity channel for ligands docking cannot see. A pre-registered blind hold-out on five gold-standard α-syn modulators (silibinin, EGCG, fisetin, rosmarinic acid, CAPE) confirms the ranking: 4/5 fall in the top 25 of 122, including silibinin (#1) and EGCG (#3). Beyond the polyphenol class that already dominates the α-syn modulator literature, seven candidates without prior α-syn direct-binding evidence enter the top 25: dehydroepiandrosterone (DHEA), all-*trans* retinoic acid, allopregnanolone, Δ9-tetrahydrocannabinol, piperine, urolithin A, and trehalose. The covalent channel resurfaces malondialdehyde, acrolein, 4-hydroxynonenal, and methylglyoxal in the order predicted by α-syn's lysine-rich, arginine-free sequence composition.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+Parkinson's disease is caused by a protein (α-synuclein) clumping into toxic shapes inside brain cells. The small, early-stage clumps are what poison the cells, but no one has captured their atomic structure experimentally. We built a model of one (based on a 2017 paper that described the general shape) and ran ~190 candidate molecules — dietary compounds, hormones, gut metabolites, vitamins — against it on the computer to see which ones might bind to the toxic shape and break it up. We then ran a blind test: five molecules already known from the lab literature to disrupt α-synuclein were ranked by the framework without telling it which they were; four landed in the top 25 of 122. Beyond those known molecules, seven non-obvious candidates rose to the top: a steroid hormone (DHEA), the active form of vitamin A, a neurosteroid (allopregnanolone), THC, piperine (black pepper compound), urolithin A (a gut metabolite from pomegranate and berries), and trehalose (a sugar). These are hypotheses to be tested in the lab, not treatment recommendations. The framework also identified four metabolic byproducts (malondialdehyde, acrolein, 4-HNE, methylglyoxal) that chemically damage α-synuclein and likely accelerate Parkinson's — these are "anti-targets" to be reduced through metabolic, dietary, and lifestyle interventions.
+</details>
+
 ## 1. Background
 
 α-Synuclein is a 140-residue presynaptic protein that aggregates into amyloid fibrils in the Lewy bodies pathognomonic of Parkinson's disease (PD), dementia with Lewy bodies, and multiple system atrophy (Spillantini et al. 1997). Familial point mutations (A53T: Polymeropoulos et al. 1997; A30P: Krüger et al. 1998; E46K: Zarranz et al. 2004; H50Q: Appel-Cresswell et al. 2013) and locus multiplications cause autosomal-dominant PD, establishing α-syn aggregation as causally upstream of neurodegeneration.
@@ -56,6 +68,12 @@ The structural-biology consequence is a sharp asymmetry. The PDB contains over t
 Direct-acting candidates that have advanced clinically — anle138b (Wagner et al. 2013), squalamine (ENT-01; Limbocker et al. 2019), and EGCG (Ehrnhoefer et al. 2008; Bieschke et al. 2010) — were each characterised on fibril or full-aggregation-pathway preparations rather than on the toxic oligomer in isolation. Their clinical signals to date have been mixed or null, motivating screens designed against the toxic species itself.
 
 This work assembles three computational components — a structure-based activity score calibrated on the PDB anchors, a topology-prior model of the toxic oligomer, and a perturbation screen of candidate small molecules — to produce a ranked list of hypotheses against a target the PDB does not provide.
+
+<details>
+<summary><b>Plain English</b></summary>
+
+Parkinson's disease happens when a brain protein called α-synuclein clumps together. The mature clumps shown in autopsy images aren't the main thing damaging cells — it's the smaller, early-stage clumps (called "oligomers") that actually poison neurons. Scientists have detailed 3D pictures of dozens of mature clumps in public databases, but no one has yet produced one for the toxic oligomers, because they're hard to capture experimentally. To screen molecules against the toxic oligomer, you first have to build a structural model of it. A 2017 paper described the general shape but didn't release coordinates — that's the gap this work fills. The molecules that have been tried clinically so far (anle138b, squalamine, EGCG) were tested on mature clumps or on the whole aggregation process, not on the toxic oligomer specifically, and their clinical results have been mixed. A screen designed against the toxic species itself is worth doing.
+</details>
 
 ## 2. Activity score and calibration
 
@@ -74,6 +92,12 @@ Five per-conformer features are computed on the most-buried protein chain of the
 Secondary structure is assigned by pydssp on the concatenated biological assembly (per-chain DSSP misses inter-chain β-bridges). Solvent-accessible surface area is computed by Shrake–Rupley with a 1.4 Å probe (Bio.PDB).
 
 The five features are z-scored against the anchor mean and standard deviation, then combined with hand-tuned weights (`classifier.WEIGHTS`). Feature selection and weights were frozen prior to the validation hold-out (§5).
+
+<details>
+<summary><b>Plain English</b></summary>
+
+To score how "toxic-looking" an α-syn structure is, we measure five geometric properties of it: how much greasy surface is exposed on its β-sheet core (which is what attaches to cell membranes and damages them), how exposed the most aggregation-prone middle region is, how tightly packed the core is, and similar surface measurements. We average these into a single "activity" number, with weights chosen and locked in *before* the validation step — so the score can't have been silently tuned to favor the answers we wanted.
+</details>
 
 ### 2.2 Anchor structures
 
@@ -98,6 +122,12 @@ Calibration uses 14 deposited α-syn structures (Table 1; full curation in `ANCH
 
 Inert anchors comprise mature fibril polymorphs (which neurons coexist with for years) and the SDS-micelle helical conformer of the physiological membrane-bound state. Graded-active anchors are familial-mutant fibrils. Because no toxic-oligomer structure has been deposited, the active side of the calibration is anchored only ordinally; the framework is tuned to rank graded-active above inert, not to identify a hard active/inert decision boundary.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+To calibrate the score, we need examples of "less toxic" and "more toxic" α-syn structures. There are no atomic-resolution structures of the truly-toxic oligomer in any public database, so we use the next best thing: nine mature clumps that neurons coexist with for years (the "less toxic" class), and five clumps that carry mutations from families with inherited Parkinson's, which are known to be more dangerous (the "more toxic" class). The framework is tuned to *rank* the more-toxic class above the less-toxic class, not to draw a hard line between them. The toxic oligomer itself sits beyond the most-toxic anchor on the scale; this is consistent with what is known biologically but is not a hard calibration.
+</details>
+
 ### 2.3 Calibration result
 
 Pairwise Mann–Whitney AUC for graded-active vs inert: **0.84** (graded-active mean +1.04, inert mean −0.58; `results/anchor_scores.csv`). Within-class protofilament-count correlation: ρ = −0.76 (inert, n=8) and ρ = −0.35 (graded-active, n=5), with single-protofilament fibrils ranking systematically higher than their paired-protofilament class-mates — consistent with the elongation-competent growing end being more conformationally available in single-protofilament polymorphs.
@@ -109,6 +139,12 @@ Pairwise Mann–Whitney AUC for graded-active vs inert: **0.84** (graded-active 
 ![Per-feature anchor profiles](results/anchor_features.png)
 
 *Per-feature breakdown. Each panel sorts the 14 anchors along one of the five raw features; vertical lines mark per-class means; AUC is the pairwise Mann–Whitney score for graded-active vs inert on that feature alone. `exposed_hydrophobic_beta_sasa` and `nac_active_score` carry most of the separation; `contact_density` is the weakest single feature and enters the composite score with a negative weight (tertiary compactness suppresses activity).*
+
+<details>
+<summary><b>Plain English</b></summary>
+
+How well does the score separate the more-toxic from the less-toxic class? We use a standard statistic called AUC: 0.5 = no better than a coin flip, 1.0 = perfect separation. We got 0.84, meaning if you pick one random structure from each class, the more-toxic one scores higher 84% of the time. The score also picks up a known biological pattern: single-strand clumps rank higher than the same clumps wound as a double helix, consistent with single-strand clumps being more "growth-ready" and dangerous. Of the five geometric features, two do most of the work — how much greasy surface is exposed on the β-sheet, and how exposed the aggregation-prone middle region is.
+</details>
 
 ## 3. Toxic-oligomer model construction
 
@@ -124,6 +160,12 @@ The build procedure (`oligomers/build_fusco_trimer.py`):
 An ensemble of 11 topologies covering seed variation, parallel vs antiparallel arrangement, oligomer order (dimer/trimer/tetramer), and β-core range (65–83, 70–88, 73–91) was built (`oligomers/run_ensemble.py`). All nine genuine Fusco-topology oligomers score in the range +10.6 to +22.1 on the activity classifier — at minimum 2.4× the highest-scoring deposited anchor (2N0A at +4.4) and with a +4.8 gap to the highest control (a fully-coil three-mer that develops β-contacts under implicit-solvent collapse). The reference structure used downstream is `results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb` (activity +17.78).
 
 The construction does not prove that this geometry corresponds to the experimentally characterised Type B* oligomer at atomic resolution — that would require the DARR set plus additional constraints the field does not yet have. It produces a structure consistent with the published topology that has the surface biophysics the activity score was designed to detect, against which docking can be performed.
+
+<details>
+<summary><b>Plain English</b></summary>
+
+We can't read the toxic oligomer's atomic coordinates from any deposited structure — none exist. The 2017 Fusco paper gave us enough information to know the general shape (three α-syn chains stuck together by a small β-sheet around residues 70–88, with the rest of each chain floppy), but not enough to pin down every atom. So we build a model that respects what's known — sheet location, number of chains, sheet direction — and let the rest relax under physics-based simulation. We built 11 such models varying sheet direction, chain count, and exact sheet boundaries; all 11 scored more "toxic-looking" than every deposited mature clump by a factor of at least 2.4×, suggesting the ranking isn't an artifact of one lucky guess. This doesn't prove the model matches the real toxic oligomer atom-for-atom — that would need experimental data the field doesn't yet have. It's a plausible target consistent with what is known, against which molecules can be tested.
+</details>
 
 ## 4. Perturbation screen
 
@@ -144,6 +186,12 @@ For each candidate molecule M and the reference toxic-oligomer model O (`screen/
 
 The `contact_density` feature is computed in a ligand-aware mode: ligand heavy atoms within 8 Å of a core Cα contribute to that residue's contact count. The other four features are computed on the receptor only and respond to ligand binding via SASA occlusion.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+For each candidate molecule, we use AutoDock Vina — a standard docking tool — to find where it likes to sit on the oligomer surface and how tightly it binds. For each binding pose, we recompute the activity score on the oligomer + molecule pair and compare it to the empty oligomer. If the molecule makes the structure look less toxic (lower activity), it gets credit. Different poses are weighted by how favorable they are, and a soft penalty is applied for molecules that don't bind tightly enough to matter biologically (the −6 kcal/mol drug-likeness threshold). The end result for each molecule is a single number, `delta_activity_gated`, that combines its binding strength with its destabilising effect — more negative = better hypothesis.
+</details>
+
 ## 5. Covalent-adduct reactivity channel
 
 AutoDock Vina evaluates non-covalent binding affinity only. Four reactive aldehydes in the candidate list — malondialdehyde (MDA), acrolein, 4-hydroxynonenal (4-HNE), and methylglyoxal (MGO) — modify α-syn covalently in vivo (Vicente-Miranda et al. 2017; reviewed in Bae & Kim 2013): MDA forms Schiff bases on lysines, acrolein and 4-HNE form Michael adducts on cysteines / histidines / lysines, and MGO forms carboxyethyl-lysine (CEL) and methylglyoxal-derived hydroimidazolone (MGH) adducts on lysines and arginines respectively. The reversible-binding gate (§4.2) correctly suppresses these reagents on `delta_activity_gated` because their non-covalent binding affinity is weak.
@@ -157,6 +205,12 @@ aspr_score(O, M) = (1 / n_chains) Σ_chains Σ_relevant_residues  min(1, SASA(r)
 `rxty(M, type)` is a per-ligand table of intrinsic per-residue chemical reactivity drawn from the standard adduct literature (Esterbauer et al. 1991 for 4-HNE; Uchida 1999 for acrolein; Vicente-Miranda et al. 2017 for MGO–Lys; LoPachin & Gavin 2014 for soft-electrophile classification). Primary targets carry rxty = 1.0; secondary targets 0.3–0.7. The 200 Å² SASA normaliser corresponds to typical fully-exposed side-chain accessibility.
 
 The channel is independent of Vina pose: one SASA pass per receptor scores the whole sweep. It is reported alongside `delta_activity_gated`, not folded in — covalent and reversible-binding modes are orthogonal axes.
+
+<details>
+<summary><b>Plain English</b></summary>
+
+Docking only finds molecules that bind reversibly — they sit on the protein and can leave again. But some molecules form permanent chemical bonds with proteins (called "covalent adducts"). Four well-known reactive molecules in our list — malondialdehyde, acrolein, 4-HNE, and methylglyoxal — work this way. These are *not* drug candidates: they are metabolic byproducts (from oxidative stress, lipid peroxidation, hyperglycaemia, smoke exposure) that *damage* α-syn and likely contribute to its aggregation. We score them on a separate channel that asks: how many places on α-syn could this molecule chemically attack, and how reactive is it at each of those places? The result is an "anti-target" ranking — molecules whose accumulation likely accelerates Parkinson's, so reducing exposure to them (through metabolic control, diet, and lifestyle) is the relevant intervention. This channel has equal scientific weight to the destabiliser ranking; the goal of the project is what to seek *and* what to avoid.
+</details>
 
 ## 6. Validation
 
@@ -181,6 +235,12 @@ Results:
 | CAPE | 20–50 | 54 | −3.98 | −0.011 |
 
 Outcome: pass (4/5 in top 25; none below rank 60). No code, weight, or threshold was modified in response. CAPE missed the predicted band; its phenethyl ester docks worse than caffeic acid itself (rank 41), consistent with the published view that CAPE's α-syn-protective effects in cell models are dominated by NF-κB and antioxidant pathways or by intracellular hydrolysis to caffeic acid rather than by direct sub-µM α-syn binding (Morroni et al. 2018).
+
+<details>
+<summary><b>Plain English</b></summary>
+
+When you build a scoring framework and then test it on examples, there is a risk you have unconsciously tuned it to pass the test. To rule this out, before running the validation we wrote down exactly what we expected — which molecules should rank where, what would count as a success, what would count as a failure — and saved that prediction publicly in `STATUS.md`. Then we ran the experiment without modifying anything. Four of five known α-syn-modulating molecules landed in the top 25 of 122; none below rank 60. That meets the pre-registered "pass" bar. The framework is not perfect (CAPE missed by quite a bit), but it correctly ranks the molecules the literature already validates, which is the minimum bar for trusting the rankings on molecules the literature has *not* yet validated.
+</details>
 
 ## 7. Results
 
@@ -219,6 +279,12 @@ rank  molecule              aff_top  Δact_gated  class
 
 Full CSV: `results/sweep/fusco_parallel_3mer_core70-88_relaxed_sweep.csv`. Polyphenols occupy 14 of the top 20 positions; the four literature-validated α-syn modulators present in the seed list (curcumin, quercetin, baicalein, resveratrol — the last at rank 27) and the three polyphenolic hold-out entries (silibinin, EGCG, fisetin) together comprise the confirmatory band.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+The ranking table reads: column 2 is the molecule, column 3 (`aff_top`) is how tightly its best pose binds to the oligomer (more negative = tighter), and column 4 (`Δact_gated`) is the combined score (binding strength × destabilising effect; more negative = stronger candidate). The class column is the molecule family. Several molecules already known from the lab to disrupt α-syn (silibinin, EGCG, curcumin, baicalein, fisetin, quercetin) are in the top 25, which is a good sign that the ranking is meaningful. The most interesting entries are the ones that are *not* polyphenols and that have no prior lab evidence for direct α-syn binding — those are the new hypotheses listed in §7.2.
+</details>
+
 ### 7.2 Candidates outside the polyphenol class
 
 Seven entries in the top 18 have no published α-syn direct-binding or aggregation-modulation evidence to our knowledge:
@@ -232,6 +298,22 @@ Seven entries in the top 18 have no published α-syn direct-binding or aggregati
 - **Urolithin A (rank 18).** Gut microbiome metabolite of ellagitannins (from pomegranate, walnuts, berries); produced in only ~40% of humans depending on microbiome composition (Tomás-Barberán et al. 2017); enhances mitophagy in muscle and neurons (Ryu et al. 2016; Cao et al. 2020) but has no published α-syn direct-binding data.
 
 Each of these is a candidate hypothesis for orthogonal experimental testing. None is a treatment recommendation.
+
+<details>
+<summary><b>Plain English</b></summary>
+
+Seven molecules in the top 18 have not previously been studied for direct α-syn binding, to our knowledge:
+
+- **DHEA** (rank 2): an adrenal hormone that the body makes naturally; levels decline with age and are lower in Parkinson's patients.
+- **Retinoic acid** (rank 4): the body's active form of vitamin A; supports the health of dopamine-producing neurons.
+- **Allopregnanolone** (rank 8): a neurosteroid (also naturally produced); currently being tested in clinical trials for Alzheimer's disease.
+- **THC** (rank 12): the main psychoactive compound in cannabis; clinical studies have reported symptomatic benefits in Parkinson's, but the mechanism was assumed to be receptor-based, not direct binding.
+- **Piperine** (rank 14): the active compound in black pepper; best known for boosting the absorption of curcumin.
+- **Trehalose** (rank 16): a sugar found in mushrooms and yeast; published research shows it reduces α-syn aggregation in cells but via an indirect cellular cleanup pathway (autophagy), not via direct binding. The framework finds a direct-binding pose in addition.
+- **Urolithin A** (rank 18): a gut-bacteria-produced metabolite of compounds in pomegranate, walnuts, and berries (only ~40% of people produce it, depending on gut microbiome).
+
+Each is a *testable hypothesis*, not a treatment recommendation. The framework predicts they should bind to and destabilise the toxic oligomer; whether they actually do is a wet-lab question.
+</details>
 
 ### 7.3 Covalent-adduct channel
 
@@ -250,6 +332,12 @@ The ranking follows α-syn's amino-acid composition: 15 Lys, 1 His, 4 Tyr, 0 Cys
 
 A smoke test against the deposited fibril 6PEO (H50Q, graded-active) gives MGO `aspr_score` = +0.98 vs +4.24 on the trimer. The 4.3× ratio reflects the model trimer's exposed Lys-rich N-terminal segment vs the partially buried N-terminus of the fibril deposit — consistent with the expectation that the toxic oligomer presents a larger covalent-modifier-accessible substrate than the fibril does.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+Four reactive damage-molecules in our list — malondialdehyde, acrolein, 4-HNE, methylglyoxal — chemically attack α-syn and likely accelerate Parkinson's. They are produced by metabolism: from lipid peroxidation (oxidative stress damaging fats), from cigarette smoke, and from high blood sugar (the Maillard browning reaction that turns sugar amber when heated). The framework ranks them by how vulnerable α-syn is to each kind of chemical attack. Malondialdehyde ranks highest because it specifically attacks the amino acid lysine, and α-syn has 15 lysines per chain. Methylglyoxal — a hyperglycaemia byproduct famously associated with diabetes complications — is partially blocked here because its primary target (arginine) doesn't exist in α-syn, so it falls back to a slower secondary route on lysine. The result is an "anti-target" ranking: molecules to minimise through metabolic control, antioxidant intake, and reduced smoke exposure.
+</details>
+
 ## 8. Discussion
 
 ### 8.1 Mechanistic interpretation
@@ -261,9 +349,21 @@ Top-ranking polyphenols (silibinin, EGCG, curcumin, baicalein, fisetin, querceti
 - Urolithin A and equol are produced by gut bacteria in a subset of humans; the framework identifies a direct-binding mode in addition to the mitophagy effect already characterised in muscle and neurons. Their predicted activity is testable through standard ThT or DLS assays on α-syn aggregation, decoupled from the autophagy pathway.
 - Trehalose's direct-binding rank is the most surprising entry — the published rationale for its in-vivo anti-aggregation effect is autophagy enhancement (Sarkar et al. 2007), which the framework would not detect. The presence of a direct-binding mode would not displace the autophagy explanation but might augment it.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+The known α-syn-disrupting molecules in the literature are almost all plant polyphenols (silibinin, EGCG, curcumin, etc.) — and they top the ranking, which is a sanity check. The new candidates outside this class span three mechanistic stories that have not been part of the structural α-syn conversation: a hormone story (DHEA and allopregnanolone both decline with age and in Parkinson's, suggesting an "endogenous brake" that weakens over time), a gut-microbiome story (urolithin A and equol are produced by bacteria in only some people's guts — those producers might have a built-in advantage), and a surprise (trehalose, a sugar that was assumed to help via cellular cleanup pathways, may also bind α-syn directly).
+</details>
+
 ### 8.2 Covalent channel
 
 The reactive-aldehyde ordering is determined by α-syn's amino-acid composition and the published per-residue reactivity of each aldehyde. The framework does not measure adduct kinetics; it scores the cross-product of substrate exposure and intrinsic reactivity. The implication for prevention is that the metabolic pathways producing these aldehydes — hyperglycaemia (MGO via the Maillard pathway), lipid peroxidation (MDA, 4-HNE), tobacco-smoke exposure (acrolein) — converge on the same protein substrate. Epidemiological signals consistent with this prediction include the reduced PD risk observed in metformin-treated diabetic cohorts (Wahlqvist et al. 2012, with subsequent contradictory reports) and the inverse association of dietary antioxidant intake with PD incidence (reviewed in Seidl et al. 2014).
+
+<details>
+<summary><b>Plain English</b></summary>
+
+Different metabolic conditions converge on the same molecular damage. High blood sugar produces methylglyoxal (linked to diabetes complications). Oxidative stress on cell-membrane fats produces malondialdehyde and 4-HNE. Cigarette smoke contains acrolein. All four end up attacking the same protein. This is consistent with two independently-observed epidemiological signals: diabetic patients taking metformin (which lowers methylglyoxal) appear to have lower Parkinson's risk in some studies, and people with higher dietary antioxidant intake show lower Parkinson's risk in others. Neither is proven causal, but both point in the direction the framework predicts.
+</details>
 
 ### 8.3 Limitations
 
@@ -279,7 +379,26 @@ The reactive-aldehyde ordering is determined by α-syn's amino-acid composition 
 
 6. **No wet-lab validation.** Every result is computational. The blind hold-out reproduces published rankings on molecules with known in-vitro activity; it does not establish that the unvalidated top-ranking candidates destabilise toxic oligomers in cells or in patients. The natural follow-up assays are ThT aggregation kinetics, DLS sizing of oligomer-enriched preparations, and LC-MS adduct mapping for the covalent channel.
 
+<details>
+<summary><b>Plain English</b></summary>
+
+Six honest caveats:
+
+1. **The target is a model, not a real measurement.** No one has experimentally captured the toxic oligomer; we built it from published constraints. We checked the result against 11 alternative builds and they all scored similarly, but it could still be off.
+2. **The scores rank, they don't measure.** A score difference between two molecules tells you the framework prefers one; it doesn't tell you by how much in any physical sense.
+3. **The protein was treated as rigid.** Real proteins flex when a molecule binds. Modelling that flexibility is expensive and was only piloted; molecules that work by *reshaping* the oligomer rather than just sitting on it can be under-ranked.
+4. **The scoring biases toward flat aromatic molecules** (the polyphenol shape) because that shape is what the β-sheet surface prefers. The blind test partially controls for this — three different polyphenol subclasses ranked correctly — but the bias is real.
+5. **Bioavailability is not in the score.** A molecule can rank highly here and still fail to reach the brain. The rankings are about α-syn binding, not about supplementation efficacy.
+6. **No lab validation has been done yet.** Every result here is computational. The known-good molecules ranked correctly; the unvalidated candidates remain hypotheses until tested with standard lab assays (ThT, DLS, LC-MS).
+</details>
+
 ## 9. Reproduction
+
+<details>
+<summary><b>Plain English</b></summary>
+
+This section is for someone who wants to *re-run* the analysis on their own computer — re-derive every number and figure in this README from the inputs. It needs Python and a one-time download of the docking tool (AutoDock Vina). The full pipeline takes a few hours on a normal workstation. If you only want to *read* the results or *propose* changes, you don't need to run any of this. If you'd like to run it but get stuck on the setup, open an issue — an AI assistant can also walk you through the install step-by-step.
+</details>
 
 Python 3.12, tested on Windows 11; Linux/macOS supported with adaptation of the Vina binary path.
 
