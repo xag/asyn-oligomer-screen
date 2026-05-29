@@ -4,6 +4,8 @@
 
 > *This repository is computational research output. Nothing in it constitutes medical, dietary, or clinical advice. The rankings are unvalidated hypotheses pending experimental testing.*
 
+**▶ Interactive results:** [`site/index.html`](site/index.html) — protective candidates and suspected-harmful anti-targets, ranked and cross-referenced with how each molecule reaches the brain. Self-contained; download and open in a browser (GitHub will not render it inline). Regenerate with `node site/build_display.mjs`.
+
 ## Plain English Summary
 
 A computational search for dietary, endogenous, and lifestyle-accessible small molecules that may bind and destabilise the toxic α-synuclein oligomer implicated in Parkinson's disease. No atomic structure of that oligomer has been deposited, so the receptor is built from the published topology constraints; ~190 candidates are then docked against it and ranked.
