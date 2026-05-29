@@ -44,3 +44,6 @@ environment.yml.local
 # Misc transient
 *.tmp
 *.bak
+
+# Outreach
+outreach/
