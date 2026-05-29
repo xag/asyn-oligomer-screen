@@ -174,8 +174,7 @@ const html = `<!DOCTYPE html>
   <h1>α-synuclein oligomer screen — results</h1>
   <a class="contribute" href="${REPO}">Contribute, critique, or test a candidate on GitHub →</a>
   <p class="disc">Molecules ranked by a computational model of the toxic α-synuclein
-    oligomer in Parkinson's, each with a plain-English account of how it actually
-    reaches the brain. <b>Unvalidated hypotheses — not medical or dietary advice.</b>
+    oligomer in Parkinson's. <b>Unvalidated hypotheses — not medical or dietary advice.</b>
     Tap any molecule for detail.</p>
 
   <div class="seg">
