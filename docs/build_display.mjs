@@ -8,9 +8,9 @@
 // self-contained HTML file (data embedded inline — opens over file://, no
 // server, no fetch).
 //
-//   node site/build_display.mjs            # writes site/index.html
+//   node docs/build_display.mjs            # writes docs/index.html
 //
-// Run from the repo root.
+// Run from the repo root. Output lives in docs/ so GitHub Pages can serve it.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

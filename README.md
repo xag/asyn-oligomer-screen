@@ -4,7 +4,7 @@
 
 > *This repository is computational research output. Nothing in it constitutes medical, dietary, or clinical advice. The rankings are unvalidated hypotheses pending experimental testing.*
 
-**▶ Interactive results:** [`site/index.html`](site/index.html) — protective candidates and suspected-harmful anti-targets, ranked and cross-referenced with how each molecule reaches the brain. Self-contained; download and open in a browser (GitHub will not render it inline). Regenerate with `node site/build_display.mjs`.
+**▶ [Interactive results page](https://xag.github.io/asyn-oligomer-screen/)** — protective candidates and suspected-harmful anti-targets, ranked and cross-referenced with how each molecule reaches the brain. Source in [docs/](docs/); regenerate with `node docs/build_display.mjs`.
 
 ## Plain English Summary
 
