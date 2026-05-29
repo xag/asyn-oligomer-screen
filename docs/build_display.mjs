@@ -125,12 +125,14 @@ const html = `<!DOCTYPE html>
 
   details.mol { background:var(--card); border:1px solid var(--line); border-radius:10px;
     margin:0 0 7px; overflow:hidden; }
-  details.mol > summary { list-style:none; cursor:pointer; display:flex; align-items:center;
-    gap:11px; padding:11px 13px; min-height:46px; }
+  details.mol > summary { list-style:none; cursor:pointer; display:flex; flex-direction:column;
+    align-items:stretch; gap:8px; padding:11px 13px; }
   details.mol > summary::-webkit-details-marker { display:none; }
-  .nm { font-weight:600; font-size:15.5px; flex:1; }
-  .track { width:60px; height:8px; border-radius:4px; background:var(--track); flex:0 0 auto; overflow:hidden; }
-  .track > i { display:block; height:100%; border-radius:4px; }
+  .nm { font-weight:600; font-size:15.5px; line-height:1.3; }
+  .meta { display:flex; align-items:center; gap:10px; }
+  .track { flex:1 1 auto; height:9px; border-radius:5px; background:var(--track); overflow:hidden; }
+  .track > i { display:block; height:100%; border-radius:5px; }
+  .chipwrap { flex:0 0 132px; display:flex; justify-content:flex-end; }
   .track > i.prot { background:var(--prot); } .track > i.harm { background:var(--harm); }
   .vchip { font-size:11px; padding:2px 9px; border-radius:999px; white-space:nowrap; flex:0 0 auto; }
   .v-crosses { color:var(--crosses); border:1px solid var(--crosses); }
@@ -194,7 +196,7 @@ const VERDICT = {
   crosses:        { label:'reaches the brain',      cls:'v-crosses' },
   boost:          { label:'raise it naturally',     cls:'v-boost' },
   limited:        { label:'a little gets in',       cls:'v-limited' },
-  marker:         { label:'by-product — not a target', cls:'v-marker' },
+  marker:         { label:'not a target',          cls:'v-marker' },
   subtherapeutic: { label:'too little gets in',     cls:'v-sub' },
   'does-not-reach':{ label:'can’t get in',          cls:'v-none' },
   unknown:        { label:'unclear',                cls:'v-unknown' },
@@ -232,8 +234,10 @@ function molProtective(r, max) {
   return \`<details class="mol">
     <summary>
       <span class="nm">\${shortName(r.name)}</span>
-      <span class="track"><i class="prot" style="width:\${pct(-r.dActGated, max)}%"></i></span>
-      <span class="vchip \${v.cls}">\${v.label}</span>
+      <div class="meta">
+        <span class="track"><i class="prot" style="width:\${pct(-r.dActGated, max)}%"></i></span>
+        <span class="chipwrap"><span class="vchip \${v.cls}">\${v.label}</span></span>
+      </div>
     </summary>
     <div class="body">
       <span class="pchip \${pcls}">\${plabel}</span>
@@ -250,7 +254,9 @@ function molHarmful(r, max) {
   return \`<details class="mol">
     <summary>
       <span class="nm">\${shortName(r.name)}</span>
-      <span class="track"><i class="harm" style="width:\${pct(r.aspr, max)}%"></i></span>
+      <div class="meta">
+        <span class="track"><i class="harm" style="width:\${pct(r.aspr, max)}%"></i></span>
+      </div>
     </summary>
     <div class="body">
       <span class="pchip \${pcls}">\${plabel}</span>
