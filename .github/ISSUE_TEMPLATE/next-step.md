@@ -20,3 +20,8 @@ labels: next-step
 ## Dependencies
 
 <!-- Blockers and downstream issues. Omit if none. -->
+
+## Plain English
+
+<!-- 2-4 sentences for a reader outside the project. What's planned, what we expect to learn,
+     why it's worth the effort. No jargon, no acronyms. -->

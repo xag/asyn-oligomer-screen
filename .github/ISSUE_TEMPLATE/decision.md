@@ -22,3 +22,13 @@ labels: decision
 ## Current direction
 
 <!-- What the project is acting on now, even if no formal decision is taken. State it. -->
+
+## Trigger to revisit
+
+<!-- What event or finding would force the call (next anchor round, wet-lab signal, outside
+     contribution, etc.). Lets a fresh reader know whether this is dormant or imminent. -->
+
+## Plain English
+
+<!-- 2-4 sentences for a reader outside the project. What we'd pick by default and what's
+     stopping us from committing. No jargon, no acronyms. -->
