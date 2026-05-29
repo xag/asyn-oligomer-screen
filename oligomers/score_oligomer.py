@@ -44,7 +44,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 PIPELINE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PIPELINE))
+sys.path.insert(0, str(PIPELINE / "scoring"))
 
 from features import FEATURES, ordered_core_full_ids
 from classifier import WEIGHTS

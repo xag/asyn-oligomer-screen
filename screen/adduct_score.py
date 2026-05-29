@@ -34,7 +34,7 @@ from pathlib import Path
 
 from Bio.PDB import PDBParser, SASA
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]
 
 # -----------------------------------------------------------------------------
 # Ligand reactivity table. Weights are intrinsic per-residue chemical rates,
@@ -171,7 +171,7 @@ def _load_structure(spec: str):
     # 4-letter PDB id — load via assembly module to get BIOMT-expanded
     # assembly consistent with Stage 2 / Stage 3 fibril scoring.
     import sys
-    sys.path.insert(0, str(ROOT))
+    sys.path.insert(0, str(ROOT / "scoring"))
     from assembly import load_assembly
     return load_assembly(spec)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from Bio.PDB import PDBList, PDBParser
 
-DATA_DIR = Path(__file__).parent / "data" / "anchors"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "anchors"
 
 
 @dataclass(frozen=True)

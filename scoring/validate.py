@@ -27,7 +27,7 @@ from classifier import WEIGHTS, score_table
 from features import FEATURES, ordered_core_full_ids
 from protofilaments import count_protofilaments
 
-RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 
 PALETTE = {
     "inert":         "#2f6f96",

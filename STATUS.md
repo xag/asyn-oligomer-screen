@@ -73,12 +73,12 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 1. Read this file.
 2. Read [`ANCHORS.md`](ANCHORS.md) for the anchor set and per-anchor context.
 3. Browse [GitHub issues](https://github.com/xag/asyn-oligomer-screen/issues) by label (`result`, `next-step`, `decision`, `caveat`) for full context on any specific topic.
-4. Re-run `validate.py` to reproduce the anchor scores. Useful flags:
+4. Re-run `scoring/validate.py` to reproduce the anchor scores. Useful flags:
    - default: assembly_inner + ordered-core mask + pydssp SS
    - `--no-core-mask`: ablate the mask
    - `--au`: legacy asymmetric-unit mode
    - `--compare`: side-by-side au / assembly_all / assembly_inner
 5. Reproduce the oligomer ensemble: `python oligomers/run_ensemble.py --summary-only` (re-scores all 11 relaxed PDBs in < 1 min). Full re-run: drop `--summary-only`.
-6. Reproduce oligomer Stage 3 controls: `python stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb` (needs `pipeline/bin/vina.exe`). For deposited-anchor pairs: `python stage3.py curcumin 6PEO`.
-7. Inspect the covalent / adduct channel for any reactive ligand: `python adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb`. Sweep CSV has `aspr_score` column.
-8. Default next move: re-run `python sweep_oligomer.py --skip-existing` to keep the sweep CSV current (cheap; backfills aspr columns onto cached reports). Pick the highest-priority `next-step` issue from the tracker.
+6. Reproduce oligomer Stage 3 controls: `python screen/stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb` (needs `bin/vina.exe`). For deposited-anchor pairs: `python screen/stage3.py curcumin 6PEO`.
+7. Inspect the covalent / adduct channel for any reactive ligand: `python screen/adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb`. Sweep CSV has `aspr_score` column.
+8. Default next move: re-run `python screen/sweep_oligomer.py --skip-existing` to keep the sweep CSV current (cheap; backfills aspr columns onto cached reports). Pick the highest-priority `next-step` issue from the tracker.

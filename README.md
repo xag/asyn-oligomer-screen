@@ -29,8 +29,8 @@ This is a first iteration. The pipeline runs end-to-end and every result below i
 
 **In-repo, computational:**
 
-- **Add catechol-quinone covalent chemistry to `adduct_score.py`.** Extend the per-ligand `rxty` table with dopamine, DOPAC, norepinephrine, aminochrome, and 6-OHDA entries. Currently these score as weakly protective on the reversible channel, even though the published mechanism is α-syn oligomer stabilisation via quinone-mediated Lys-Schiff and Cys-Michael adducts — the same chemistry family the covalent channel already handles for MDA, acrolein, 4-HNE, and MGO (Conway et al. 2001; Norris et al. 2005; Mazzulli et al. 2006).
-- **Run longer-timescale MD around docked poses.** The pilot in `md_stage3.py` was inconclusive at 50 ps. ≥10 ns runs would let stabilising binders show positive Δact through receptor rearrangement, partly removing the §8.3 sign-bound.
+- **Add catechol-quinone covalent chemistry to `screen/adduct_score.py`.** Extend the per-ligand `rxty` table with dopamine, DOPAC, norepinephrine, aminochrome, and 6-OHDA entries. Currently these score as weakly protective on the reversible channel, even though the published mechanism is α-syn oligomer stabilisation via quinone-mediated Lys-Schiff and Cys-Michael adducts — the same chemistry family the covalent channel already handles for MDA, acrolein, 4-HNE, and MGO (Conway et al. 2001; Norris et al. 2005; Mazzulli et al. 2006).
+- **Run longer-timescale MD around docked poses.** The pilot in `screen/md_stage3.py` was inconclusive at 50 ps. ≥10 ns runs would let stabilising binders show positive Δact through receptor rearrangement, partly removing the §8.3 sign-bound.
 - **Add a shape-stability channel based on multi-replica short MD.** Instead of scoring whether a ligand changes the activity of a static complex, measure whether it narrows the distribution of oligomer shapes at fixed Δt across many MD replicas. Bypasses the §8.3 sign-bound and reuses the 11-topology ensemble for shape coverage.
 - **Build a metal-coordination scoring channel.** Cu²⁺, Fe²⁺/³⁺ currently fail at the Meeko PDBQT stage (single-atom-ligand limitation) and drop out of the rankings entirely. Replace with parametrised-ion MD against α-syn, or with a coordination-chemistry score against the N-terminal Cu/Fe sites (Rasia et al. 2005; Davies et al. 2011).
 - **Build alternative receptor models** under the same Fusco topology constraints, to test how strongly the ranking depends on the specific relaxed geometry used here.
@@ -133,7 +133,7 @@ The construction does not prove that this geometry corresponds to the experiment
 
 ### 4.2 Docking and scoring
 
-For each candidate molecule M and the reference toxic-oligomer model O (`stage3.py`):
+For each candidate molecule M and the reference toxic-oligomer model O (`screen/stage3.py`):
 
 1. Embed M in 3D from SMILES (RDKit ETKDGv3), minimise with MMFF94s, and prepare a PDBQT ligand with Meeko.
 2. Prepare a PDBQT receptor from O with `mk_prepare_receptor` (Meeko).
@@ -148,7 +148,7 @@ The `contact_density` feature is computed in a ligand-aware mode: ligand heavy a
 
 AutoDock Vina evaluates non-covalent binding affinity only. Four reactive aldehydes in the candidate list — malondialdehyde (MDA), acrolein, 4-hydroxynonenal (4-HNE), and methylglyoxal (MGO) — modify α-syn covalently in vivo (Vicente-Miranda et al. 2017; reviewed in Bae & Kim 2013): MDA forms Schiff bases on lysines, acrolein and 4-HNE form Michael adducts on cysteines / histidines / lysines, and MGO forms carboxyethyl-lysine (CEL) and methylglyoxal-derived hydroimidazolone (MGH) adducts on lysines and arginines respectively. The reversible-binding gate (§4.2) correctly suppresses these reagents on `delta_activity_gated` because their non-covalent binding affinity is weak.
 
-`adduct_score.py` adds an orthogonal channel:
+`screen/adduct_score.py` adds an orthogonal channel:
 
 ```
 aspr_score(O, M) = (1 / n_chains) Σ_chains Σ_relevant_residues  min(1, SASA(r) / 200 Å²) × rxty(M, type(r))
@@ -271,7 +271,7 @@ The reactive-aldehyde ordering is determined by α-syn's amino-acid composition 
 
 2. **Activity scores are ordinal.** A `Δact_gated` of −0.24 against an apo baseline of +17.78 is a 1.4% perturbation in the framework's internal units. The framework is calibrated to rank, not to predict absolute occupancy. Comparisons across molecules are valid; the magnitudes are not.
 
-3. **Static docking.** No molecular dynamics relaxation around the bound pose is performed in the production pipeline. Receptor flexibility is therefore not represented; harm-leaning non-covalent modes (where receptor rearrangement increases the activity score) are sign-bounded out of the current channel. Pilot 50 ps MD around six pairs (`md_stage3.py`) was inconclusive because thermal sampling on that timescale dominates ligand-induced effects; longer simulations are deferred.
+3. **Static docking.** No molecular dynamics relaxation around the bound pose is performed in the production pipeline. Receptor flexibility is therefore not represented; harm-leaning non-covalent modes (where receptor rearrangement increases the activity score) are sign-bounded out of the current channel. Pilot 50 ps MD around six pairs (`screen/md_stage3.py`) was inconclusive because thermal sampling on that timescale dominates ligand-induced effects; longer simulations are deferred.
 
 4. **Polyphenol-class bias.** The features reward aromatic engagement with β-strand surfaces. This is a real biophysical signal (aromatic π-π stacking with extended β-sheets) but means structurally similar molecules will tend to cluster in the rankings. The blind hold-out (where polyphenols of three distinct sub-classes — flavonolignan, catechin gallate, flavonol — were ranked correctly) and the non-polyphenol hits (steroids, alkaloids, disaccharide) bound the bias but do not eliminate it.
 
@@ -292,7 +292,7 @@ uv venv && uv pip install -r requirements.txt
 **Anchor calibration** (no Vina required; auto-downloads PDB files to `data/anchors/` on first run):
 
 ```bash
-.venv/bin/python validate.py
+.venv/bin/python scoring/validate.py
 ```
 
 Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activity-vs-class plot.
@@ -306,14 +306,14 @@ Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activ
 **Single (molecule, target) perturbation**. Download the AutoDock Vina 1.2.5 binary from [https://github.com/ccsb-scripps/AutoDock-Vina/releases](https://github.com/ccsb-scripps/AutoDock-Vina/releases) and place it at `bin/vina.exe`.
 
 ```bash
-.venv/bin/python stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
-.venv/bin/python stage3.py curcumin 6PEO   # against a deposited fibril for comparison
+.venv/bin/python screen/stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
+.venv/bin/python screen/stage3.py curcumin 6PEO   # against a deposited fibril for comparison
 ```
 
 **Full sweep**:
 
 ```bash
-.venv/bin/python sweep_oligomer.py --skip-existing
+.venv/bin/python screen/sweep_oligomer.py --skip-existing
 ```
 
 `--skip-existing` re-reads cached reports without re-docking; `--no-skip` forces a full re-dock (~3 h on a workstation).
@@ -321,7 +321,7 @@ Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activ
 **Covalent channel**:
 
 ```bash
-.venv/bin/python adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
+.venv/bin/python screen/adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
 ```
 
 **MD relaxation (optional)**. The OpenMM + openff-toolkit + openmmforcefields stack does not co-exist cleanly with the pip pipeline; create a separate conda environment and point at it via the `ASYN_MD_PYTHON` environment variable:
@@ -329,58 +329,20 @@ Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activ
 ```bash
 conda create -n asyn-md python=3.11 openmm openff-toolkit openmmforcefields -c conda-forge
 export ASYN_MD_PYTHON="$HOME/miniforge3/envs/asyn-md/bin/python"
-.venv/bin/python md_stage3.py
+.venv/bin/python screen/md_stage3.py
 ```
 
-## 10. File guide
-
-```
-README.md                              this file
-STATUS.md                              chronological development log; source of truth for "why"
-ANCHORS.md                             anchor structure curation and per-entry rationale
-LICENSE                                MIT
-
-# Activity score
-anchors.py                             PDB structure loader with cache
-assembly.py                            REMARK 350 biological assembly builder
-features.py                            five per-conformer features
-classifier.py                          weighted z-score
-protofilaments.py                      geometric protofilament counter
-validate.py                            run the 14-anchor calibration
-analyze_protofilaments.py              within-class PF-count correlation
-
-# Toxic-oligomer model
-oligomers/build_fusco_trimer.py        topology-prior build
-oligomers/score_oligomer.py            all-chain mean + β-gate scoring
-oligomers/run_ensemble.py              build / relax / score / summary across 11 topologies
-oligomers/README.md                    sub-package notes
-
-# Perturbation screen
-stage3.py                              single (molecule, target) docking + scoring
-sweep_oligomer.py                      full vicinity-list sweep
-recompute_stage3.py                    re-score cached pairs after feature changes
-adduct_score.py                        covalent-adduct reactivity channel
-md_relax.py                            OpenMM MD relaxation of a docked complex
-md_stage3.py                           batch MD-relax + re-score
-
-# Inputs
-data/vicinity_molecules.js             191-entry candidate list
-data/anchors/                          PDB cache (gitignored; auto-populated)
-
-# Artifacts
-results/anchor_features.csv            anchor-calibration features
-results/anchor_scores.csv              anchor activity scores
-results/anchor_activity.png            activity-vs-class plot
-results/anchor_features.png            per-feature anchor profiles
-results/oligomers/*_relaxed.pdb        11 relaxed oligomer structures
-results/oligomers/ensemble_summary.csv ensemble activity scores
-results/sweep/fusco_*_sweep.csv        127-molecule perturbation screen
-results/stage3/                        per-pair docking artifacts (gitignored)
-```
+Each top-level directory carries a `README.md` describing its contents:
+[scoring/](scoring/) (activity score + calibration),
+[oligomers/](oligomers/) (toxic-oligomer model construction),
+[screen/](screen/) (perturbation screen + covalent channel),
+[data/](data/) (candidate list, PDB cache),
+[results/](results/) (calibration outputs, ensemble, sweep),
+[bin/](bin/) (Vina binary).
 
 `STATUS.md` records the chronological development log including framework fixes, abandoned approaches, and decisions made during construction. It is the source of truth for the reasoning behind every choice and is the natural entry point for anyone extending the work.
 
-## 11. References
+## 10. References
 
 Antonschmidt L, Matthes D, Dervişoğlu R, et al. The clinical drug candidate anle138b binds in a cavity of lipidic α-synuclein fibrils. *Nat Commun* 13, 5385 (2022).
 
@@ -486,7 +448,7 @@ Yang Y, Shi Y, Schweighauser M, et al. Structures of α-synuclein filaments from
 
 Zarranz JJ, Alegre J, Gómez-Esteban JC, et al. The new mutation, E46K, of α-synuclein causes Parkinson and Lewy body dementia. *Ann Neurol* 55, 164–173 (2004).
 
-## 12. License and citation
+## 11. License and citation
 
 MIT License — see `LICENSE`.
 

@@ -54,7 +54,7 @@ from stage3 import (
     load_vicinity_molecule,
 )
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]
 STAGE3 = ROOT / "results" / "stage3"
 _MD_PY_ENV = os.environ.get("ASYN_MD_PYTHON")
 if not _MD_PY_ENV:
@@ -64,7 +64,7 @@ if not _MD_PY_ENV:
         "See README.md (Reproduction / MD relaxation)."
     )
 MD_PYTHON = Path(_MD_PY_ENV)
-MD_RELAX = ROOT / "md_relax.py"
+MD_RELAX = Path(__file__).parent / "md_relax.py"
 
 
 def _run_md(cmd: list[str], out_pdb: Path, tag: str) -> None:

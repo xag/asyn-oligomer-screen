@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).parent))
 
 from adduct_score import LIGAND_REACTIVITY, aspr_score
 from stage3 import (

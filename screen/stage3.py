@@ -52,12 +52,14 @@ from Bio.PDB.Structure import Structure
 
 from Bio.PDB import PDBParser as _PDBParser
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scoring"))
+
 from adduct_score import LIGAND_REACTIVITY, aspr_score
 from assembly import inner_chain_ids, load_assembly
 from classifier import WEIGHTS
 from features import FEATURES, ordered_core_full_ids
 
-ROOT = Path(__file__).parent
 RESULTS = ROOT / "results" / "stage3"
 VINA_BIN = ROOT / "bin" / "vina.exe"
 MK_PREP_RECEPTOR = ROOT / ".venv" / "Scripts" / "mk_prepare_receptor.exe"
