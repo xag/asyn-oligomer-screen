@@ -114,6 +114,8 @@ const html = `<!DOCTYPE html>
   .disc b { color:var(--limited); }
   .contribute { display:inline-block; font-size:13px; margin:0 0 4px; color:var(--novel); text-decoration:none; }
   .contribute:hover { text-decoration:underline; }
+  .handoff { display:block; font-size:13px; margin:0 0 4px; color:var(--novel); text-decoration:none; }
+  .handoff:hover { text-decoration:underline; }
 
   .seg { display:flex; gap:6px; margin:14px 0 6px; position:sticky; top:0;
     background:var(--bg); padding:8px 0; z-index:5; }
@@ -173,6 +175,7 @@ const html = `<!DOCTYPE html>
 <div class="wrap">
   <h1>α-synuclein oligomer screen — results</h1>
   <a class="contribute" href="${REPO}">Contribute, critique, or test a candidate on GitHub →</a>
+  <a class="handoff" href="${REPO}/blob/main/docs/HANDOFF.md">Wet-lab handoff package — 7 candidates to test + 4 exposures to reduce →</a>
   <p class="disc">Molecules ranked by a computational model of the toxic α-synuclein
     oligomer in Parkinson's. <b>Unvalidated hypotheses — not medical or dietary advice.</b>
     Tap any molecule for detail.</p>
