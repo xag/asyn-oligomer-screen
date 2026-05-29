@@ -172,13 +172,6 @@ const html = `<!DOCTYPE html>
   .seg button.on.harm { color:#0e1117; background:var(--harm); border-color:var(--harm); }
   .intro { color:var(--dim); font-size:13px; margin:2px 0 10px; }
 
-  .callout { background:#11261a; border:1px solid #1f6f3a; border-radius:12px;
-    padding:12px 14px; margin:0 0 16px; }
-  .callout h2 { font-size:13px; margin:0 0 6px; color:var(--reaches);
-    text-transform:uppercase; letter-spacing:.04em; }
-  .chip { display:inline-block; margin:3px 6px 0 0; padding:3px 11px; border-radius:999px;
-    font-size:13px; background:var(--bg); border:1px solid #1f6f3a; }
-
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
     padding:13px 14px; margin:0 0 11px; }
   .top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -205,6 +198,8 @@ const html = `<!DOCTYPE html>
   .reachline { margin:2px 0; }
   .reachline.barrier { color:var(--barrier); }
   .reachline.conditional { color:var(--conditional); }
+  .reachline { margin-top:4px; }
+  .mini { font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
   .notes { color:var(--dim); }
   .lever { color:var(--reaches); }
 
@@ -229,7 +224,6 @@ const html = `<!DOCTYPE html>
   </div>
   <p class="intro" id="intro"></p>
 
-  <div id="callout"></div>
   <div id="list"></div>
   <button class="more" id="more"></button>
 
@@ -247,18 +241,12 @@ const ROUTE_LABEL = {
   injection:'injection', 'none-known':'route unknown',
 };
 
-// plain-language "does it reach the brain", from feasibility + route
-function reachSentence(r) {
-  if (r.reach === 'conditional')
-    return 'Made by gut bacteria — reaches the brain only in people whose microbiome produces it.';
-  switch (r.feasibility) {
-    case 'native': return 'The body makes it; already present in the brain.';
-    case 'achievable': return 'Reaches the brain at useful levels from diet or supplements.';
-    case 'low-bioavailability':
-      return 'Poorly absorbed — little reaches the brain without special formulation.';
-    case 'invasive-only': return 'Only reaches the brain by injection or infusion.';
-    default: return 'Brain delivery not well characterised.';
-  }
+// concrete achievable brain concentration, straight from the curated CNS data
+function brainLevel(r) {
+  const range = (r.cnsLow && r.cnsHigh) ? r.cnsLow + '–' + r.cnsHigh
+    : r.cnsLow ? r.cnsLow : null;
+  if (!range && !r.cnsNote) return '';
+  return (range || '') + (r.cnsNote ? (range ? ' — ' : '') + r.cnsNote : '');
 }
 
 // actionable lever for an anti-target, keyword-derived from its source notes
@@ -289,8 +277,8 @@ function cardProtective(r, max) {
     <div class="how">
       <div class="lbl"><span class="dot \${r.reach}"></span><b>Getting it to the brain</b>
         <span class="route">\${ROUTE_LABEL[r.route]}</span></div>
-      <div class="reachline \${reachCls}">\${reachSentence(r)}</div>
       \${r.deliveryNotes ? '<div class="notes">' + r.deliveryNotes + '.</div>' : ''}
+      \${brainLevel(r) ? '<div class="reachline ' + reachCls + '"><span class="mini">Brain level reached</span> ' + brainLevel(r) + '</div>' : ''}
     </div>
   </div>\`;
 }
@@ -322,17 +310,6 @@ function render() {
   document.getElementById('intro').textContent = prot
     ? 'Candidates the model predicts could break up the toxic oligomer. Top of the list = strongest predicted effect.'
     : 'Reactive molecules the model flags as likely to damage α-synuclein and accelerate aggregation. These are exposures to reduce, not things to take.';
-
-  // "test first" callout: strong predicted effect AND reaches the brain readily
-  const co = document.getElementById('callout');
-  if (prot) {
-    const mags = all.map(r => -r.dActGated).sort((a,b)=>a-b);
-    const med = mags[Math.floor(mags.length/2)];
-    const first = all.filter(r => (-r.dActGated) >= med && r.reach === 'reaches');
-    co.innerHTML = '<div class="callout"><h2>Most actionable to test first</h2>'
-      + '<div>Strong predicted effect <i>and</i> already reaches the brain from the body or diet:</div>'
-      + first.map(r => '<span class="chip">' + shortName(r.name) + '</span>').join('') + '</div>';
-  } else co.innerHTML = '';
 
   const shown = showAll ? all : all.slice(0, TOPN);
   document.getElementById('list').innerHTML =
