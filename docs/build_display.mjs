@@ -3,11 +3,6 @@
 // (data/vicinity_molecules.js) and the plain-English brain-access justification
 // layer (data/brain_access.js).
 //
-// The sweep CSV carries the ranking signal; it does NOT say how a molecule
-// reaches the brain. That comes from the candidate list + brain_access. This
-// script joins them on `id` and emits a single self-contained HTML file (data
-// embedded inline — opens over file://, no server, no fetch).
-//
 //   node docs/build_display.mjs            # writes docs/index.html
 //
 // Run from the repo root. Output lives in docs/ so GitHub Pages can serve it.
@@ -77,15 +72,14 @@ for (const r of sweep) {
   records.push({
     id: r.mol_id,
     name: meta.name ?? r.mol_name,
-    group: meta.group,
     dActGated: Number.isFinite(dActGated) ? dActGated : 0,
     aspr: Number.isFinite(aspr) ? aspr : 0,
     deliveryNotes: meta?.delivery?.notes ?? '',
     cnsLow: meta?.cns_conc?.low ?? null,
     cnsHigh: meta?.cns_conc?.high ?? null,
-    cnsNote: meta?.cns_conc?.note ?? '',
     verdict: ba?.verdict ?? 'unknown',
     brainRoute: ba?.route ?? '',
+    lever: ba?.lever ?? '',
     prov: provenance(meta),
   });
 }
@@ -95,9 +89,6 @@ const harmfulIds = new Set(harmful.map((r) => r.id));
 const protective = records
   .filter((r) => r.dActGated < 0 && !harmfulIds.has(r.id))
   .sort((a, b) => a.dActGated - b.dActGated);
-
-protective.forEach((r, i) => (r.rank = i + 1));
-harmful.forEach((r, i) => (r.rank = i + 1));
 
 const payload = JSON.stringify({ protective, harmful });
 
@@ -109,9 +100,10 @@ const html = `<!DOCTYPE html>
 <title>α-synuclein oligomer screen — results</title>
 <style>
   :root {
-    --bg:#0e1117; --card:#161b22; --line:#2b3240; --txt:#e3e8ef; --dim:#9aa5b4;
-    --crosses:#3fb950; --endo:#58a6ff; --limited:#d29922; --sub:#f0883e; --none:#f85149;
-    --prot:#3fb950; --harm:#f85149;
+    --bg:#0e1117; --card:#161b22; --line:#2b3240; --txt:#e3e8ef; --dim:#9aa5b4; --track:#222a36;
+    --crosses:#3fb950; --boost:#2dd4bf; --limited:#d29922; --marker:#8b95a5;
+    --sub:#f0883e; --none:#f85149; --prot:#3fb950; --harm:#f85149;
+    --known:#8b95a5; --novel:#58a6ff; --holdout:#bc8cff;
   }
   * { box-sizing:border-box; -webkit-text-size-adjust:100%; }
   body { margin:0; background:var(--bg); color:var(--txt);
@@ -120,8 +112,7 @@ const html = `<!DOCTYPE html>
   h1 { font-size:18px; margin:0 0 6px; line-height:1.3; }
   .disc { color:var(--dim); font-size:13px; margin:0 0 10px; }
   .disc b { color:var(--limited); }
-  .contribute { display:inline-block; font-size:13px; margin:0 0 4px;
-    color:var(--endo); text-decoration:none; }
+  .contribute { display:inline-block; font-size:13px; margin:0 0 4px; color:var(--novel); text-decoration:none; }
   .contribute:hover { text-decoration:underline; }
 
   .seg { display:flex; gap:6px; margin:14px 0 6px; position:sticky; top:0;
@@ -135,44 +126,45 @@ const html = `<!DOCTYPE html>
   details.mol { background:var(--card); border:1px solid var(--line); border-radius:10px;
     margin:0 0 7px; overflow:hidden; }
   details.mol > summary { list-style:none; cursor:pointer; display:flex; align-items:center;
-    gap:9px; padding:10px 13px; min-height:44px; }
+    gap:11px; padding:11px 13px; min-height:46px; }
   details.mol > summary::-webkit-details-marker { display:none; }
-  .rk { color:var(--dim); font-variant-numeric:tabular-nums; font-size:12.5px; min-width:30px; }
   .nm { font-weight:600; font-size:15.5px; flex:1; }
-  .vchip { font-size:11px; padding:2px 9px; border-radius:999px; white-space:nowrap; }
+  .track { width:60px; height:8px; border-radius:4px; background:var(--track); flex:0 0 auto; overflow:hidden; }
+  .track > i { display:block; height:100%; border-radius:4px; }
+  .track > i.prot { background:var(--prot); } .track > i.harm { background:var(--harm); }
+  .vchip { font-size:11px; padding:2px 9px; border-radius:999px; white-space:nowrap; flex:0 0 auto; }
   .v-crosses { color:var(--crosses); border:1px solid var(--crosses); }
-  .v-endo { color:var(--endo); border:1px solid var(--endo); }
+  .v-boost { color:var(--boost); border:1px solid var(--boost); }
   .v-limited { color:var(--limited); border:1px solid var(--limited); }
+  .v-marker { color:var(--marker); border:1px solid var(--marker); }
   .v-sub { color:var(--sub); border:1px solid var(--sub); }
   .v-none { color:var(--none); border:1px solid var(--none); }
   .v-unknown { color:var(--dim); border:1px solid var(--dim); }
-  .chev { color:var(--dim); transition:transform .15s; flex:0 0 auto; font-size:12px; }
-  details.mol[open] .chev { transform:rotate(90deg); }
 
   .body { padding:2px 13px 13px; font-size:13.5px; }
-  .eff { display:flex; align-items:center; gap:9px; margin:4px 0 11px; }
-  .bar { height:7px; border-radius:4px; flex:0 0 auto; }
-  .bar.prot { background:var(--prot); } .bar.harm { background:var(--harm); }
-  .efftxt { color:var(--dim); font-size:12px; }
+  .pchip { display:inline-block; font-size:11px; padding:2px 9px; border-radius:999px; margin:4px 0 2px; }
+  .p-known { color:var(--known); border:1px solid var(--known); }
+  .p-novel { color:var(--novel); border:1px solid var(--novel); }
+  .p-holdout { color:var(--holdout); border:1px solid var(--holdout); }
   .field { margin:9px 0; }
   .field .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim);
     display:block; margin-bottom:1px; }
   .field .val { line-height:1.5; }
-  .lever { color:var(--crosses); }
+  .raise { color:var(--boost); }
+  .reduce { color:var(--harm); }
 
-  .grouphdr { color:var(--dim); font-size:12.5px; margin:20px 0 8px; display:flex;
-    align-items:center; gap:8px; }
+  .grouphdr { color:var(--dim); font-size:12.5px; margin:20px 0 8px; display:flex; align-items:center; gap:8px; }
   .grouphdr::before, .grouphdr::after { content:""; flex:1; height:1px; background:var(--line); }
-  details.barriergroup { margin:8px 0 0; }
-  details.barriergroup > summary { list-style:none; cursor:pointer; color:var(--dim);
-    font-size:13px; padding:12px 13px; min-height:44px; background:var(--card);
-    border:1px dashed var(--line); border-radius:10px; display:flex; align-items:center; gap:8px; }
-  details.barriergroup > summary::-webkit-details-marker { display:none; }
-  details.barriergroup[open] > summary { margin-bottom:8px; }
+  details.group { margin:8px 0 0; }
+  details.group > summary { list-style:none; cursor:pointer; color:var(--dim); font-size:13px;
+    padding:12px 13px; min-height:46px; background:var(--card); border:1px dashed var(--line);
+    border-radius:10px; }
+  details.group > summary::-webkit-details-marker { display:none; }
+  details.group[open] > summary { margin-bottom:8px; }
   .gcount { color:var(--txt); }
 
-  .foot { color:var(--dim); font-size:12px; margin:22px 0 0; line-height:1.8; }
-  .foot a { color:var(--endo); }
+  .foot { color:var(--dim); font-size:12px; margin:22px 0 0; line-height:2; }
+  .foot a { color:var(--novel); }
 </style>
 </head>
 <body>
@@ -199,66 +191,71 @@ const DATA = ${payload};
 let panel = 'protective';
 
 const VERDICT = {
-  crosses:        { label:'reaches the brain',  cls:'v-crosses' },
-  endogenous:     { label:'made in the brain',  cls:'v-endo' },
-  limited:        { label:'a little gets in',   cls:'v-limited' },
-  subtherapeutic: { label:'too little gets in', cls:'v-sub' },
-  'does-not-reach':{ label:'doesn’t get in',    cls:'v-none' },
-  unknown:        { label:'unclear',            cls:'v-unknown' },
+  crosses:        { label:'reaches the brain',      cls:'v-crosses' },
+  boost:          { label:'raise it naturally',     cls:'v-boost' },
+  limited:        { label:'a little gets in',       cls:'v-limited' },
+  marker:         { label:'by-product — not a target', cls:'v-marker' },
+  subtherapeutic: { label:'too little gets in',     cls:'v-sub' },
+  'does-not-reach':{ label:'can’t get in',          cls:'v-none' },
+  unknown:        { label:'unclear',                cls:'v-unknown' },
 };
-const REACHES = new Set(['crosses', 'endogenous', 'limited', 'unknown']);
+const REACH = new Set(['crosses', 'boost', 'limited', 'unknown']);
+const MARKER = new Set(['marker']);
 
+function provLabel(prov, prot) {
+  if (prot) {
+    if (prov === 'known') return ['Known α-synuclein modulator', 'p-known'];
+    if (prov === 'holdout') return ['Known modulator (used as a blind test)', 'p-holdout'];
+    return ['New lead — no prior α-syn evidence', 'p-novel'];
+  }
+  if (prov === 'known') return ['Documented α-synuclein-damaging agent', 'p-known'];
+  return ['Suspected — weaker evidence', 'p-novel'];
+}
 function brainLevel(r) {
-  // bare concentration range only — the curated note carries jargon, and the
-  // plain-English route + verdict already convey whether the level is enough
   return (r.cnsLow && r.cnsHigh) ? r.cnsLow + '–' + r.cnsHigh : (r.cnsLow || '');
 }
 function harmLever(r) {
   const t = r.deliveryNotes.toLowerCase(); const o = [];
-  if (/glyc|\\bage\\b|ages|browning|maillard|hyperglyc/.test(t)) o.push('lower blood sugar; limit browned & ultra-processed foods');
-  if (/lipid peroxidation|polyunsaturat|oxidative|peroxid/.test(t)) o.push('more antioxidants; avoid oxidised / rancid fats');
+  if (/glyc|\\bage\\b|ages|browning|maillard|hyperglyc/.test(t)) o.push('keep blood sugar down; cut back on browned & ultra-processed foods');
+  if (/lipid peroxidation|polyunsaturat|oxidative|peroxid/.test(t)) o.push('eat more antioxidants; avoid oxidised / rancid fats');
   if (/smok|tobacco/.test(t)) o.push('avoid tobacco smoke');
   if (/heated|overheat|cooking oil|frying/.test(t)) o.push('don’t overheat cooking oils');
   return o.join('; ');
 }
 function shortName(n){ return n.replace(/\\s*\\(.*\\)/, ''); }
 function field(lbl, val, cls){ return val ? '<div class="field"><span class="lbl">' + lbl + '</span><span class="val ' + (cls||'') + '">' + val + '</span></div>' : ''; }
+function pct(v, max){ return Math.max(3, Math.round((v / max) * 100)); }
 
 function molProtective(r, max) {
   const v = VERDICT[r.verdict];
-  const w = Math.max(4, Math.round((-r.dActGated / max) * 130));
+  const [plabel, pcls] = provLabel(r.prov, true);
   return \`<details class="mol">
     <summary>
-      <span class="rk">#\${r.rank}</span>
       <span class="nm">\${shortName(r.name)}</span>
+      <span class="track"><i class="prot" style="width:\${pct(-r.dActGated, max)}%"></i></span>
       <span class="vchip \${v.cls}">\${v.label}</span>
-      <span class="chev">▶</span>
     </summary>
     <div class="body">
-      <div class="eff"><span class="bar prot" style="width:\${w}px"></span>
-        <span class="efftxt">predicted to break up the toxic clump — rank \${r.rank} of \${DATA.protective.length}</span></div>
+      <span class="pchip \${pcls}">\${plabel}</span>
       \${field('How it gets into the brain', r.brainRoute)}
+      \${field('How to make more', r.lever, 'raise')}
       \${field('Typical brain level', brainLevel(r))}
     </div>
   </details>\`;
 }
 
 function molHarmful(r, max) {
-  const v = VERDICT[r.verdict];
-  const w = Math.max(4, Math.round((r.aspr / max) * 130));
+  const [plabel, pcls] = provLabel(r.prov, false);
   const lever = harmLever(r);
   return \`<details class="mol">
     <summary>
-      <span class="rk">#\${r.rank}</span>
       <span class="nm">\${shortName(r.name)}</span>
-      <span class="vchip \${v.cls}">\${v.label}</span>
-      <span class="chev">▶</span>
+      <span class="track"><i class="harm" style="width:\${pct(r.aspr, max)}%"></i></span>
     </summary>
     <div class="body">
-      <div class="eff"><span class="bar harm" style="width:\${w}px"></span>
-        <span class="efftxt">damages α-synuclein — reactivity +\${r.aspr.toFixed(2)}</span></div>
+      <span class="pchip \${pcls}">\${plabel}</span>
       \${field('Where it comes from', r.brainRoute)}
-      \${field('Lower it by', lever, 'lever')}
+      \${field('How to reduce your exposure', lever, 'reduce')}
     </div>
   </details>\`;
 }
@@ -268,23 +265,23 @@ function render() {
   const all = DATA[panel];
   const max = prot ? Math.max(...all.map(r => -r.dActGated)) : Math.max(...all.map(r => r.aspr));
   document.getElementById('intro').textContent = prot
-    ? 'Candidates the model predicts could break up the toxic clump, grouped by whether they actually reach the brain. Top of the list = strongest predicted effect.'
-    : 'Reactive molecules the model flags as damaging to α-synuclein — exposures to reduce, not things to take.';
+    ? 'Candidates the model predicts could break up the toxic clump, grouped by whether you can actually get more of them into the brain. Longer bar = stronger predicted effect.'
+    : 'Reactive molecules the model flags as damaging to α-synuclein. These are exposures to reduce — longer bar = more reactive.';
 
   const list = document.getElementById('list');
-  if (!prot) {
-    list.innerHTML = all.map(r => molHarmful(r, max)).join('');
-    return;
-  }
-  const reach = all.filter(r => REACHES.has(r.verdict));
-  const barrier = all.filter(r => !REACHES.has(r.verdict));
+  if (!prot) { list.innerHTML = all.map(r => molHarmful(r, max)).join(''); return; }
+
+  const reach = all.filter(r => REACH.has(r.verdict));
+  const marker = all.filter(r => MARKER.has(r.verdict));
+  const barrier = all.filter(r => !REACH.has(r.verdict) && !MARKER.has(r.verdict));
+  const group = (title, sub, arr) => arr.length
+    ? '<details class="group"><summary><span class="gcount">' + arr.length + '</span> ' + title
+      + ' — ' + sub + '</summary>' + arr.map(r => molProtective(r, max)).join('') + '</details>'
+    : '';
   list.innerHTML =
     reach.map(r => molProtective(r, max)).join('')
-    + (barrier.length ? '<div class="grouphdr">below: rank well, but don’t reach the brain</div>'
-        + '<details class="barriergroup"><summary>▶ <span class="gcount">'
-        + barrier.length + ' candidates</span>&nbsp;that bind in the model but can’t get into the brain in useful amounts — a delivery problem, not benefits</summary>'
-        + barrier.map(r => molProtective(r, max)).join('') + '</details>'
-      : '');
+    + group('made in the brain', 'by-products or markers — nothing useful to raise, or you’d want less', marker)
+    + group('can’t get into the brain', 'bind in the model but don’t reach the brain from outside — a delivery problem, not benefits', barrier);
 }
 
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
@@ -296,12 +293,12 @@ document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
 });
 
 document.getElementById('foot').innerHTML =
-  '<b>How to read the tags:</b> '
-  + '<span class="vchip v-crosses">reaches the brain</span> taking it in raises the brain level · '
-  + '<span class="vchip v-endo">made in the brain</span> already there; only a metabolic lever · '
+  '<b>Tags:</b> '
+  + '<span class="vchip v-crosses">reaches the brain</span> eat/supplement it · '
+  + '<span class="vchip v-boost">raise it naturally</span> the brain makes it — diet/activity/sleep raises it · '
   + '<span class="vchip v-limited">a little gets in</span> modest/uncertain · '
-  + '<span class="vchip v-sub">too little gets in</span> far below the needed amount · '
-  + '<span class="vchip v-none">doesn’t get in</span> blocked entirely.<br>'
+  + '<span class="vchip v-marker">by-product</span> not a target · '
+  + '<span class="vchip v-sub">too little gets in</span> / <span class="vchip v-none">can’t get in</span>.<br>'
   + 'Every result is an unvalidated computational hypothesis. Method, candidate list, and caveats: '
   + '<a href="${REPO}">github.com/xag/asyn-oligomer-screen</a> — contributions, critiques, and wet-lab tests welcome.';
 

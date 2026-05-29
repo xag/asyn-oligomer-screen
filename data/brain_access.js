@@ -2,27 +2,28 @@
 //
 // The original inclusion gate for data/vicinity_molecules.js ("plausibly reaches
 // the substantia nigra") was never enforced per molecule. This file makes that
-// gate explicit and auditable: every docked candidate must carry a concrete,
-// real reason it reaches the brain, and a verdict. Molecules that do not reach
-// the brain at useful levels are demoted out of the "worth testing" view (they
-// stay visible, flagged as a delivery problem).
+// gate explicit and auditable: every docked candidate carries a concrete,
+// plain-English reason it reaches the brain, a verdict, and — where one exists —
+// a practical `lever` for actually changing the brain level (diet, supplement,
+// activity, sleep). Molecules that can't reach useful levels, or that you would
+// not want more of, are demoted out of the "worth testing" view.
 //
-// `route` is written in PLAIN ENGLISH — it is shown to readers, so it avoids
-// jargon (no "BBB", "LAT1", "glucuronidation"). The pharmacology underneath is
-// standard absorption / blood-brain-barrier knowledge, not a claim about
-// α-synuclein activity. "Too little reaches" and "doesn't reach" are honest
-// findings, not failures.
+// `route` and `lever` are PLAIN ENGLISH — they are shown to readers, so no
+// jargon. The pharmacology underneath is standard absorption / blood-brain-
+// barrier knowledge, not a claim about α-synuclein activity.
 //
 // verdict (drives display grouping):
-//   crosses        taking it in actually raises the level in the brain
-//   endogenous     the body already makes it inside the brain; the lever is
-//                  metabolic, not swallowing it (often can't be raised from outside)
+//   crosses        taking it in raises the brain level (eat/supplement it)
 //   limited        some gets in, but only a little / uncertain
+//   boost          the brain makes it, and you CAN raise it — diet, activity,
+//                  sleep, etc. (the `lever` says how)
+//   marker         the brain makes it, but it is a by-product/marker, or you
+//                  would NOT want more of it — not a target
 //   subtherapeutic gets in only far below the amount the effect would need
 //   does-not-reach doesn't get into the brain intact by any practical route
 
 export const BRAIN_ACCESS = {
-  // ---- fat-soluble small molecules that genuinely get in ----
+  // ---- eat/supplement it: fat-soluble small molecules that get in ----
   thc: { verdict: 'crosses', route: 'Fat-soluble, so it slips straight into the brain — the fact that it gets you high is direct proof it arrives there.' },
   cannabidiol: { verdict: 'crosses', route: 'Fat-soluble; passes easily into the brain after oil or capsule.' },
   caffeine: { verdict: 'crosses', route: 'Small and fat-soluble; reaches the brain almost completely within minutes of a coffee or tea.' },
@@ -33,9 +34,9 @@ export const BRAIN_ACCESS = {
   pterostilbene: { verdict: 'limited', route: 'A more stable, fattier cousin of resveratrol, so a modest amount reaches the brain where resveratrol itself essentially does not.' },
   piperine: { verdict: 'crosses', route: 'The pungent compound in black pepper; gets into the brain itself, and also slows the gut/liver from clearing other compounds taken with it.' },
   sulforaphane: { verdict: 'crosses', route: 'A small fat-soluble compound from broccoli sprouts; passes into the brain and switches on the cell’s antioxidant defences.' },
-  melatonin: { verdict: 'crosses', route: 'Small and fat-soluble; passes freely into the brain, so a bedtime dose reaches it directly.' },
-  'retinoic-acid': { verdict: 'crosses', route: 'The active form of vitamin A; the body makes it from dietary vitamin A and it is fat-soluble enough to enter the brain.' },
-  thiamine: { verdict: 'crosses', route: 'Vitamin B1; carried into the brain by a dedicated uptake system, and high-dose or the fat-soluble benfotiamine form raises brain levels.' },
+  melatonin: { verdict: 'crosses', route: 'Small and fat-soluble; passes freely into the brain, so a bedtime dose reaches it directly.', lever: 'The brain makes it at night in darkness — protect it with a dark bedroom and no bright/blue light in the evening; also sold as a supplement.' },
+  'retinoic-acid': { verdict: 'crosses', route: 'The active form of vitamin A; the body makes it from dietary vitamin A and it is fat-soluble enough to enter the brain.', lever: 'Eat enough vitamin A (liver, eggs, dairy) or its plant form beta-carotene (orange/leafy veg).' },
+  thiamine: { verdict: 'crosses', route: 'Vitamin B1; carried into the brain by a dedicated uptake system, and high-dose or the fat-soluble benfotiamine form raises brain levels.', lever: 'Whole grains, pork, legumes; high-dose or benfotiamine supplements push more in.' },
   nicotinamide: { verdict: 'crosses', route: 'A B3 vitamin form; gets into the brain and tops up cellular energy molecules when supplemented.' },
   ascorbate: { verdict: 'limited', route: 'Vitamin C; pumped into the brain by a dedicated carrier, but brain levels are held steady and max out — hard to push much higher.' },
   bmaa: { verdict: 'crosses', route: 'An algae-derived amino-acid mimic; sneaks into the brain on the carrier meant for normal amino acids — which is exactly why it is neurotoxic.' },
@@ -69,75 +70,75 @@ export const BRAIN_ACCESS = {
   trehalose: { verdict: 'does-not-reach', route: 'A sugar that the gut splits into glucose before absorption — almost none gets into the blood intact, and it cannot enter the brain. Its anti-clumping effect in animals works through the gut and body, not by reaching the brain.' },
   mannitol: { verdict: 'does-not-reach', route: 'A sugar-alcohol the brain barrier actively keeps out — it is used in hospitals precisely because it stays out of the brain.' },
 
-  // ---- body-made molecules that DO get in from outside ----
-  dhea: { verdict: 'crosses', route: 'A fat-soluble hormone the body makes; passes into the brain, and a supplement raises brain levels. It naturally declines with age.' },
-  allopregnanolone: { verdict: 'crosses', route: 'A fat-soluble brain steroid; gets in, and its precursor pregnenolone (taken by mouth) raises how much the brain makes.' },
+  // ---- body-made, and you can RAISE it from outside (eat/supplement) ----
+  dhea: { verdict: 'crosses', route: 'A fat-soluble hormone the body makes; passes into the brain, and a supplement raises brain levels.', lever: 'Levels fall with age and are lower in Parkinson’s; regular exercise raises them, and it is sold as a supplement.' },
+  allopregnanolone: { verdict: 'crosses', route: 'A fat-soluble brain steroid; gets in, and its precursor pregnenolone (taken by mouth) raises how much the brain makes.', lever: 'The brain makes it from pregnenolone; chronic stress lowers it, so sleep and stress reduction help, and pregnenolone is sold as a supplement.' },
   'l-dopa': { verdict: 'crosses', route: 'The textbook example: dopamine itself cannot get into the brain, but L-DOPA rides an amino-acid shuttle across and is turned into dopamine inside — the basis of Parkinson’s medication.' },
   inosine: { verdict: 'crosses', route: 'Taken by mouth, it raises the antioxidant urate in the brain and spinal fluid — actually tested this way in Parkinson’s trials.' },
-  tryptophan: { verdict: 'crosses', route: 'A dietary amino acid that rides an amino-acid shuttle into the brain (competing with others in a protein meal); it is the raw material for serotonin.' },
+  tryptophan: { verdict: 'crosses', route: 'A dietary amino acid that rides an amino-acid shuttle into the brain (competing with others in a protein meal); it is the raw material for serotonin.', lever: 'Eat it (turkey, eggs, dairy, seeds), ideally with a carbohydrate, which helps it win the shuttle into the brain.' },
   kynurenine: { verdict: 'crosses', route: 'Rides the amino-acid shuttle into the brain; diet and inflammation set how much arrives.' },
   glutamine: { verdict: 'crosses', route: 'A dietary amino acid taken up into the brain as a major fuel and building block.' },
-  creatine: { verdict: 'limited', route: 'Carried into the brain by its own shuttle; a supplement raises brain creatine, but slowly and only modestly.' },
+  creatine: { verdict: 'limited', route: 'Carried into the brain by its own shuttle; a supplement raises brain creatine, but slowly and only modestly.', lever: 'Meat and fish supply it; creatine powder raises brain levels over weeks (vegetarians gain the most).' },
   'acetyl-l-carnitine': { verdict: 'crosses', route: 'A fattier form of carnitine that gets into the brain (plain carnitine barely does); taken as a supplement and studied for the brain.' },
   carnitine: { verdict: 'limited', route: 'Water-loving, so it barely enters the brain — the acetyl form (ALCAR) is the practical way in.' },
   taurine: { verdict: 'limited', route: 'Carried into the brain by its own shuttle; a supplement raises brain levels modestly.' },
-  'choline-endo': { verdict: 'crosses', route: 'Carried into the brain on a dedicated shuttle; dietary choline (eggs, soy) feeds the brain’s acetylcholine supply.' },
-  lactate: { verdict: 'crosses', route: 'Carried into the brain as a fuel; rises with exercise.' },
-  'beta-hydroxybutyrate': { verdict: 'crosses', route: 'A ketone carried into the brain as fuel; a ketogenic diet or ketone drinks raise brain levels substantially — a real dietary lever.' },
-  betaine: { verdict: 'crosses', route: 'A nutrient (from beets) carried into the brain; reaches it after a supplement or food.' },
+  'choline-endo': { verdict: 'crosses', route: 'Carried into the brain on a dedicated shuttle; dietary choline (eggs, soy) feeds the brain’s acetylcholine supply.', lever: 'Eat choline-rich foods — eggs, liver, soy — or take a choline supplement.' },
+  lactate: { verdict: 'crosses', route: 'Carried into the brain as a fuel; rises with exercise.', lever: 'Rises with vigorous exercise, which delivers more fuel to the brain.' },
+  'beta-hydroxybutyrate': { verdict: 'crosses', route: 'A ketone carried into the brain as fuel.', lever: 'Rises with a low-carb / ketogenic diet, fasting, or prolonged exercise; also sold as ketone drinks — a real dietary lever.' },
+  betaine: { verdict: 'crosses', route: 'A nutrient (from beets) carried into the brain; reaches it after a supplement or food.', lever: 'Beets, spinach, and whole grains supply it; also sold as a supplement.' },
   pyruvate: { verdict: 'limited', route: 'A fuel molecule carried into the brain in small amounts.' },
   succinate: { verdict: 'limited', route: 'An energy-cycle molecule that barely crosses into the brain; the brain mostly makes its own.' },
   citrate: { verdict: 'limited', route: 'An energy-cycle molecule; only some crosses in, and the brain makes its own.' },
   'alpha-ketoglutarate': { verdict: 'limited', route: 'An energy-cycle molecule with limited entry into the brain.' },
   guanosine: { verdict: 'limited', route: 'A building-block molecule taken into the brain in modest amounts.' },
-  urate: { verdict: 'limited', route: 'A natural antioxidant; the brain level is a fraction of the blood level and can be nudged up via oral inosine, but not freely controlled.' },
-  spermidine: { verdict: 'limited', route: 'A compound in wheat germ and aged cheese, studied for cellular "self-cleaning"; only a little reaches the brain, but some effect is reported.' },
+  urate: { verdict: 'limited', route: 'A natural antioxidant; the brain level is a fraction of the blood level.', lever: 'Raised by oral inosine (tested in Parkinson’s trials) — but pushing it too high causes gout and kidney stones, so this is double-edged.' },
+  spermidine: { verdict: 'limited', route: 'A compound in wheat germ and aged cheese, studied for cellular "self-cleaning"; only a little reaches the brain, but some effect is reported.', lever: 'Wheat germ, aged cheese, mushrooms, soy and legumes raise it; also sold as a supplement.' },
   spermine: { verdict: 'limited', route: 'A natural cell compound present in the brain; little crosses in from outside.' },
   putrescine: { verdict: 'limited', route: 'A natural cell compound; only a little enters the brain from outside.' },
-  homocysteine: { verdict: 'endogenous', route: 'Not something you take — its brain level rises when B-vitamins (B12, folate, B6) run low, so the lever is B-vitamin status.' },
-  glutathione: { verdict: 'subtherapeutic', route: 'The body’s main antioxidant, but swallowed glutathione is mostly destroyed in the gut and barely enters the brain. The realistic lever is its building block NAC, which raises brain levels only a little.' },
+  glutathione: { verdict: 'boost', route: 'The body’s main antioxidant; swallowed glutathione is mostly destroyed in the gut, so the brain’s supply is what the brain makes itself.', lever: 'Raise the brain’s own production: regular exercise, sulforaphane (broccoli sprouts), and the building-block supplement NAC all help; the brain’s glutathione drops early in Parkinson’s.' },
 
-  // ---- body-made, but you CANNOT raise them from outside (don't cross) ----
+  // ---- body-made, BOOSTABLE through activity / diet / sleep (can't be eaten directly) ----
+  serotonin: { verdict: 'boost', route: 'Swallowed serotonin can’t enter the brain — the brain makes its own from tryptophan.', lever: 'Raise the brain’s own supply: bright daylight (or a light box), regular aerobic exercise, and tryptophan-rich food all increase it.' },
+  gaba: { verdict: 'boost', route: 'Swallowed GABA barely enters the brain — the calming signal comes from the GABA the brain makes itself.', lever: 'Yoga and meditation have been shown to raise the brain’s own GABA; regular exercise does too.' },
+  'gaba-endo': { verdict: 'boost', route: 'The brain’s own calming chemical; not meaningfully raised by swallowing it.', lever: 'Yoga, meditation, and regular exercise raise the brain’s own GABA.' },
+  anandamide: { verdict: 'boost', route: 'A natural "bliss" molecule the brain makes on demand; it can’t be swallowed — it’s made and broken down on the spot.', lever: 'Sustained aerobic exercise raises it — this is the molecule behind the "runner’s high."' },
+  '2-ag': { verdict: 'boost', route: 'A natural cannabis-like molecule the brain makes on demand; not something you can swallow.', lever: 'Aerobic exercise raises it, alongside anandamide.' },
+  'hydrogen-sulfide': { verdict: 'boost', route: 'A signalling gas the brain makes itself; you don’t take the gas — you feed its production.', lever: 'Garlic, onions, and cruciferous vegetables (and the supplement NAC) give the body the sulfur to make more.' },
+  'kynurenic-acid': { verdict: 'boost', route: 'A protective molecule the brain makes from kynurenine; swallowing it doesn’t work because it barely crosses into the brain.', lever: 'Exercise trains muscle to divert this pathway toward the protective product, lowering the neurotoxic version that reaches the brain.' },
+
+  // ---- body-made by-products / markers, or things you would NOT want more of ----
   dopamine: { verdict: 'does-not-reach', route: 'Cannot get into the brain at all — the whole reason Parkinson’s patients take L-DOPA instead. Only the brain’s own supply counts.' },
   norepinephrine: { verdict: 'does-not-reach', route: 'Cannot cross into the brain; the brain makes its own from dopamine.' },
   epinephrine: { verdict: 'does-not-reach', route: 'Cannot cross into the brain; it is a body hormone, with only a small brain supply made locally.' },
   'glutamate-endo': { verdict: 'does-not-reach', route: 'Kept out of the brain; the brain makes and recycles its own — dietary glutamate (MSG) does not raise it.' },
-  'gaba-endo': { verdict: 'does-not-reach', route: 'Barely crosses into the brain; the brain makes its own. Swallowed GABA acts mostly in the body, not the brain.' },
-  hva: { verdict: 'endogenous', route: 'A dopamine breakdown product made in the brain — a meter of dopamine turnover, not something you take.' },
-  dopac: { verdict: 'endogenous', route: 'A dopamine breakdown product formed inside neurons — a turnover marker, not something taken.' },
-  mhpg: { verdict: 'endogenous', route: 'A noradrenaline breakdown product made in the brain — a turnover marker.' },
-  '3-methoxytyramine': { verdict: 'endogenous', route: 'A dopamine breakdown product formed in the brain — not something taken.' },
-  '3-hydroxykynurenine': { verdict: 'endogenous', route: 'Made inside the brain (more so during inflammation); the lever is the pathway upstream, not intake.' },
-  'kynurenic-acid': { verdict: 'endogenous', route: 'Barely crosses into the brain — the brain makes its own from kynurenine, so swallowing it is not the route.' },
-  'quinolinic-acid': { verdict: 'endogenous', route: 'Made inside the brain by activated immune cells; does not get in well from outside.' },
-  aminochrome: { verdict: 'endogenous', route: 'Forms inside dopamine neurons as dopamine oxidises — it cannot be taken; it arises on the spot.' },
-  xanthine: { verdict: 'endogenous', route: 'A normal breakdown molecule present in the brain — a metabolic step, not a delivery target.' },
-  hypoxanthine: { verdict: 'endogenous', route: 'A normal breakdown molecule recycled within the brain.' },
-
-  // ---- signalling molecules ----
-  adenosine: { verdict: 'limited', route: 'Already abundant in the brain; you influence it indirectly (caffeine blocks its receptors) rather than by swallowing it.' },
-  serotonin: { verdict: 'does-not-reach', route: 'Cannot cross into the brain; the brain makes its own from tryptophan or 5-HTP — those precursors are the lever, not serotonin itself.' },
   histamine: { verdict: 'does-not-reach', route: 'Cannot cross into the brain; the brain makes its own.' },
   acetylcholine: { verdict: 'does-not-reach', route: 'Cannot cross into the brain and is destroyed within moments; the lever is its building block choline, not acetylcholine itself.' },
-  gaba: { verdict: 'does-not-reach', route: 'Barely crosses into the brain; swallowed GABA acts mostly on the gut, not the brain.' },
+  hva: { verdict: 'marker', route: 'A dopamine breakdown product made in the brain — a meter of how fast dopamine is being used, not something to raise.' },
+  dopac: { verdict: 'marker', route: 'A dopamine breakdown product formed inside neurons — a turnover marker, nothing to raise.' },
+  mhpg: { verdict: 'marker', route: 'A noradrenaline breakdown product made in the brain — a turnover marker.' },
+  '3-methoxytyramine': { verdict: 'marker', route: 'A dopamine breakdown product formed in the brain — a turnover marker, nothing to raise.' },
+  '5-hiaa': { verdict: 'marker', route: 'A serotonin breakdown product made in the brain — a turnover marker (raise serotonin instead).' },
+  xanthine: { verdict: 'marker', route: 'A normal breakdown molecule — a metabolic stepping-stone toward urate, not a target itself.' },
+  hypoxanthine: { verdict: 'marker', route: 'A normal breakdown molecule recycled within the brain — not a target.' },
+  homocysteine: { verdict: 'marker', route: 'You would NOT want more — high homocysteine is itself a Parkinson’s and vascular risk. The goal is to LOWER it, with B12, folate, and B6. (The model ranked it on shape only.)' },
+  '3-hydroxykynurenine': { verdict: 'marker', route: 'You would NOT want more — it generates oxidative stress and is raised in the Parkinson’s brain. (The model ranked it on shape only.)' },
+  'quinolinic-acid': { verdict: 'marker', route: 'You would NOT want more — it is an excitotoxin made by activated immune cells in the brain. (The model ranked it on shape only.)' },
+  aminochrome: { verdict: 'marker', route: 'You would NOT want more — it is a toxic dopamine by-product that helps drive the disease. (The model ranked it on shape only.)' },
+  adenosine: { verdict: 'marker', route: 'Already abundant in the brain; you influence it indirectly (caffeine blocks its receptors) rather than by raising it.' },
   glycine: { verdict: 'limited', route: 'An amino acid that enters the brain, but levels are tightly controlled, so high doses raise it only a little.' },
-  anandamide: { verdict: 'endogenous', route: 'A natural "bliss" molecule the brain makes on demand and destroys within seconds; raised indirectly by blocking its breakdown, not by swallowing it.' },
-  '2-ag': { verdict: 'endogenous', route: 'A natural cannabis-like molecule the brain makes on demand — not something you take.' },
-  '5-hiaa': { verdict: 'endogenous', route: 'A serotonin breakdown product made in the brain — a turnover marker.' },
-  pea: { verdict: 'crosses', route: 'A natural fat-like calming molecule; the micronised supplement form reaches the brain and is used that way.' },
-  'hydrogen-sulfide': { verdict: 'endogenous', route: 'A gas the brain makes itself; the lever is foods that feed its production (garlic, cysteine, NAC), not the gas directly.' },
+  pea: { verdict: 'crosses', route: 'Palmitoylethanolamide — a natural fat-like calming molecule; the micronised supplement form reaches the brain and is used that way.' },
 
   // ---- gut-bacteria molecules ----
-  'urolithin-a': { verdict: 'limited', route: 'Made from pomegranate/walnut compounds by gut bacteria in only about 40% of people; a supplement raises blood levels, but only a little reaches the brain — and only if your gut makes it.' },
+  'urolithin-a': { verdict: 'limited', route: 'Made from pomegranate/walnut compounds by gut bacteria in only about 40% of people; only a little reaches the brain, and only if your gut makes it.', lever: 'Eat pomegranate, walnuts, and berries — but only ~40% of people have the gut bacteria to make it; the supplement (Urolithin A / Mitopure) works for everyone.' },
   equol: { verdict: 'limited', route: 'Made from soy by gut bacteria in only some people (~30–50%); a little reaches the brain in those who produce it.' },
-  'indole-3-propionate': { verdict: 'crosses', route: 'A fat-soluble molecule gut bacteria make from tryptophan; it gets into the brain (studied as protective) — if you carry the right gut bacteria.' },
+  'indole-3-propionate': { verdict: 'crosses', route: 'A fat-soluble molecule gut bacteria make from tryptophan; it gets into the brain (studied as protective) — if you carry the right gut bacteria.', lever: 'A fibre-rich diet that feeds tryptophan-using gut bacteria raises it.' },
   'indole-3-acetate': { verdict: 'limited', route: 'A gut-bacteria tryptophan product; some reaches the brain, depending on your microbiome.' },
   tryptamine: { verdict: 'crosses', route: 'A gut/trace molecule that is fat-soluble and gets into the brain, but is broken down within minutes — so exposure is brief.' },
   skatole: { verdict: 'crosses', route: 'A fat-soluble molecule from gut protein breakdown; gets into the brain.' },
   indole: { verdict: 'crosses', route: 'A small fat-soluble gut-bacteria molecule; gets into the brain.' },
-  butyrate: { verdict: 'limited', route: 'A fibre-fermentation fat made by gut bacteria; a small fraction reaches the brain, as most is used up by the gut and liver first.' },
-  propionate: { verdict: 'limited', route: 'A fibre-fermentation fat from gut bacteria; partly reaches the brain.' },
-  acetate: { verdict: 'crosses', route: 'A fibre-fermentation fat from gut bacteria; carried into the brain and used as fuel.' },
+  butyrate: { verdict: 'limited', route: 'A fibre-fermentation fat made by gut bacteria; a small fraction reaches the brain (its gene-regulating effects are studied).', lever: 'Eat more fibre and resistant starch (oats, beans, cooled potatoes/rice) so gut bacteria make more.' },
+  propionate: { verdict: 'limited', route: 'A fibre-fermentation fat from gut bacteria; partly reaches the brain.', lever: 'A fibre-rich diet feeds the gut bacteria that make it.' },
+  acetate: { verdict: 'crosses', route: 'A fibre-fermentation fat from gut bacteria; carried into the brain and used as fuel.', lever: 'A fibre-rich diet feeds the gut bacteria that make it.' },
   valerate: { verdict: 'limited', route: 'A gut-bacteria fat; a modest amount reaches the brain.' },
   hippurate: { verdict: 'subtherapeutic', route: 'A water-loving by-product of gut polyphenol breakdown; barely crosses into the brain — mostly seen in urine.' },
   'p-cresol-sulfate': { verdict: 'limited', route: 'A gut by-product that reaches the brain mainly when blood levels run high (e.g. with kidney problems).' },
@@ -162,9 +163,9 @@ export const BRAIN_ACCESS = {
   // ====================================================================
   // anti-targets (covalent channel) — made on the spot inside the brain
   // ====================================================================
-  malondialdehyde: { verdict: 'endogenous', route: 'Not eaten as such — it forms inside brain tissue when fats are damaged by oxidation; the lever is lowering that oxidative damage.' },
-  '4-hne': { verdict: 'endogenous', route: 'Forms inside the brain when omega-6 fats are oxidised; rises with oxidative stress, so the lever is antioxidant status and fat quality.' },
-  acrolein: { verdict: 'endogenous', route: 'Forms inside the brain from fat and amine breakdown, and is also delivered directly by tobacco smoke and overheated cooking oils.' },
-  methylglyoxal: { verdict: 'endogenous', route: 'A sugar-handling by-product made throughout the body, including the brain; it rises with high blood sugar, so the lever is glucose control.' },
-  'nitric-oxide': { verdict: 'endogenous', route: 'A gas the brain makes itself; dietary nitrate (beets, leafy greens) feeds the body’s supply, but the brain controls its own.' },
+  malondialdehyde: { verdict: 'made-in-body', route: 'Not eaten as such — it forms inside brain tissue when fats are damaged by oxidation; the lever is lowering that oxidative damage.' },
+  '4-hne': { verdict: 'made-in-body', route: 'Forms inside the brain when omega-6 fats are oxidised; rises with oxidative stress, so the lever is antioxidant status and fat quality.' },
+  acrolein: { verdict: 'made-in-body', route: 'Forms inside the brain from fat and amine breakdown, and is also delivered directly by tobacco smoke and overheated cooking oils.' },
+  methylglyoxal: { verdict: 'made-in-body', route: 'A sugar-handling by-product made throughout the body, including the brain; it rises with high blood sugar, so the lever is glucose control.' },
+  'nitric-oxide': { verdict: 'made-in-body', route: 'A gas the brain makes itself; dietary nitrate (beets, leafy greens) feeds the body’s supply, but the brain controls its own.' },
 };
