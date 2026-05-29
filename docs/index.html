@@ -3,298 +3,221 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>asyn-oligomer-screen — results</title>
+<title>α-synuclein oligomer screen — results</title>
 <style>
   :root {
-    --bg: #0e1117; --panel: #161b22; --line: #2b3240; --txt: #d7dde5;
-    --dim: #8b95a5; --reaches: #2ea043; --conditional: #d29922; --barrier: #f85149;
-    --unknown: #6e7681; --novel: #58a6ff; --known: #8b95a5; --holdout: #bc8cff;
-    --bar-prot: #3fb950; --bar-harm: #f85149;
+    --bg:#0e1117; --card:#161b22; --line:#2b3240; --txt:#e3e8ef; --dim:#9aa5b4;
+    --reaches:#3fb950; --conditional:#d29922; --barrier:#f0883e; --unknown:#6e7681;
+    --novel:#58a6ff; --known:#8b95a5; --holdout:#bc8cff;
+    --prot:#3fb950; --harm:#f85149;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--txt);
-    font: 14px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-  header { padding: 22px 28px 8px; }
-  h1 { font-size: 19px; margin: 0 0 4px; }
-  .sub { color: var(--dim); font-size: 13px; max-width: 860px; }
-  .warn { color: var(--conditional); }
-  .wrap { padding: 0 28px 60px; }
-  .tabs { display: flex; gap: 8px; margin: 18px 0 6px; }
-  .tab { padding: 7px 16px; border: 1px solid var(--line); background: var(--panel);
-    color: var(--dim); border-radius: 7px 7px 0 0; cursor: pointer; font-weight: 600; }
-  .tab.active { color: var(--txt); border-bottom-color: var(--bg); background: var(--bg); }
-  .tab.harm.active { color: var(--barrier); }
-  .tab.prot.active { color: var(--bar-prot); }
-  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
-    padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
-    border-radius: 0 7px 7px 7px; margin-bottom: 14px; }
-  .controls label { color: var(--dim); font-size: 12px; cursor: pointer; user-select: none; }
-  .controls .grp { display: flex; gap: 9px; align-items: center; }
-  .controls .grp b { color: var(--txt); font-size: 11px; text-transform: uppercase;
-    letter-spacing: .04em; }
-  select { background: var(--bg); color: var(--txt); border: 1px solid var(--line);
-    border-radius: 5px; padding: 4px 7px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line);
-    vertical-align: top; }
-  th { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    cursor: pointer; white-space: nowrap; user-select: none; }
-  th.sorted::after { content: " \25BC"; font-size: 9px; }
-  th.sorted.asc::after { content: " \25B2"; }
-  td.rank { color: var(--dim); width: 34px; }
-  td.name { font-weight: 600; }
-  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px;
-    border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
-  .prov { font-size: 10px; padding: 1px 6px; border-radius: 999px; margin-left: 6px;
-    vertical-align: middle; }
-  .prov.novel { color: var(--novel); border: 1px solid var(--novel); }
-  .prov.known { color: var(--known); border: 1px solid var(--known); }
-  .prov.holdout { color: var(--holdout); border: 1px solid var(--holdout); }
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px;
-    vertical-align: middle; }
-  .dot.reaches { background: var(--reaches); }
-  .dot.conditional { background: var(--conditional); }
-  .dot.barrier { background: var(--barrier); }
-  .dot.unknown { background: var(--unknown); }
-  .reach-txt.barrier { color: var(--barrier); }
-  .reach-txt.conditional { color: var(--conditional); }
-  .barcell { width: 190px; }
-  .bar { height: 9px; border-radius: 3px; }
-  .bar.prot { background: var(--bar-prot); }
-  .bar.harm { background: var(--bar-harm); }
-  .barnum { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
-  tr.mol { cursor: pointer; }
-  tr.mol:hover td { background: #1b2230; }
-  tr.detail td { background: #10141c; color: var(--dim); font-size: 12.5px; padding: 4px 14px 14px 44px; }
-  tr.detail .k { color: var(--txt); }
-  .hidden { display: none; }
-  .matrix { margin: 26px 0 6px; }
-  .matrix h2 { font-size: 14px; margin: 0 0 4px; }
-  .matrix .msub { color: var(--dim); font-size: 12px; margin-bottom: 10px; }
-  .grid { display: grid; grid-template-columns: 130px 1fr 1fr; gap: 8px; }
-  .grid .h { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    align-self: end; padding-bottom: 4px; }
-  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-    padding: 11px 13px; min-height: 64px; }
-  .cell.first { background: #11261a; border-color: #1f6f3a; }
-  .rowlabel { color: var(--dim); font-size: 12px; display: flex; align-items: center; }
-  .chip { display: inline-block; margin: 3px 5px 0 0; padding: 2px 9px; border-radius: 999px;
-    font-size: 12px; background: var(--bg); border: 1px solid var(--line); }
-  .legend { color: var(--dim); font-size: 11.5px; margin: 14px 0 0; line-height: 1.9; }
-  .legend .dot { margin-left: 2px; }
-  code { background: #1b2230; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-  a { color: var(--novel); }
+  * { box-sizing:border-box; -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:680px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:18px; margin:0 0 6px; line-height:1.3; }
+  .disc { color:var(--dim); font-size:13px; margin:0 0 4px; }
+  .disc b { color:var(--conditional); }
+
+  /* segmented toggle */
+  .seg { display:flex; gap:6px; margin:18px 0 6px; position:sticky; top:0;
+    background:var(--bg); padding:8px 0; z-index:5; }
+  .seg button { flex:1; min-height:46px; border:1px solid var(--line); background:var(--card);
+    color:var(--dim); border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+  .seg button.on.prot { color:#0e1117; background:var(--prot); border-color:var(--prot); }
+  .seg button.on.harm { color:#0e1117; background:var(--harm); border-color:var(--harm); }
+  .intro { color:var(--dim); font-size:13px; margin:2px 0 10px; }
+
+  .callout { background:#11261a; border:1px solid #1f6f3a; border-radius:12px;
+    padding:12px 14px; margin:0 0 16px; }
+  .callout h2 { font-size:13px; margin:0 0 6px; color:var(--reaches);
+    text-transform:uppercase; letter-spacing:.04em; }
+  .chip { display:inline-block; margin:3px 6px 0 0; padding:3px 11px; border-radius:999px;
+    font-size:13px; background:var(--bg); border:1px solid #1f6f3a; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:13px 14px; margin:0 0 11px; }
+  .top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .rk { color:var(--dim); font-variant-numeric:tabular-nums; font-size:13px; }
+  .nm { font-weight:700; font-size:16px; flex:1; min-width:130px; }
+  .prov { font-size:11px; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .prov.novel { color:var(--novel); border:1px solid var(--novel); }
+  .prov.known { color:var(--known); border:1px solid var(--known); }
+  .prov.holdout { color:var(--holdout); border:1px solid var(--holdout); }
+
+  .eff { display:flex; align-items:center; gap:9px; margin:9px 0 11px; }
+  .bar { height:8px; border-radius:4px; flex:0 0 auto; }
+  .bar.prot { background:var(--prot); } .bar.harm { background:var(--harm); }
+  .efftxt { color:var(--dim); font-size:12.5px; }
+
+  .how { font-size:13.5px; line-height:1.5; border-top:1px solid var(--line); padding-top:10px; }
+  .how .lbl { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .how .lbl b { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
+  .dot { width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+  .dot.reaches{background:var(--reaches);} .dot.conditional{background:var(--conditional);}
+  .dot.barrier{background:var(--barrier);} .dot.unknown{background:var(--unknown);}
+  .route { display:inline-block; padding:1px 9px; border-radius:999px; font-size:12px;
+    background:var(--bg); border:1px solid var(--line); color:var(--dim); }
+  .reachline { margin:2px 0; }
+  .reachline.barrier { color:var(--barrier); }
+  .reachline.conditional { color:var(--conditional); }
+  .notes { color:var(--dim); }
+  .lever { color:var(--reaches); }
+
+  .more { display:block; width:100%; min-height:46px; margin:6px 0 0; border:1px solid var(--line);
+    background:var(--card); color:var(--txt); border-radius:10px; font-size:14px; cursor:pointer; }
+  .legend { color:var(--dim); font-size:12px; margin:18px 0 0; line-height:1.9; }
+  .legend .dot { display:inline-block; vertical-align:middle; margin:0 3px 0 6px; }
+  a { color:var(--novel); }
 </style>
 </head>
 <body>
-<header>
-  <h1>α-synuclein oligomer screen — candidate display</h1>
-  <div class="sub">
-    Ranked outputs of the Stage 3 perturbation screen against the toxic-oligomer model,
-    joined with each molecule's route to the brain. <span class="warn">These are
-    unvalidated computational hypotheses, not medical or dietary advice.</span>
-    Rankings order molecules; they do not measure effect size. Reachability is
-    <b>not</b> in the score — it is shown alongside so a tightly-binding but
-    poorly-bioavailable hit is not mistaken for an actionable one.
-  </div>
-</header>
 <div class="wrap">
-  <div class="tabs">
-    <div class="tab prot active" data-panel="protective">Protective — candidates to test</div>
-    <div class="tab harm" data-panel="harmful">Suspected harmful — anti-targets</div>
-  </div>
-  <div class="controls">
-    <div class="grp"><b>Route</b><select id="routeFilter"></select></div>
-    <div class="grp"><b>Reach</b><select id="reachFilter"></select></div>
-    <div class="grp"><b>Evidence</b><select id="provFilter"></select></div>
-    <label><input type="checkbox" id="showAll"> show all rows</label>
-  </div>
-  <table id="tbl"><thead></thead><tbody></tbody></table>
+  <h1>α-synuclein oligomer screen — results</h1>
+  <p class="disc">Molecules ranked by a computational model of the toxic α-synuclein
+    oligomer in Parkinson's, shown with how each typically reaches the brain.
+    <b>Unvalidated hypotheses — not medical or dietary advice.</b> Ranks order
+    molecules; they do not measure effect size.</p>
 
-  <div class="matrix" id="matrix"></div>
+  <div class="seg">
+    <button id="bProt" class="prot on" data-panel="protective">Worth testing</button>
+    <button id="bHarm" class="harm" data-panel="harmful">Reduce exposure</button>
+  </div>
+  <p class="intro" id="intro"></p>
+
+  <div id="callout"></div>
+  <div id="list"></div>
+  <button class="more" id="more"></button>
 
   <div class="legend" id="legend"></div>
 </div>
 
 <script>
 const DATA = {"protective":[{"id":"silibinin","name":"Silibinin (silybin A)","group":"dietary","dActGated":-0.4149182685256832,"aspr":0,"aff":-5.799,"route":"supplement","feasibility":"low-bioavailability","deliveryNotes":"milk-thistle; phytosome formulations improve absorption modestly","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma after milk-thistle intake; limited BBB","evidence":"Milk-thistle flavonolignan; widely studied hepatoprotectant. In vitro α-syn aggregation modulation and reduced toxicity in PD cell models. Promoted to anchor role on validation cohort review.","reach":"barrier","prov":"holdout","rank":1},{"id":"dhea","name":"Dehydroepiandrosterone (DHEA)","group":"endogenous-metabolites","dActGated":-0.2436553560737213,"aspr":0,"aff":-5.573,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral DHEA raises plasma; brain entry passive","cnsLow":"1 nM","cnsHigh":"50 nM","cnsNote":"brain; declines with age","evidence":"Adrenal/brain neurosteroid that declines with age. Representative of the broader age-declining neurosteroid pool.","reach":"reaches","prov":"novel","rank":2},{"id":"egcg","name":"Epigallocatechin gallate (EGCG)","group":"dietary","dActGated":-0.2354626922958405,"aspr":0,"aff":-5.619,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"green tea polyphenol; CNS sub-µM after high oral doses while in vitro α-syn effects are at 10–100 µM (~100× gap)","cnsLow":"10 nM","cnsHigh":"1 µM","cnsNote":"CNS bioavailability poor; sub-µM in brain after oral dosing","evidence":"EGCG redirects α-syn (and Aβ, prion) aggregation from on-pathway fibrils into off-pathway, non-toxic, SDS-stable spherical oligomers. The canonical \"redirect\" reference compound for Stage 3 validation.","reach":"barrier","prov":"holdout","rank":3},{"id":"retinoic-acid","name":"Retinoic acid (all-trans)","group":"dietary","dActGated":-0.1995178589458596,"aspr":0,"aff":-5.28,"route":"precursor","feasibility":"achievable","deliveryNotes":"dietary retinol or β-carotene → retinoic acid; therapeutic isotretinoin reaches CNS","cnsLow":"5 nM","cnsHigh":"50 nM","cnsNote":"CNS; vitamin-A active metabolite","evidence":"Nuclear-receptor ligand controlling neuronal differentiation. Reaches CNS; potential role in α-syn handling via transcriptional control of dopaminergic genes.","reach":"reaches","prov":"novel","rank":4},{"id":"fisetin","name":"Fisetin","group":"dietary","dActGated":-0.14974569840989246,"aspr":0,"aff":-5.246,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"strawberries, apples, persimmons; senolytic at higher doses","cnsLow":"1 nM","cnsHigh":"300 nM","cnsNote":"plasma; reasonable BBB penetrance among flavonols","evidence":"Flavonol (3,7,3',4'-tetrahydroxyflavone, no 5-OH). Inhibits α-syn fibrillation and protects DA neurons in PD models; senotherapeutic with reported neuroprotection in MPTP and α-syn-overexpression models.","reach":"barrier","prov":"holdout","rank":5},{"id":"curcumin","name":"Curcumin","group":"dietary","dActGated":-0.14816270929151906,"aspr":0,"aff":-5.215,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"oral curcumin brain levels nM; piperine, liposomal, nano-formulations help but still far below in vitro effective doses","cnsLow":"10 nM","cnsHigh":"100 nM","cnsNote":"free curcumin in brain is low without formulation enhancement","evidence":"Binds α-syn directly, inhibits fibrillation, dissolves preformed fibrils, reduces α-syn-mediated toxicity in cell models. Classical anti-aggregation reference.","reach":"barrier","prov":"known","rank":6},{"id":"baicalein","name":"Baicalein","group":"dietary","dActGated":-0.14376420646064297,"aspr":0,"aff":-5.268,"route":"supplement","feasibility":"low-bioavailability","deliveryNotes":"Scutellaria extracts reach plasma sub-µM; brain entry partial","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"CNS-penetrant flavone from Scutellaria baicalensis","evidence":"Inhibits α-syn fibrillation in vitro and stabilises soluble oligomers, with cellular toxicity studies showing reduced α-syn-driven cell death. Among the strongest non-EGCG polyphenol anti-aggregation candidates.","reach":"barrier","prov":"known","rank":7},{"id":"allopregnanolone","name":"Allopregnanolone","group":"endogenous-metabolites","dActGated":-0.14186257069924366,"aspr":0,"aff":-5.346,"route":"precursor","feasibility":"achievable","deliveryNotes":"oral pregnenolone raises plasma; allopregnanolone injection in clinical trials","cnsLow":"1 nM","cnsHigh":"50 nM","cnsNote":"CSF; pregnenolone-derived neurosteroid","evidence":"Endogenously synthesised neurosteroid; positive allosteric modulator of GABA-A. Included as a representative neurosteroid in the search space.","reach":"reaches","prov":"novel","rank":8},{"id":"naringenin","name":"Naringenin","group":"dietary","dActGated":-0.1278952880603243,"aspr":0,"aff":-5.193,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"grapefruit, oranges","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after citrus intake","evidence":"Companion citrus flavanone to hesperetin; smaller B-ring substituent. Reaches CNS at sub-µM.","reach":"barrier","prov":"novel","rank":9},{"id":"luteolin","name":"Luteolin","group":"dietary","dActGated":-0.11941149902108342,"aspr":0,"aff":-5.365,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"celery, peppers, mint","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma; partial BBB","evidence":"Catechol-B-ring flavone; chemistry close to quercetin minus C-ring hydroxyl. Several anti-aggregation in vitro reports across amyloid systems.","reach":"barrier","prov":"novel","rank":10},{"id":"demethoxycurcumin","name":"Demethoxycurcumin","group":"dietary","dActGated":-0.1193094096587862,"aspr":0,"aff":-5.103,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"turmeric (~15% of curcuminoids); same delivery limits as curcumin","cnsLow":"10 nM","cnsHigh":"100 nM","cnsNote":"plasma after turmeric intake","evidence":"Companion curcuminoid; one fewer methoxy group than curcumin. Useful for separating the methoxy contribution from the diketone chromophore.","reach":"barrier","prov":"novel","rank":11},{"id":"thc","name":"Δ9-Tetrahydrocannabinol (THC)","group":"dietary","dActGated":-0.11541236386544074,"aspr":0,"aff":-5.161,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral, inhaled, sublingual; lipophilic, accumulates in brain","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"CSF after inhaled/oral intake","evidence":"CB1/CB2 agonist; lipophilic, accumulates in brain. Cannabinoid-receptor signalling overlaps with α-syn-related neuroinflammation.","reach":"reaches","prov":"novel","rank":12},{"id":"myricetin","name":"Myricetin","group":"dietary","dActGated":-0.11451378602059907,"aspr":0,"aff":-5.279,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"berries, walnuts; rapid B-ring metabolism","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma; limited BBB","evidence":"Tri-hydroxylated B-ring flavonol; reported in vitro inhibitor of multiple amyloid systems. Adds B-ring hydroxyl coverage to the polyphenol set.","reach":"barrier","prov":"novel","rank":13},{"id":"piperine","name":"Piperine","group":"dietary","dActGated":-0.11220784147757464,"aspr":0,"aff":-5.054,"route":"diet","feasibility":"achievable","deliveryNotes":"black pepper; reaches CNS and inhibits curcumin glucuronidation","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after black pepper intake; CNS-penetrant","evidence":"Black-pepper alkaloid. Bioavailability enhancer (curcumin co-administration) and direct CNS effects on monoamine handling.","reach":"reaches","prov":"novel","rank":14},{"id":"hesperetin","name":"Hesperetin","group":"dietary","dActGated":-0.1067113017443125,"aspr":0,"aff":-5.261,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"citrus; aglycone has some reported BBB transport","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after citrus intake; aglycone form crosses BBB","evidence":"Citrus flavanone. Vascular/anti-inflammatory effects with documented brain entry; α-syn evidence not established.","reach":"barrier","prov":"novel","rank":15},{"id":"trehalose","name":"Trehalose","group":"dietary","dActGated":-0.10331448841954932,"aspr":0,"aff":-5.207,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"mushrooms, supplements; oral CNS entry limited but autophagy effects observed at oral doses","cnsLow":null,"cnsHigh":null,"cnsNote":"oral trehalose reaches plasma; brain entry limited but autophagy induction is observed","evidence":"Disaccharide chemical chaperone / autophagy inducer. In vivo PD-model studies show reduced α-syn pathology via autophagy.","reach":"barrier","prov":"novel","rank":16},{"id":"genistein","name":"Genistein","group":"dietary","dActGated":-0.10110905023799736,"aspr":0,"aff":-5.028,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"soy products","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after soy intake; CSF detectable","evidence":"Isoflavone with weak ER affinity. Reaches brain; α-syn evidence not specifically established.","reach":"barrier","prov":"novel","rank":17},{"id":"urolithin-a","name":"Urolithin A","group":"gut-derived","dActGated":-0.09787726118533302,"aspr":0,"aff":-5.166,"route":"precursor","feasibility":"achievable","deliveryNotes":"pomegranate/walnut ellagitannins + competent microbiome, OR direct urolithin A supplements (e.g. Mitopure)","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after pomegranate/walnut intake; microbiome-dependent","evidence":"Gut metabolite of ellagic acid / ellagitannins. Mitophagy inducer; reported α-syn aggregation reduction in worm and cell models.","reach":"reaches","prov":"novel","rank":18},{"id":"kaempferol","name":"Kaempferol","group":"dietary","dActGated":-0.09488578675541129,"aspr":0,"aff":-5.185,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"leafy greens, capers, tea","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma free; brain levels low","evidence":"Flavonol; quercetin without one B-ring hydroxyl. Companion to quercetin in the flavonol family.","reach":"barrier","prov":"novel","rank":19},{"id":"epicatechin","name":"(–)-Epicatechin (EC)","group":"dietary","dActGated":-0.09313653634093048,"aspr":0,"aff":-5.213,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"cocoa, tea; sub-µM plasma, CNS lower","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma; partial BBB penetration","evidence":"Smallest catechin; the building-block monomer of catechin polymers in cocoa and tea. Vascular and BDNF-related effects; companion to EGCG in the family.","reach":"barrier","prov":"novel","rank":20},{"id":"quercetin","name":"Quercetin","group":"dietary","dActGated":-0.0922642457710096,"aspr":0,"aff":-5.146,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"rapidly conjugated; free quercetin in plasma sub-µM","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma free quercetin sub-µM; limited brain penetration","evidence":"In vitro α-syn fibrillation inhibition; stabilises monomer / non-toxic aggregates. Same polyphenol pharmacophore family as EGCG.","reach":"barrier","prov":"known","rank":21},{"id":"apigenin","name":"Apigenin","group":"dietary","dActGated":-0.09111511648527915,"aspr":0,"aff":-5.168,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"parsley, chamomile, celery","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma; partial BBB","evidence":"Flavone present in parsley, celery, chamomile. Distinct from flavonols by lacking the 3-OH — useful for separating C-ring substituent effects.","reach":"barrier","prov":"novel","rank":22},{"id":"equol","name":"Equol","group":"gut-derived","dActGated":-0.08969904546334152,"aspr":0,"aff":-5.031,"route":"precursor","feasibility":"achievable","deliveryNotes":"daidzein + equol-producing microbiome (~30% of adults); equol supplements available","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma in microbiome-permissive individuals after soy intake","evidence":"Microbial reduction product of daidzein. Selective ER-β agonist; CNS-active. Produced only by ~30% of adults depending on microbiome.","reach":"reaches","prov":"novel","rank":23},{"id":"rosmarinic-acid","name":"Rosmarinic acid","group":"dietary","dActGated":-0.07727564436421586,"aspr":0,"aff":-4.936,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"rosemary, mint, basil, sage","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after herb intake; partial BBB","evidence":"Caffeic-acid–DOPA-like ester from rosemary, mint, basil. Multiple reports of α-syn aggregation inhibition in vitro and in cells. Promoted to anchor role on validation cohort review.","reach":"barrier","prov":"holdout","rank":24},{"id":"guanosine","name":"Guanosine","group":"endogenous-metabolites","dActGated":-0.06575461681697131,"aspr":0,"aff":-4.913,"route":"supplement","feasibility":"low-bioavailability","deliveryNotes":"oral guanosine reaches plasma; brain entry partial via ENT transporters","cnsLow":"100 nM","cnsHigh":"5 µM","cnsNote":"CSF; neuroprotective purine with documented BBB transport","evidence":"Independent body of in vivo work showing motor recovery in 6-OHDA and rotenone PD models. Mechanism unclear and partly mGluR-mediated.","reach":"barrier","prov":"novel","rank":25},{"id":"daidzein","name":"Daidzein","group":"dietary","dActGated":-0.0583683363598763,"aspr":0,"aff":-4.84,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"soy; only equol-producers (~30% of adults) further metabolise to equol","cnsLow":"5 nM","cnsHigh":"300 nM","cnsNote":"plasma after soy intake","evidence":"Companion soy isoflavone; precursor to equol after microbial conversion (see equol entry under gut-derived).","reach":"barrier","prov":"novel","rank":26},{"id":"honokiol","name":"Honokiol","group":"dietary","dActGated":-0.054962944229917425,"aspr":0,"aff":-4.75,"route":"supplement","feasibility":"low-bioavailability","deliveryNotes":"Magnolia bark; better BBB than many natural products","cnsLow":"50 nM","cnsHigh":"1 µM","cnsNote":"plasma after Magnolia intake; crosses BBB","evidence":"Biphenolic neolignan from Magnolia. Anti-aggregation reports across amyloids; SIRT3 activator with mitochondrial effects.","reach":"barrier","prov":"novel","rank":27},{"id":"adenosine","name":"Adenosine","group":"neurotransmitter","dActGated":-0.04405176444638087,"aspr":0,"aff":-4.654,"route":"endogenous","feasibility":"native","deliveryNotes":"plasma half-life <10 s; cannot raise via oral adenosine","cnsLow":"30 nM","cnsHigh":"300 nM","cnsNote":"striatal extracellular; rises with metabolic stress","evidence":"A2A receptor signalling is the major caffeine-protection axis. Direct α-syn effects weak; A2A pathway modulates α-syn-driven neurodegeneration in MPTP and α-syn-overexpression models.","reach":"reaches","prov":"known","rank":28},{"id":"resveratrol","name":"Resveratrol","group":"dietary","dActGated":-0.04360308830079286,"aspr":0,"aff":-4.728,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"rapid glucuronidation; sub-µM brain levels even with high oral doses","cnsLow":"10 nM","cnsHigh":"300 nM","cnsNote":"CNS bioavailability is low; clearance-side mechanism","evidence":"Reduces intracellular α-syn accumulation by upregulating autophagy / SIRT1-mediated clearance, not by direct binding.","reach":"barrier","prov":"known","rank":29},{"id":"arachidonic-acid","name":"Arachidonic acid (20:4 n-6)","group":"lipid","dActGated":-0.03963102805603519,"aspr":0,"aff":-4.386,"route":"diet","feasibility":"native","deliveryNotes":"animal fats, egg yolk; bilayer enrichment slow","cnsLow":null,"cnsHigh":null,"cnsNote":"~10 mol% of grey-matter phospholipid acyl chains","evidence":"Major n-6 PUFA, eicosanoid precursor. Free AA accelerates α-syn oligomerisation; bilayer AA fraction affects α-syn binding.","reach":"reaches","prov":"novel","rank":30},{"id":"inosine","name":"Inosine","group":"endogenous-metabolites","dActGated":-0.03626212435693368,"aspr":0,"aff":-4.683,"route":"supplement","feasibility":"achievable","deliveryNotes":"SURE-PD dosed 0.5–2.4 g/day to raise urate","cnsLow":"100 nM","cnsHigh":"5 µM","cnsNote":"CSF; precursor to hypoxanthine and urate","evidence":"Therapeutically dosed to raise urate in PD trials (SURE-PD). Adenosine-related purine; reaches the brain.","reach":"reaches","prov":"novel","rank":31},{"id":"tryptophan","name":"L-Tryptophan","group":"endogenous-metabolites","dActGated":-0.03254518698242812,"aspr":0,"aff":-4.402,"route":"diet","feasibility":"achievable","deliveryNotes":"dietary tryptophan crosses BBB via LAT1; competes with other large neutral AAs","cnsLow":"1 µM","cnsHigh":"20 µM","cnsNote":"CSF; substrate for serotonin and kynurenine pathways","evidence":"Source amino acid for both the serotonergic and kynurenine arms. Itself reaches the SN; indole side chain shares ring chemistry with several α-syn-relevant metabolites.","reach":"reaches","prov":"novel","rank":32},{"id":"kynurenic-acid","name":"Kynurenic acid","group":"endogenous-metabolites","dActGated":-0.030835986128048352,"aspr":0,"aff":-4.605,"route":"endogenous","feasibility":"native","deliveryNotes":"modulable indirectly via KAT activity and kynurenine flux","cnsLow":"1 nM","cnsHigh":"50 nM","cnsNote":"CSF; neuroprotective arm of the kynurenine pathway","evidence":"NMDA / α7-nAChR antagonist, AhR ligand. Lower in PD CSF; the neuroprotective candidate of the kynurenine branch.","reach":"reaches","prov":"novel","rank":33},{"id":"pterostilbene","name":"Pterostilbene","group":"dietary","dActGated":-0.030506144246829212,"aspr":0,"aff":-4.565,"route":"supplement","feasibility":"low-bioavailability","deliveryNotes":"blueberries; better bioavailability than resveratrol but still sub-µM in brain","cnsLow":"50 nM","cnsHigh":"1 µM","cnsNote":"plasma after blueberry intake; better BBB than resveratrol","evidence":"Dimethyl ether of resveratrol; significantly better bioavailability. Companion stilbene in the search.","reach":"barrier","prov":"novel","rank":34},{"id":"melatonin","name":"Melatonin","group":"neurotransmitter","dActGated":-0.02886824247871961,"aspr":0,"aff":-4.402,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral melatonin freely crosses BBB and raises CSF; common OTC supplement","cnsLow":"10 pM","cnsHigh":"500 pM","cnsNote":"CSF, diurnal; supplementation raises plasma 100×","evidence":"Binds α-syn at the C-terminus, inhibits fibrillation in vitro, dissolves preformed fibrils. Free-radical scavenger on the same oxidative axis as glutathione.","reach":"reaches","prov":"known","rank":35},{"id":"l-dopa","name":"L-DOPA (levodopa)","group":"endogenous-metabolites","dActGated":-0.02814750882380455,"aspr":0,"aff":-4.39,"route":"supplement","feasibility":"achievable","deliveryNotes":"gold-standard PD therapy; carbidopa blocks peripheral decarboxylation","cnsLow":"10 nM","cnsHigh":"10 µM","cnsNote":"CSF; rises sharply during oral therapy","evidence":"Dopamine precursor and the first-line PD therapy. Itself a catechol with the same quinone-forming chemistry; the long-running question of whether chronic L-DOPA modifies α-syn through this route sits in this list.","reach":"reaches","prov":"novel","rank":36},{"id":"indole-3-propionate","name":"Indole-3-propionate (IPA)","group":"gut-derived","dActGated":-0.027303139851085245,"aspr":0,"aff":-4.317,"route":"microbiome","feasibility":"achievable","deliveryNotes":"C. sporogenes canonical producer; plasma sub-µM in colonised individuals","cnsLow":"50 nM","cnsHigh":"5 µM","cnsNote":"plasma after Clostridium-rich microbiome state; crosses BBB","evidence":"Microbial indole with potent radical-scavenging activity. Reported in vitro inhibition of α-syn fibrillation.","reach":"conditional","prov":"novel","rank":37},{"id":"anandamide","name":"Anandamide (AEA)","group":"neurotransmitter","dActGated":-0.02608873968333336,"aspr":0,"aff":-4.003,"route":"endogenous","feasibility":"native","deliveryNotes":"FAAH inhibitors raise endogenous levels; no oral AEA supplement","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"striatal tissue; endocannabinoid","evidence":"Endocannabinoid (CB1/CB2 ligand). Lipid signaler with potential to alter membrane environment α-syn engages.","reach":"reaches","prov":"novel","rank":38},{"id":"cannabidiol","name":"Cannabidiol (CBD)","group":"dietary","dActGated":-0.016928672660035986,"aspr":0,"aff":-4.153,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral or sublingual; freely crosses BBB; Epidiolex validates CNS reach","cnsLow":"50 nM","cnsHigh":"5 µM","cnsNote":"CSF at therapeutic plasma levels; freely crosses BBB","evidence":"Non-psychoactive cannabinoid. Reported in vitro α-syn aggregation modulation and reduced cell toxicity from α-syn pre-formed fibrils.","reach":"reaches","prov":"novel","rank":39},{"id":"2-ag","name":"2-Arachidonoylglycerol (2-AG)","group":"neurotransmitter","dActGated":-0.015883627725693312,"aspr":0,"aff":-3.937,"route":"endogenous","feasibility":"native","deliveryNotes":"MAGL inhibitors raise endogenous levels","cnsLow":"100 nM","cnsHigh":"5 µM","cnsNote":"striatal tissue; the major endocannabinoid by abundance","evidence":"Dominant endocannabinoid in CNS. Same lipid-environment-modulation logic as anandamide.","reach":"reaches","prov":"novel","rank":40},{"id":"caffeic-acid","name":"Caffeic acid","group":"dietary","dActGated":-0.015836337742316412,"aspr":0,"aff":-4.26,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"coffee, fruits","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after coffee or fruit intake","evidence":"Catechol-bearing phenolic acid widespread in plant foods. Catechol redox chemistry overlaps with α-syn modification routes.","reach":"barrier","prov":"novel","rank":41},{"id":"5-hiaa","name":"5-Hydroxyindoleacetic acid (5-HIAA)","group":"neurotransmitter","dActGated":-0.015563231085699538,"aspr":0,"aff":-4.201,"route":"endogenous","feasibility":"native","deliveryNotes":"serotonin metabolite; tracks 5-HT turnover","cnsLow":"50 nM","cnsHigh":"300 nM","cnsNote":"CSF; serotonin terminal metabolite","evidence":"Serotonin oxidation end-product. Companion to 5-HT in the indoleamine series.","reach":"reaches","prov":"novel","rank":42},{"id":"urate","name":"Urate (uric acid)","group":"endogenous-metabolites","dActGated":-0.01499631352594231,"aspr":0,"aff":-4.166,"route":"precursor","feasibility":"achievable","deliveryNotes":"oral inosine raises serum and CSF urate (SURE-PD trial)","cnsLow":"0.2 mg/dL","cnsHigh":"0.5 mg/dL","cnsNote":"CSF; serum ~10× higher and the operative epidemiological variable","evidence":"Higher serum urate is associated with reduced PD risk and slower progression. Mechanistically attributed to peroxynitrite scavenging and Fe³⁺ chelation upstream of α-syn modification.","reach":"reaches","prov":"known","rank":43},{"id":"epinephrine","name":"Epinephrine (adrenaline)","group":"endogenous-metabolites","dActGated":-0.013784792364481739,"aspr":0,"aff":-4.074,"route":"endogenous","feasibility":"native","deliveryNotes":"same BBB limitation as NE; CNS pool tiny vs periphery","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"low in brain vs periphery; PNMT-positive C1/C2 medulla neurons","evidence":"N-methylated catecholamine. Same catechol quinone chemistry as dopamine and norepinephrine — completes the catecholamine series in the search space.","reach":"reaches","prov":"novel","rank":44},{"id":"hva","name":"Homovanillic acid (HVA)","group":"endogenous-metabolites","dActGated":-0.013659476323637324,"aspr":0,"aff":-3.906,"route":"endogenous","feasibility":"native","deliveryNotes":"terminal DA metabolite; tracks turnover, not directly modulable","cnsLow":"20 nM","cnsHigh":"300 nM","cnsNote":"CSF; major terminal metabolite of dopamine via COMT+MAO","evidence":"Methylated dopamine end-metabolite. Methoxy group blunts catechol redox activity, so HVA tests the \"what does the catechol contribute\" question against DOPAC.","reach":"reaches","prov":"novel","rank":45},{"id":"thiamine","name":"Thiamine (B1)","group":"dietary","dActGated":-0.013515843111129725,"aspr":0,"aff":-4.124,"route":"diet","feasibility":"achievable","deliveryNotes":"whole grains, pork; benfotiamine raises tissue thiamine more than free thiamine","cnsLow":"50 nM","cnsHigh":"500 nM","cnsNote":"CSF; TDP is the metabolically active form","evidence":"Co-substrate of pyruvate dehydrogenase and α-KGDH; central to mitochondrial energetics. Small PD pilot studies report symptomatic effects of high-dose thiamine.","reach":"reaches","prov":"novel","rank":46},{"id":"norepinephrine","name":"Norepinephrine","group":"endogenous-metabolites","dActGated":-0.012692953789413484,"aspr":0,"aff":-4.139,"route":"endogenous","feasibility":"native","deliveryNotes":"oral NE does not cross BBB; CNS pool intrinsic to LC neurons","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"LC-derived noradrenergic terminals; SN receives noradrenergic input","evidence":"Catecholamine cousin of dopamine; shares the catechol oxidation chemistry that drives α-syn quinone adducts. Loss of LC noradrenergic neurons is an early PD lesion.","reach":"reaches","prov":"novel","rank":47},{"id":"ferulic-acid","name":"Ferulic acid","group":"dietary","dActGated":-0.012143233623041523,"aspr":0,"aff":-4.003,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"whole grains, brown rice","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after whole-grain intake","evidence":"Methoxylated phenolic acid; reported in vitro α-syn fibrillation inhibition. The methoxy blunts catechol chemistry, separating those routes from B-ring effects.","reach":"barrier","prov":"novel","rank":48},{"id":"3-hydroxykynurenine","name":"3-Hydroxykynurenine","group":"endogenous-metabolites","dActGated":-0.011776607081826294,"aspr":0,"aff":-4.038,"route":"endogenous","feasibility":"native","deliveryNotes":"rises with kynurenine pathway activation","cnsLow":"1 nM","cnsHigh":"50 nM","cnsNote":"CSF; intermediate generating ROS via auto-oxidation","evidence":"Kynurenine pathway intermediate that auto-oxidises to generate H₂O₂. Elevated in PD substantia nigra; sits in the oxidative-stress upstream of α-syn modification.","reach":"reaches","prov":"novel","rank":49},{"id":"serotonin","name":"Serotonin (5-HT)","group":"neurotransmitter","dActGated":-0.011765770010590326,"aspr":0,"aff":-3.953,"route":"precursor","feasibility":"achievable","deliveryNotes":"tryptophan or 5-HTP precursors; oral 5-HT does not cross BBB","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"CSF; raphe-derived projections to SN and striatum","evidence":"Major monoamine in the SN context; indoleamine with redox-active phenol. Implicated in motor symptoms via L-DOPA-induced dyskinesias.","reach":"reaches","prov":"novel","rank":50},{"id":"gallic-acid","name":"Gallic acid","group":"dietary","dActGated":-0.011744097894273584,"aspr":0,"aff":-4.104,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"tea, wine, nuts","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after tea/wine intake","evidence":"Trihydroxybenzoic acid; the galloyl group is what makes EGCG \"EGCG\". Direct anti-aggregation testing across amyloids.","reach":"barrier","prov":"novel","rank":51},{"id":"dopac","name":"3,4-Dihydroxyphenylacetic acid (DOPAC)","group":"endogenous-metabolites","dActGated":-0.011257956314350172,"aspr":0,"aff":-4.001,"route":"endogenous","feasibility":"native","deliveryNotes":"MAO-A product; tracks DA turnover, not directly modulable","cnsLow":"1 µM","cnsHigh":"20 µM","cnsNote":"striatal tissue; major dopamine metabolite via MAO-A","evidence":"DOPAC and related catechols (analogous quinone chemistry) inhibit α-syn fibrillation and stabilise oligomers in vitro.","reach":"reaches","prov":"known","rank":52},{"id":"indole-3-acetate","name":"Indole-3-acetate (IAA)","group":"gut-derived","dActGated":-0.011208804021891478,"aspr":0,"aff":-4.03,"route":"microbiome","feasibility":"achievable","deliveryNotes":"tryptophan + many gut species","cnsLow":"50 nM","cnsHigh":"1 µM","cnsNote":"plasma; major microbial tryptophan metabolite, AhR ligand","evidence":"Microbial tryptophan derivative; AhR ligand modulating immune/inflammation set point. Companion to IPA.","reach":"conditional","prov":"novel","rank":53},{"id":"cape","name":"Caffeic acid phenethyl ester (CAPE)","group":"dietary","dActGated":-0.010869475068271423,"aspr":0,"aff":-3.978,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"honeybee propolis principal active; topical/IV in research, oral bioavailability poor","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"plasma after propolis intake; CYP-conjugated rapidly","evidence":"Phenethyl ester of caffeic acid (propolis component). Inhibits α-syn aggregation and reduces α-syn-induced toxicity in cell and PD models; NF-κB inhibitor.","reach":"barrier","prov":"holdout","rank":54},{"id":"mhpg","name":"3-Methoxy-4-hydroxyphenylglycol (MHPG)","group":"endogenous-metabolites","dActGated":-0.01055651656552669,"aspr":0,"aff":-3.94,"route":"endogenous","feasibility":"native","deliveryNotes":"terminal NE metabolite; tracks turnover","cnsLow":"10 nM","cnsHigh":"100 nM","cnsNote":"CSF; major norepinephrine metabolite","evidence":"Noradrenaline terminal metabolite. Same methoxy-blunted catechol logic as HVA.","reach":"reaches","prov":"novel","rank":55},{"id":"kynurenine","name":"L-Kynurenine","group":"endogenous-metabolites","dActGated":-0.00994027462341475,"aspr":0,"aff":-3.882,"route":"endogenous","feasibility":"native","deliveryNotes":"modulated by inflammation (IDO activation) and dietary tryptophan flux","cnsLow":"20 nM","cnsHigh":"500 nM","cnsNote":"CSF; first committed metabolite of the kynurenine branch","evidence":"Branch point for neurotoxic (quinolinic acid) vs neuroprotective (kynurenic acid) downstream metabolites. The KYN/KYNA ratio is altered in PD.","reach":"reaches","prov":"novel","rank":56},{"id":"hippurate","name":"Hippurate (hippuric acid)","group":"gut-derived","dActGated":-0.009538666298841099,"aspr":0,"aff":-3.984,"route":"microbiome","feasibility":"achievable","deliveryNotes":"polyphenol-rich diets raise hippurate; urinary biomarker","cnsLow":"1 µM","cnsHigh":"50 µM","cnsNote":"plasma; major polyphenol gut metabolite excreted in urine","evidence":"End-metabolite of many dietary polyphenols. A urinary readout of polyphenol exposure; CNS-reaching abundance is modest.","reach":"conditional","prov":"novel","rank":57},{"id":"glutathione","name":"Glutathione (reduced, GSH)","group":"endogenous-metabolites","dActGated":-0.009405379449058443,"aspr":0,"aff":-3.825,"route":"endogenous","feasibility":"low-bioavailability","deliveryNotes":"oral GSH degraded in gut; NAC precursor route produces only modest brain-GSH increases","cnsLow":"1 mM","cnsHigh":"3 mM","cnsNote":"neuronal cytosol; SN GSH reduced ~40% in early PD","evidence":"GSH depletion in the SN is one of the earliest neurochemical changes in PD; shifts dopamine-driven α-syn modification toward toxic quinone adducts. Indirect ensemble modulator via redox tone.","reach":"barrier","prov":"known","rank":58},{"id":"quinolinic-acid","name":"Quinolinic acid","group":"endogenous-metabolites","dActGated":-0.009177581289030292,"aspr":0,"aff":-3.974,"route":"endogenous","feasibility":"native","deliveryNotes":"rises with neuroinflammation; lowering is the actionable direction","cnsLow":"5 nM","cnsHigh":"100 nM","cnsNote":"CSF; elevated in neuroinflammatory states","evidence":"NMDA-receptor agonist; the neurotoxic arm of the kynurenine pathway. Iron chelator and Fe-mediated oxidation generator, both potentially relevant to α-syn modification.","reach":"reaches","prov":"novel","rank":59},{"id":"3-methoxytyramine","name":"3-Methoxytyramine (3-MT)","group":"endogenous-metabolites","dActGated":-0.00899572396041898,"aspr":0,"aff":-3.694,"route":"endogenous","feasibility":"native","deliveryNotes":"extra-vesicular DA-COMT product","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"striatal extracellular; extra-vesicular DA metabolite via COMT","evidence":"Intermediate in dopamine metabolism. Distinct receptor pharmacology (TAAR1) from dopamine; structure is methoxy-blocked catechol so its α-syn surface chemistry is different from DA.","reach":"reaches","prov":"novel","rank":60},{"id":"oleic-acid","name":"Oleic acid (18:1 n-9)","group":"lipid","dActGated":-0.008756849205522757,"aspr":0,"aff":-3.693,"route":"diet","feasibility":"native","deliveryNotes":"olive oil, animal fats; bilayer composition shifts over weeks–months","cnsLow":null,"cnsHigh":null,"cnsNote":"major monounsaturated FA in CNS membranes","evidence":"Most abundant MUFA. Free oleic acid affects α-syn solubility; bilayer-acyl-chain composition tunes α-syn membrane binding.","reach":"reaches","prov":"novel","rank":61},{"id":"p-cresol-sulfate","name":"p-Cresol sulfate","group":"gut-derived","dActGated":-0.008694676893007154,"aspr":0,"aff":-3.859,"route":"microbiome","feasibility":"achievable","deliveryNotes":"dietary tyrosine + Clostridium species; lowering via microbiome modulation is the actionable direction","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"serum; gut-microbial metabolite of tyrosine; crosses BBB","evidence":"Microbiota-derived uraemic toxin reported to alter dopaminergic-neuron behaviour in ASD/PD models. Representative gut-derived aromatic.","reach":"conditional","prov":"known","rank":62},{"id":"paraquat","name":"Paraquat","group":"environmental","dActGated":-0.00846081164833513,"aspr":0,"aff":-3.837,"route":"environmental","feasibility":"achievable","deliveryNotes":"herbicide; reaches humans via agricultural exposure, contaminated water, and food residue; rural pesticide exposure is one of the most consistent epidemiological associations with PD risk","cnsLow":null,"cnsHigh":null,"cnsNote":"reaches brain via dopamine-transporter-mediated uptake of the dication; concentrations after typical environmental exposure are low but the molecule accumulates in SN neurons","evidence":"Canonical environmental PD risk factor. Generates ROS via redox cycling, damages dopaminergic neurons, and upregulates and aggregates α-syn in mouse models. One of the molecules Stage 3 must rank as harm-leaning to be trusted.","reach":"reaches","prov":"known","rank":63},{"id":"hydroxytyrosol","name":"Hydroxytyrosol","group":"dietary","dActGated":-0.00839012592461277,"aspr":0,"aff":-3.849,"route":"diet","feasibility":"low-bioavailability","deliveryNotes":"extra-virgin olive oil; better BBB than parent oleuropein","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"plasma after olive oil intake; crosses BBB","evidence":"Catechol from olive oil. Reported in vitro α-syn inhibition; structurally adjacent to dopamine (catechol + ethanol vs ethylamine).","reach":"barrier","prov":"novel","rank":64},{"id":"citrate","name":"Citrate","group":"endogenous-metabolites","dActGated":-0.008228789563701884,"aspr":0,"aff":-3.894,"route":"endogenous","feasibility":"native","deliveryNotes":"TCA pool; not directly modulable","cnsLow":"100 µM","cnsHigh":"500 µM","cnsNote":"CSF; tricarboxylic chelator","evidence":"TCA-cycle intermediate and effective Fe/Cu chelator. Citrate-mediated chelation could modulate metal-driven α-syn aggregation.","reach":"reaches","prov":"novel","rank":65},{"id":"tryptamine","name":"Tryptamine","group":"gut-derived","dActGated":-0.00821655224303694,"aspr":0,"aff":-3.835,"route":"microbiome","feasibility":"achievable","deliveryNotes":"tryptophan + decarboxylase-positive gut species (Clostridium, Ruminococcus)","cnsLow":"1 nM","cnsHigh":"100 nM","cnsNote":"CSF; trace amine, TAAR1 agonist","evidence":"Indoleamine trace amine. TAAR1 agonism modulates dopaminergic firing; bridges gut tryptophan flux and SN circuitry.","reach":"conditional","prov":"novel","rank":66},{"id":"xanthine","name":"Xanthine","group":"endogenous-metabolites","dActGated":-0.007005947825310471,"aspr":0,"aff":-3.964,"route":"endogenous","feasibility":"native","deliveryNotes":"xanthine-oxidase substrate; coffee provides parent caffeine, not free xanthine","cnsLow":"100 nM","cnsHigh":"2 µM","cnsNote":"CSF; urate precursor via xanthine oxidase","evidence":"Bridge from hypoxanthine to urate; xanthine-oxidase reaction generates H₂O₂ in the process. Both substrate and reaction context matter to α-syn redox modification.","reach":"reaches","prov":"novel","rank":67},{"id":"aminochrome","name":"Aminochrome","group":"endogenous-metabolites","dActGated":-0.006758568822012278,"aspr":0,"aff":-3.836,"route":"endogenous","feasibility":"native","deliveryNotes":"transient DA oxidation intermediate; concentration set by local redox","cnsLow":null,"cnsHigh":null,"cnsNote":"transient oxidative product of dopamine; concentration depends on local redox","evidence":"Two-electron oxidation product of dopamine; the dominant cytotoxic dopamine derivative. Stabilises α-syn protofibrils, inhibits mitochondrial complex I, and blocks proteasome — multiple α-syn-relevant routes.","reach":"reaches","prov":"known","rank":68},{"id":"caffeine","name":"Caffeine","group":"dietary","dActGated":-0.0064855830867666655,"aspr":0,"aff":-3.667,"route":"diet","feasibility":"achievable","deliveryNotes":"freely crosses BBB; brain ≈ plasma concentration","cnsLow":"1 µM","cnsHigh":"50 µM","cnsNote":"CSF after regular consumption; freely crosses BBB","evidence":"Inverse association with PD risk in prospective cohorts. Direct α-syn binding reported in vitro; dominant mechanism plausibly A2A receptor antagonism upstream of α-syn handling.","reach":"reaches","prov":"known","rank":69},{"id":"nicotine","name":"Nicotine","group":"dietary","dActGated":-0.0064121823251487905,"aspr":0,"aff":-3.675,"route":"diet","feasibility":"achievable","deliveryNotes":"rapid BBB transit; gum and patches deliver predictably","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"CSF in smokers; freely crosses BBB","evidence":"Inverse epidemiological association with PD persisting after confounder adjustment. Direct evidence of binding α-syn and inhibiting fibrillation in vitro.","reach":"reaches","prov":"known","rank":70},{"id":"dopamine","name":"Dopamine","group":"endogenous-metabolites","dActGated":-0.00626337530263663,"aspr":0,"aff":-3.828,"route":"endogenous","feasibility":"native","deliveryNotes":"L-DOPA bypasses tyrosine-hydroxylase deficit and raises striatal DA — the established route","cnsLow":"10 nM","cnsHigh":"1 µM","cnsNote":"striatal extracellular basal/evoked; vesicular ~100 mM","evidence":"Dopamine oxidation products (dopamine quinone, aminochrome) covalently modify α-syn and stabilise SDS-resistant protofibril/oligomer states, redirecting aggregation away from amyloid fibrils.","reach":"reaches","prov":"known","rank":71},{"id":"theobromine","name":"Theobromine","group":"dietary","dActGated":-0.0061752913226156975,"aspr":0,"aff":-3.718,"route":"diet","feasibility":"achievable","deliveryNotes":"cocoa; freely crosses BBB","cnsLow":"100 nM","cnsHigh":"5 µM","cnsNote":"plasma after cocoa intake; crosses BBB","evidence":"Cocoa methylxanthine. Companion to caffeine with weaker A2A antagonism but longer half-life.","reach":"reaches","prov":"novel","rank":72},{"id":"nicotinamide","name":"Nicotinamide (B3)","group":"dietary","dActGated":-0.00577572054945442,"aspr":0,"aff":-3.611,"route":"diet","feasibility":"achievable","deliveryNotes":"meat, fish, grains; freely crosses BBB","cnsLow":"5 µM","cnsHigh":"50 µM","cnsNote":"CSF; precursor to NAD⁺ via the salvage pathway","evidence":"NAD⁺ precursor and PARP/sirtuin substrate-context modulator. Companion to NAD⁺/NR in the NAD-precursor family.","reach":"reaches","prov":"novel","rank":73},{"id":"pea","name":"Palmitoylethanolamide (PEA)","group":"neurotransmitter","dActGated":-0.0056780888628163405,"aspr":0,"aff":-3.461,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral PEA at 300–1200 mg/day used clinically for chronic pain","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"CNS tissue; endogenous fatty-acid amide","evidence":"Endogenous PPAR-α / TRPV1 modulator; small clinical interest in PD. Lipid signaler complementing the endocannabinoids.","reach":"reaches","prov":"novel","rank":74},{"id":"skatole","name":"Skatole (3-methylindole)","group":"gut-derived","dActGated":-0.005579186365065233,"aspr":0,"aff":-3.65,"route":"microbiome","feasibility":"achievable","deliveryNotes":"high-protein diets and certain Clostridia","cnsLow":null,"cnsHigh":null,"cnsNote":"plasma after high-protein diet; partial BBB","evidence":"Tryptophan microbial derivative; pneumotoxic at high concentration but at physiological levels a passive aromatic in scope.","reach":"conditional","prov":"novel","rank":75},{"id":"theophylline","name":"Theophylline","group":"dietary","dActGated":-0.0055307501460875475,"aspr":0,"aff":-3.633,"route":"supplement","feasibility":"achievable","deliveryNotes":"tea (low) and therapeutic dosing for asthma; narrow therapeutic window","cnsLow":"1 µM","cnsHigh":"50 µM","cnsNote":"CSF at therapeutic plasma 5–20 µg/mL","evidence":"Methylxanthine therapeutic; broader phosphodiesterase inhibition than caffeine. Same A2A-pathway axis as caffeine.","reach":"reaches","prov":"novel","rank":76},{"id":"phenylacetate","name":"Phenylacetate","group":"gut-derived","dActGated":-0.005385554056334338,"aspr":0,"aff":-3.639,"route":"microbiome","feasibility":"achievable","deliveryNotes":"phenylalanine + many gut species","cnsLow":"0.1 µM","cnsHigh":"2 µM","cnsNote":"plasma; CNS-penetrant aromatic acid","evidence":"Microbial phenylalanine metabolite; HDAC modulation reported. Aromatic carboxylate in scope as competitor at α-syn surface basic patches.","reach":"conditional","prov":"novel","rank":77},{"id":"glutamine","name":"Glutamine","group":"endogenous-metabolites","dActGated":-0.005044009470161907,"aspr":0,"aff":-3.599,"route":"diet","feasibility":"achievable","deliveryNotes":"dietary glutamine raises plasma and enters CNS via SNAT transporters","cnsLow":"0.5 mM","cnsHigh":"5 mM","cnsNote":"astrocyte–neuron glutamate–glutamine shuttle","evidence":"Co-substrate of the glutamate cycle; high CNS abundance. Companion to the glutamate entry.","reach":"reaches","prov":"novel","rank":78},{"id":"ascorbate","name":"Vitamin C (ascorbate)","group":"dietary","dActGated":-0.004988522193081036,"aspr":0,"aff":-3.718,"route":"diet","feasibility":"native","deliveryNotes":"brain ascorbate is 10× plasma; SVCT2 saturates so supraphysiological dosing has diminishing returns","cnsLow":"200 µM","cnsHigh":"500 µM","cnsNote":"neuronal cytosol; brain ascorbate is 10× plasma","evidence":"High CNS abundance reducing-agent. Recycles α-tocopherol and reduces Fe³⁺ — both upstream of α-syn modification. Dual effect: redox protection vs Fenton-chemistry catalyst.","reach":"reaches","prov":"novel","rank":79},{"id":"alpha-ketoglutarate","name":"α-Ketoglutarate","group":"endogenous-metabolites","dActGated":-0.004475852678546326,"aspr":0,"aff":-3.513,"route":"endogenous","feasibility":"native","deliveryNotes":"TCA pool; oral αKG raises plasma marginally","cnsLow":"10 µM","cnsHigh":"100 µM","cnsNote":"cytosolic / mitochondrial","evidence":"TCA intermediate; co-substrate for many α-ketoglutarate-dependent dioxygenases. Implicated in epigenetic / autophagy control of α-syn clearance.","reach":"reaches","prov":"novel","rank":80},{"id":"mannitol","name":"Mannitol","group":"dietary","dActGated":-0.004474437819559277,"aspr":0,"aff":-3.583,"route":"injection","feasibility":"invasive-only","deliveryNotes":"IV mannitol used to open BBB; oral CNS levels low; intranasal in PD trials","cnsLow":"10 µM","cnsHigh":"500 µM","cnsNote":"after parenteral dosing; oral CNS levels lower","evidence":"Polyol osmolyte. Reduces α-syn aggregation and rescues phenotype in Drosophila and mouse PD models; small clinical interest in oral/intranasal mannitol followed.","reach":"barrier","prov":"known","rank":81},{"id":"hypoxanthine","name":"Hypoxanthine","group":"endogenous-metabolites","dActGated":-0.004413414707674657,"aspr":0,"aff":-3.555,"route":"endogenous","feasibility":"native","deliveryNotes":"purine-salvage intermediate","cnsLow":"500 nM","cnsHigh":"5 µM","cnsNote":"CSF; immediate urate precursor","evidence":"Purine catabolism intermediate one step upstream of xanthine / urate. Reaches CNS in achievable concentrations.","reach":"reaches","prov":"novel","rank":82},{"id":"indole","name":"Indole (free)","group":"gut-derived","dActGated":-0.004253358185810075,"aspr":0,"aff":-3.529,"route":"microbiome","feasibility":"achievable","deliveryNotes":"tryptophan + indole-producing gut bacteria (E. coli, Bacteroides)","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"CSF; gut-microbial tryptophan product","evidence":"Microbial tryptophan derivative. AhR ligand in CNS; the aromatic surface of many α-syn-relevant metabolites starts here.","reach":"conditional","prov":"novel","rank":83},{"id":"spermine","name":"Spermine","group":"endogenous-metabolites","dActGated":-0.0038673640236075793,"aspr":0,"aff":-3.257,"route":"endogenous","feasibility":"native","deliveryNotes":"dietary polyamines absorbed but tissue distribution complex","cnsLow":"50 µM","cnsHigh":"500 µM","cnsNote":"neuronal cytosol; polyamine pool turns over rapidly","evidence":"Polyamines accelerate α-syn aggregation in vitro; spermine specifically promotes oligomerisation and changes fibril polymorphism. One of the longest-known α-syn modulators.","reach":"reaches","prov":"known","rank":84},{"id":"palmitic-acid","name":"Palmitic acid (16:0)","group":"lipid","dActGated":-0.0037325001238123676,"aspr":0,"aff":-3.215,"route":"diet","feasibility":"native","deliveryNotes":"animal fats, palm oil; substrate for de novo lipogenesis","cnsLow":null,"cnsHigh":null,"cnsNote":"major saturated FA in CNS membranes","evidence":"Most abundant saturated FA. Co-substrate for palmitoylation of α-syn-adjacent proteins (cysteine-string protein).","reach":"reaches","prov":"novel","rank":85},{"id":"glutamate-endo","name":"Glutamate (free pool)","group":"endogenous-metabolites","dActGated":-0.0034709842485563286,"aspr":0,"aff":-3.446,"route":"endogenous","feasibility":"native","deliveryNotes":"oral glutamate does not cross BBB significantly; intrinsic pool","cnsLow":"5 mM","cnsHigh":"15 mM","cnsNote":"tissue total; synaptic-cleft transients are mM-microsecond","evidence":"Most abundant amino acid in brain; dominant anionic background and the primary excitatory NT. Excitotoxicity overlaps with α-syn pathology.","reach":"reaches","prov":"novel","rank":86},{"id":"histamine","name":"Histamine","group":"neurotransmitter","dActGated":-0.0030635352106755664,"aspr":0,"aff":-3.35,"route":"endogenous","feasibility":"native","deliveryNotes":"oral histamine does not cross BBB; CNS pool intrinsic","cnsLow":"50 nM","cnsHigh":"500 nM","cnsNote":"CSF; tuberomamillary projections to SN are documented","evidence":"Hypothalamic histaminergic projections reach the SN; H3 receptor modulators have been explored in PD. Distinct receptor pharmacology; ring-amine surface chemistry.","reach":"reaches","prov":"novel","rank":87},{"id":"creatine","name":"Creatine","group":"endogenous-metabolites","dActGated":-0.003052181809217852,"aspr":0,"aff":-3.432,"route":"supplement","feasibility":"achievable","deliveryNotes":"oral creatine raises brain creatine; LS1 PD trial null on progression","cnsLow":"5 mM","cnsHigh":"15 mM","cnsNote":"neuronal cytosol; one of the highest-concentration free metabolites","evidence":"Energy-buffer molecule; supplementation reaches brain. Tested in PD (LS1) without effect on disease progression — but its high abundance and small-molecule character make it a relevant ambient species.","reach":"reaches","prov":"novel","rank":88},{"id":"bmaa","name":"β-N-methylamino-L-alanine (BMAA)","group":"dietary","dActGated":-0.0027319381822438118,"aspr":0,"aff":-3.358,"route":"diet","feasibility":"achievable","deliveryNotes":"cyanobacterial neurotoxin; reaches humans via contaminated freshwater, biomagnified seafood, and cycad seeds (Guam ALS-PDC); not nutritional but the route is dietary","cnsLow":null,"cnsHigh":null,"cnsNote":"low-µM detected in human brain in some PD/ALS/dementia cohorts; absolute quantitation contested","evidence":"Non-proteinogenic amino acid implicated in the Guam ALS-Parkinsonism-dementia complex. Misincorporation into proteins and glutamate-receptor activation are proposed routes to α-syn-relevant pathology. The cleanest published dietary harm anchor.","reach":"reaches","prov":"known","rank":89},{"id":"acetyl-l-carnitine","name":"Acetyl-L-carnitine (ALCAR)","group":"endogenous-metabolites","dActGated":-0.002312035763208343,"aspr":0,"aff":-3.161,"route":"supplement","feasibility":"achievable","deliveryNotes":"better BBB than free carnitine","cnsLow":"5 µM","cnsHigh":"50 µM","cnsNote":"CNS; better BBB-penetrant than free carnitine","evidence":"Acetylated carnitine with reported neuroprotective effects in MPTP and rotenone models. Direct α-syn evidence absent but bioavailability and mitochondrial route make it candidate-worthy.","reach":"reaches","prov":"novel","rank":90},{"id":"carnitine","name":"L-Carnitine","group":"endogenous-metabolites","dActGated":-0.0023009502789985378,"aspr":0,"aff":-3.101,"route":"diet","feasibility":"achievable","deliveryNotes":"red meat, dairy; OCTN2 BBB transport","cnsLow":"20 µM","cnsHigh":"100 µM","cnsNote":"cytosolic; required for mitochondrial fatty-acid β-oxidation","evidence":"Reaches brain via OCTN2; required for mitochondrial fatty-acid import. Mitochondrial-function modulator with established BBB transport.","reach":"reaches","prov":"novel","rank":91},{"id":"taurine","name":"Taurine","group":"endogenous-metabolites","dActGated":-0.0020620264029823443,"aspr":0,"aff":-3.16,"route":"diet","feasibility":"achievable","deliveryNotes":"seafood, energy drinks, supplementation; crosses BBB","cnsLow":"1 mM","cnsHigh":"5 mM","cnsNote":"neuronal cytosolic; one of the most abundant free amino acids in brain","evidence":"Sulfonic-acid amino acid present at mM in brain. Reported to inhibit α-syn aggregation in vitro; mechanism unclear (osmolyte?).","reach":"reaches","prov":"novel","rank":92},{"id":"sulforaphane","name":"Sulforaphane","group":"dietary","dActGated":-0.0018854616416037146,"aspr":0,"aff":-3.053,"route":"diet","feasibility":"achievable","deliveryNotes":"broccoli sprouts (myrosinase-active) deliver bioavailable sulforaphane; crosses BBB","cnsLow":"50 nM","cnsHigh":"500 nM","cnsNote":"plasma/brain after broccoli sprout intake; potent at sub-µM","evidence":"Nrf2 pathway activator. Reduces α-syn-driven dopaminergic loss in MPTP and rotenone models via antioxidant gene upregulation; not a direct binder.","reach":"reaches","prov":"known","rank":93},{"id":"homocysteine","name":"Homocysteine","group":"endogenous-metabolites","dActGated":-0.0018162777753592152,"aspr":0,"aff":-3.031,"route":"endogenous","feasibility":"native","deliveryNotes":"rises with B12/folate deficiency or chronic L-DOPA — lowering (B-vitamins, betaine) is actionable","cnsLow":"50 nM","cnsHigh":"500 nM","cnsNote":"CSF; rises with B12/folate deficiency and chronic L-DOPA","evidence":"Elevated plasma homocysteine is a PD risk factor and rises with chronic L-DOPA (COMT methyl drain). Thiol with disulfide chemistry, and a known oxidative-stress contributor.","reach":"reaches","prov":"novel","rank":94},{"id":"spermidine","name":"Spermidine","group":"endogenous-metabolites","dActGated":-0.0015635639872665506,"aspr":0,"aff":-2.965,"route":"diet","feasibility":"achievable","deliveryNotes":"wheat germ, aged cheese, soy; oral spermidine raises plasma and autophagy markers","cnsLow":"20 µM","cnsHigh":"300 µM","cnsNote":"neuronal cytosol","evidence":"Same polyamine α-syn-accelerating chemistry as spermine. Separately, spermidine induces autophagy and is being trialled for cognitive/neuroprotective effects — so both an aggregation modulator and a clearance modulator.","reach":"reaches","prov":"known","rank":95},{"id":"cadaverine","name":"Cadaverine","group":"gut-derived","dActGated":-0.0013605222264606138,"aspr":0,"aff":-2.699,"route":"microbiome","feasibility":"native","deliveryNotes":"lysine decarboxylation by gut microbiota","cnsLow":null,"cnsHigh":null,"cnsNote":"plasma low; gut-microbial polyamine from lysine","evidence":"Microbial polyamine from lysine decarboxylation. Same diamine surface chemistry as putrescine but C5 rather than C4.","reach":"conditional","prov":"novel","rank":96},{"id":"acetylcholine","name":"Acetylcholine","group":"neurotransmitter","dActGated":-0.001187170622225541,"aspr":0,"aff":-2.762,"route":"endogenous","feasibility":"native","deliveryNotes":"cholinesterase inhibitors raise local ACh; choline is upstream precursor","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"extracellular striatum; high vesicular","evidence":"Cholinergic system loss is a PD comorbidity; striatal cholinergic interneurons are dense.","reach":"reaches","prov":"novel","rank":97},{"id":"gaba-endo","name":"γ-Aminobutyric acid (GABA, free pool)","group":"endogenous-metabolites","dActGated":-0.0011370691651767348,"aspr":0,"aff":-2.831,"route":"endogenous","feasibility":"native","deliveryNotes":"oral GABA crosses BBB poorly despite supplement claims; CNS pool intrinsic","cnsLow":"0.5 mM","cnsHigh":"5 mM","cnsNote":"tissue total; receptor-relevant synaptic transients are sub-mM","evidence":"Major inhibitory NT; listed under endogenous metabolites for its bulk free-pool concentration in addition to its receptor role.","reach":"reaches","prov":"novel","rank":98},{"id":"gaba","name":"γ-Aminobutyric acid (GABA, signalling pool)","group":"neurotransmitter","dActGated":-0.0011370691651767348,"aspr":0,"aff":-2.831,"route":"endogenous","feasibility":"native","deliveryNotes":"oral GABA crosses BBB poorly despite supplement claims","cnsLow":"0.1 µM","cnsHigh":"10 µM","cnsNote":"synaptic cleft transients; signalling-relevant concentration","evidence":"Major inhibitory NT in the basal-ganglia output circuit. Bulk pool listed separately under endogenous metabolites.","reach":"reaches","prov":"novel","rank":99},{"id":"succinate","name":"Succinate","group":"endogenous-metabolites","dActGated":-0.0009951841909518644,"aspr":0,"aff":-2.795,"route":"endogenous","feasibility":"native","deliveryNotes":"TCA pool; SUCNR1 signalling modulable by metabolic state","cnsLow":"5 µM","cnsHigh":"50 µM","cnsNote":"extracellular; SUCNR1 signalling concentration","evidence":"Mitochondrial / TCA intermediate and an extracellular signalling molecule via SUCNR1. Mitochondrial dysfunction is upstream of α-syn pathology, so the local TCA pool is in scope.","reach":"reaches","prov":"novel","rank":100},{"id":"choline-endo","name":"Choline","group":"endogenous-metabolites","dActGated":-0.0009887386952422523,"aspr":0,"aff":-2.721,"route":"diet","feasibility":"achievable","deliveryNotes":"eggs, liver, fish; CHT transporter at BBB","cnsLow":"5 µM","cnsHigh":"50 µM","cnsNote":"CSF; ACh precursor and phospholipid head-group source","evidence":"Acetylcholine precursor and the head-group source for PC. Cholinergic system loss is a PD comorbidity; in scope as a metabolic species, not just as the NT precursor.","reach":"reaches","prov":"novel","rank":101},{"id":"lactate","name":"Lactate","group":"endogenous-metabolites","dActGated":-0.0009015664138619959,"aspr":0,"aff":-2.856,"route":"endogenous","feasibility":"native","deliveryNotes":"rises with exercise; ANLS shuttle delivers astrocyte → neuron","cnsLow":"0.5 mM","cnsHigh":"3 mM","cnsNote":"CSF / extracellular; rises with neural activity (ANLS)","evidence":"Major neuronal fuel substrate shuttled from astrocytes. Reaches mM concentrations and is one of the dominant small organic anions in the SN extracellular space.","reach":"reaches","prov":"novel","rank":102},{"id":"beta-hydroxybutyrate","name":"β-Hydroxybutyrate","group":"endogenous-metabolites","dActGated":-0.0008886676087286897,"aspr":0,"aff":-2.763,"route":"diet","feasibility":"achievable","deliveryNotes":"ketogenic diet, fasting, or exogenous ketone esters raise brain BHB","cnsLow":"50 µM","cnsHigh":"5 mM","cnsNote":"CNS; rises with ketosis (fasting, ketogenic diet)","evidence":"Major ketone-body energy substrate during ketosis; HDAC-inhibitor activity. Bridges the ketogenic-diet literature to α-syn handling.","reach":"reaches","prov":"novel","rank":103},{"id":"putrescine","name":"Putrescine","group":"endogenous-metabolites","dActGated":-0.000774183165547909,"aspr":0,"aff":-2.63,"route":"endogenous","feasibility":"native","deliveryNotes":"spermidine precursor; pool tightly regulated","cnsLow":"5 µM","cnsHigh":"100 µM","cnsNote":"neuronal cytosol; polyamine pathway precursor","evidence":"Smallest polyamine. Same diamine surface chemistry as spermidine/spermine but shorter and weaker; included to bound the polyamine series.","reach":"reaches","prov":"novel","rank":104},{"id":"glycine","name":"Glycine","group":"neurotransmitter","dActGated":-0.0006903417028962241,"aspr":0,"aff":-2.824,"route":"diet","feasibility":"achievable","deliveryNotes":"dietary glycine raises plasma; supplemented at gram doses","cnsLow":"1 µM","cnsHigh":"50 µM","cnsNote":"CSF; co-agonist at NMDA receptors","evidence":"Inhibitory NT in brainstem/spinal cord; co-agonist at NMDA receptors. Simplest amino acid; high abundance.","reach":"reaches","prov":"novel","rank":105},{"id":"valerate","name":"Valerate","group":"gut-derived","dActGated":-0.000628687568826233,"aspr":0,"aff":-2.627,"route":"microbiome","feasibility":"achievable","deliveryNotes":"minor SCFA; plasma low","cnsLow":"0.1 µM","cnsHigh":"2 µM","cnsNote":"minor SCFA","evidence":"C5 SCFA from gut microbiota; less abundant than C2–C4. Completes the SCFA chain-length series.","reach":"conditional","prov":"novel","rank":106},{"id":"betaine","name":"Betaine (trimethylglycine)","group":"endogenous-metabolites","dActGated":-0.0005791561578334147,"aspr":0,"aff":-2.513,"route":"diet","feasibility":"achievable","deliveryNotes":"beets, spinach, whole grains; supplemented for homocysteine lowering","cnsLow":"10 µM","cnsHigh":"100 µM","cnsNote":"neuronal cytosolic; osmolyte","evidence":"Methyl donor (homocysteine remethylation) and a chemical chaperone-class osmolyte. The osmolyte class is interesting on α-syn (compare to TMAO and trehalose).","reach":"reaches","prov":"novel","rank":107},{"id":"butyrate","name":"Butyrate","group":"gut-derived","dActGated":-0.00045966708165536544,"aspr":0,"aff":-2.502,"route":"microbiome","feasibility":"achievable","deliveryNotes":"dietary fibre + resistant starch feed colonic Clostridia; CSF butyrate µM but trial designs vary","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"CSF; colonic lumen is mM","evidence":"Microbial SCFA. Modulates α-syn-related microglial activation and motor deficits in α-syn-overexpressing mice via HDAC inhibition and gut–brain signalling.","reach":"conditional","prov":"known","rank":108},{"id":"pyruvate","name":"Pyruvate","group":"endogenous-metabolites","dActGated":-0.00044448729485804025,"aspr":0,"aff":-2.566,"route":"endogenous","feasibility":"native","deliveryNotes":"oral pyruvate has ergogenic claims; CNS impact unclear","cnsLow":"50 µM","cnsHigh":"300 µM","cnsNote":"cytosolic; mitochondrial substrate","evidence":"Companion to lactate at the L-P shuttle. Pyruvate dose-dependently rescues mitochondrial dysfunction in α-syn-overexpressing models — worth scoring directly.","reach":"reaches","prov":"novel","rank":109},{"id":"propionate","name":"Propionate","group":"gut-derived","dActGated":-0.000326468612222657,"aspr":0,"aff":-2.4,"route":"microbiome","feasibility":"achievable","deliveryNotes":"fibre-fed colonic Bacteroidetes","cnsLow":"0.5 µM","cnsHigh":"5 µM","cnsNote":"CSF; intermediate SCFA","evidence":"Middle SCFA; FFAR2/3 ligand. Companion to butyrate / acetate in the SCFA series.","reach":"conditional","prov":"novel","rank":110},{"id":"tmao","name":"Trimethylamine N-oxide (TMAO)","group":"gut-derived","dActGated":-0.00016699674336870276,"aspr":0,"aff":-1.778,"route":"microbiome","feasibility":"achievable","deliveryNotes":"dietary choline, carnitine, betaine → gut TMA → hepatic FMO3 → TMAO; lowering is the more actionable direction","cnsLow":"0.5 µM","cnsHigh":"10 µM","cnsNote":"CSF; from dietary choline/carnitine via gut microbiota and hepatic FMO3","evidence":"Classical chemical chaperone stabilising folded protein states. Promotes α-syn folding into β-rich oligomers in vitro at physiological concentrations; elevated in PD patient plasma.","reach":"conditional","prov":"known","rank":111},{"id":"acetate","name":"Acetate","group":"gut-derived","dActGated":-0.00015200933182326598,"aspr":0,"aff":-2.148,"route":"microbiome","feasibility":"achievable","deliveryNotes":"fibre-fed; the most abundant SCFA in plasma","cnsLow":"50 µM","cnsHigh":"500 µM","cnsNote":"CSF; the most abundant SCFA in circulation","evidence":"Smallest microbial SCFA, also produced systemically. Companion to butyrate in the SCFA series; the predominant SCFA in plasma.","reach":"conditional","prov":"novel","rank":112},{"id":"zinc","name":"Zinc (Zn²⁺)","group":"metal","dActGated":-0.000012252253189526989,"aspr":0,"aff":-1.09,"route":"diet","feasibility":"native","deliveryNotes":"oral Zn raises plasma; brain Zn tightly regulated by ZnT/ZIP transporters","cnsLow":"1 nM","cnsHigh":"500 nM","cnsNote":"free cytosolic; total brain Zn is mM but protein-bound","evidence":"Binds α-syn C-terminus and promotes oligomerisation. Synaptic Zn²⁺ release co-occurs with glutamate spikes, putting it in α-syn presynaptic neighbourhood.","reach":"reaches","prov":"known","rank":113},{"id":"magnesium","name":"Magnesium (Mg²⁺)","group":"metal","dActGated":-0.000012252253189526989,"aspr":0,"aff":-1.09,"route":"diet","feasibility":"native","deliveryNotes":"dietary Mg often suboptimal; magnesium-L-threonate claimed for CNS but evidence thin","cnsLow":"0.5 mM","cnsHigh":"1.5 mM","cnsNote":"free cytosolic; one of the most abundant divalent cations","evidence":"Highly abundant divalent cation in neurons. Stabiliser of phosphate / nucleotide chemistry and an NMDA-channel blocker. Competes with Ca²⁺, Cu²⁺ at carboxylate sites.","reach":"reaches","prov":"novel","rank":114},{"id":"manganese","name":"Manganese (Mn²⁺)","group":"metal","dActGated":-0.000012252253189526989,"aspr":0,"aff":-1.09,"route":"diet","feasibility":"native","deliveryNotes":"dietary Mn adequate; excess (occupational, contaminated water) causes manganism","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"exposure-variable; concentrates in basal ganglia","evidence":"Chronic Mn exposure produces manganism. Binds α-syn and accelerates oligomerisation/fibrillation in vitro and in cellular models.","reach":"reaches","prov":"known","rank":115},{"id":"calcium","name":"Calcium (Ca²⁺)","group":"metal","dActGated":-0.000010570103711419481,"aspr":0,"aff":-1.09,"route":"diet","feasibility":"native","deliveryNotes":"dietary Ca abundant; brain Ca tightly buffered by channels and pumps, not by intake","cnsLow":"50 nM","cnsHigh":"100 nM","cnsNote":"neuronal resting cytosolic free Ca²⁺; transient micro-domains >10 µM","evidence":"Binds α-syn C-terminus, promotes synaptic-vesicle interaction, induces a distinct A53T fibril polymorph (anchor 7WO0). Ca²⁺ dysregulation is mechanistically linked to α-syn pathology.","reach":"reaches","prov":"known","rank":116},{"id":"hydrogen-sulfide","name":"Hydrogen sulfide (H₂S)","group":"neurotransmitter","dActGated":-0.000004180368101167751,"aspr":0,"aff":-0.4442,"route":"precursor","feasibility":"achievable","deliveryNotes":"dietary cysteine, garlic organosulfurs, NAC raise endogenous H₂S synthesis","cnsLow":"10 nM","cnsHigh":"500 nM","cnsNote":"free CNS sulfide; CBS/CSE-derived","evidence":"Gasotransmitter with reducing thiol chemistry. Can modify α-syn cysteines (or methionines indirectly via redox) and reduces oxidative stress.","reach":"reaches","prov":"novel","rank":117}],"harmful":[{"id":"malondialdehyde","name":"Malondialdehyde (MDA)","group":"endogenous-metabolites","dActGated":-0.0001457656259684772,"aspr":10.603336684882414,"aff":-2.11,"route":"endogenous","feasibility":"native","deliveryNotes":"polyunsaturated lipid peroxidation product; also dietary, especially in oxidised fats and processed meats","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"brain; standard lipid-peroxidation biomarker","evidence":"Dialdehyde companion to 4-HNE in the lipid-peroxidation reactive-aldehyde pool. Cross-links proteins via Schiff bases. Direct α-syn evidence weaker than 4-HNE; included to bound the reactive-aldehyde axis.","reach":"reaches","prov":"novel","rank":1},{"id":"acrolein","name":"Acrolein","group":"endogenous-metabolites","dActGated":-0.00011609260759064566,"aspr":6.701455505851512,"aff":-1.872,"route":"endogenous","feasibility":"native","deliveryNotes":"polyamine catabolism + lipid peroxidation; major exogenous sources are tobacco smoke and overheated cooking oils","cnsLow":"0.05 µM","cnsHigh":"5 µM","cnsNote":"brain; rises in neurodegeneration","evidence":"Most reactive of the common α,β-unsaturated aldehydes. Cross-links α-syn, accelerates oligomerisation, and induces dopaminergic loss in cell and rodent models. Provides a chemistry bridge between smoking exposure and α-syn modification.","reach":"reaches","prov":"known","rank":2},{"id":"4-hne","name":"4-Hydroxynonenal (4-HNE)","group":"endogenous-metabolites","dActGated":-0.00327040613064245,"aspr":4.648678867859446,"aff":-3.293,"route":"endogenous","feasibility":"native","deliveryNotes":"ω-6 lipid peroxidation product; also generated in heated polyunsaturated cooking oils — pool tracks oxidative-stress tone and dietary lipid composition","cnsLow":"0.1 µM","cnsHigh":"10 µM","cnsNote":"SN tissue; rises in PD brain vs controls","evidence":"Reactive α,β-unsaturated aldehyde. Forms Michael adducts on α-syn nucleophilic residues, promotes oligomer formation, and is immunohistochemically elevated in PD substantia nigra.","reach":"reaches","prov":"known","rank":3},{"id":"methylglyoxal","name":"Methylglyoxal","group":"endogenous-metabolites","dActGated":-0.00020949413747114575,"aspr":4.241334673952966,"aff":-2.211,"route":"endogenous","feasibility":"native","deliveryNotes":"glycolysis side-product; also from dietary AGEs, browning reactions, smoking — concentration tracks glycaemic load and metabolic state","cnsLow":"0.1 µM","cnsHigh":"5 µM","cnsNote":"brain; rises with hyperglycaemia and ageing","evidence":"Reactive dicarbonyl that glycates α-syn directly, cross-links the protein, and accelerates pathology in cell and mouse models. Concrete molecular bridge from hyperglycaemia/AGEs to α-syn aggregation; one of the more developed harm-leaning anchors.","reach":"reaches","prov":"known","rank":4},{"id":"nitric-oxide","name":"Nitric oxide (NO)","group":"neurotransmitter","dActGated":-0.00002394341366359251,"aspr":2.669842810889065,"aff":-1.649,"route":"precursor","feasibility":"achievable","deliveryNotes":"dietary nitrate (beets, leafy greens) → NO via salivary reduction; L-arginine/citrulline upstream","cnsLow":"1 nM","cnsHigh":"500 nM","cnsNote":"extracellular transient near NOS-expressing neurons","evidence":"Gasotransmitter. S-nitrosylation modifies α-syn; nNOS activity in SN is implicated in oxidative α-syn pathology.","reach":"reaches","prov":"novel","rank":5}]};
+const TOPN = 20;
+let panel = 'protective', showAll = false;
+
 const ROUTE_LABEL = {
-  endogenous: 'endogenous', diet: 'diet', supplement: 'supplement',
-  precursor: 'precursor', microbiome: 'microbiome', environmental: 'environmental',
-  injection: 'injection', 'none-known': 'none known',
+  endogenous:'made by the body', diet:'diet', supplement:'supplement',
+  precursor:'dietary precursor', microbiome:'gut microbiome', environmental:'environmental',
+  injection:'injection', 'none-known':'route unknown',
 };
-const REACH_LABEL = {
-  reaches: 'reaches brain', conditional: 'conditional', barrier: 'delivery barrier',
-  unknown: 'unknown',
-};
-const PROV_LABEL = { novel: 'novel hypothesis', known: 'known modulator', holdout: 'hold-out (sanity check)' };
 
-let state = { panel: 'protective', route: '', reach: '', prov: '', showAll: false,
-  sortKey: 'rank', sortAsc: true };
-
-const tbl = document.getElementById('tbl');
-const TOPN = 25;
-
-function rows() {
-  let rs = DATA[state.panel].slice();
-  if (state.route) rs = rs.filter(r => r.route === state.route);
-  if (state.reach) rs = rs.filter(r => r.reach === state.reach);
-  if (state.prov) rs = rs.filter(r => r.prov === state.prov);
-  const k = state.sortKey, asc = state.sortAsc ? 1 : -1;
-  rs.sort((a, b) => {
-    let av = a[k], bv = b[k];
-    if (typeof av === 'string') return av.localeCompare(bv) * asc;
-    return (av - bv) * asc;
-  });
-  if (!state.showAll && !state.route && !state.reach && !state.prov) rs = rs.slice(0, TOPN);
-  return rs;
+// plain-language "does it reach the brain", from feasibility + route
+function reachSentence(r) {
+  if (r.reach === 'conditional')
+    return 'Made by gut bacteria — reaches the brain only in people whose microbiome produces it.';
+  switch (r.feasibility) {
+    case 'native': return 'The body makes it; already present in the brain.';
+    case 'achievable': return 'Reaches the brain at useful levels from diet or supplements.';
+    case 'low-bioavailability':
+      return 'Poorly absorbed — little reaches the brain without special formulation.';
+    case 'invasive-only': return 'Only reaches the brain by injection or infusion.';
+    default: return 'Brain delivery not well characterised.';
+  }
 }
 
-function fmtConc(r) {
-  if (r.cnsLow && r.cnsHigh) return r.cnsLow + '–' + r.cnsHigh;
-  if (r.cnsLow) return r.cnsLow;
-  return '—';
+// actionable lever for an anti-target, keyword-derived from its source notes
+// only (not the mechanism text, which can mention "oxidative" etc. spuriously)
+function harmLever(r) {
+  const t = r.deliveryNotes.toLowerCase();
+  const out = [];
+  if (/glyc|\bage\b|ages|browning|maillard|hyperglyc/.test(t)) out.push('lower glycaemic load; limit browned & ultra-processed foods');
+  if (/lipid peroxidation|polyunsaturat|oxidative|peroxid/.test(t)) out.push('antioxidant status; avoid oxidised / rancid fats');
+  if (/smok|tobacco/.test(t)) out.push('avoid tobacco smoke');
+  if (/heated|overheat|cooking oil|frying/.test(t)) out.push('avoid overheated cooking oils');
+  return out.length ? out.join('; ') : null;
+}
+
+function shortName(n){ return n.replace(/\s*\(.*\)/, ''); }
+
+function cardProtective(r, max) {
+  const w = Math.max(4, Math.round((-r.dActGated / max) * 140));
+  const reachCls = r.reach === 'barrier' ? 'barrier' : r.reach === 'conditional' ? 'conditional' : '';
+  return `<div class="card">
+    <div class="top">
+      <span class="rk">#${r.rank}</span>
+      <span class="nm">${shortName(r.name)}</span>
+      <span class="prov ${r.prov}">${r.prov === 'novel' ? 'new lead' : r.prov === 'holdout' ? 'sanity-check' : 'known'}</span>
+    </div>
+    <div class="eff"><span class="bar prot" style="width:${w}px"></span>
+      <span class="efftxt">predicted to destabilise — rank ${r.rank} of ${DATA.protective.length}</span></div>
+    <div class="how">
+      <div class="lbl"><span class="dot ${r.reach}"></span><b>Getting it to the brain</b>
+        <span class="route">${ROUTE_LABEL[r.route]}</span></div>
+      <div class="reachline ${reachCls}">${reachSentence(r)}</div>
+      ${r.deliveryNotes ? '<div class="notes">' + r.deliveryNotes + '.</div>' : ''}
+    </div>
+  </div>`;
+}
+
+function cardHarmful(r, max) {
+  const w = Math.max(4, Math.round((r.aspr / max) * 140));
+  const lever = harmLever(r);
+  return `<div class="card">
+    <div class="top">
+      <span class="rk">#${r.rank}</span>
+      <span class="nm">${shortName(r.name)}</span>
+      <span class="prov ${r.prov}">${r.prov === 'known' ? 'documented' : 'suspected'}</span>
+    </div>
+    <div class="eff"><span class="bar harm" style="width:${w}px"></span>
+      <span class="efftxt">reactivity toward α-synuclein — +${r.aspr.toFixed(2)}</span></div>
+    <div class="how">
+      <div class="lbl"><b>Where it comes from</b></div>
+      ${r.deliveryNotes ? '<div class="notes">' + r.deliveryNotes + '.</div>' : ''}
+      ${lever ? '<div class="reachline"><b style="color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Lower it by</b><br><span class="lever">' + lever + '</span></div>' : ''}
+    </div>
+  </div>`;
 }
 
 function render() {
-  const prot = state.panel === 'protective';
-  const all = DATA[state.panel];
-  const maxMag = prot
-    ? Math.max(...all.map(r => -r.dActGated))
-    : Math.max(...all.map(r => r.aspr));
+  const prot = panel === 'protective';
+  const all = DATA[panel];
+  const max = prot ? Math.max(...all.map(r => -r.dActGated)) : Math.max(...all.map(r => r.aspr));
 
-  const cols = prot
-    ? [['rank','#'],['name','molecule'],['dActGated','predicted destabilisation'],
-       ['route','route to brain'],['reach','reachability'],['cns','CNS conc.']]
-    : [['rank','#'],['name','molecule'],['aspr','adduct reactivity'],
-       ['route','origin'],['cns','CNS conc.']];
+  document.getElementById('intro').textContent = prot
+    ? 'Candidates the model predicts could break up the toxic oligomer. Top of the list = strongest predicted effect.'
+    : 'Reactive molecules the model flags as likely to damage α-synuclein and accelerate aggregation. These are exposures to reduce, not things to take.';
 
-  tbl.querySelector('thead').innerHTML = '<tr>' + cols.map(([k,l]) => {
-    const sorted = state.sortKey === k;
-    const cls = sorted ? 'sorted ' + (state.sortAsc ? 'asc' : '') : '';
-    return '<th class="'+cls+'" data-k="'+k+'">'+l+'</th>';
-  }).join('') + '</tr>';
+  // "test first" callout: strong predicted effect AND reaches the brain readily
+  const co = document.getElementById('callout');
+  if (prot) {
+    const mags = all.map(r => -r.dActGated).sort((a,b)=>a-b);
+    const med = mags[Math.floor(mags.length/2)];
+    const first = all.filter(r => (-r.dActGated) >= med && r.reach === 'reaches');
+    co.innerHTML = '<div class="callout"><h2>Most actionable to test first</h2>'
+      + '<div>Strong predicted effect <i>and</i> already reaches the brain from the body or diet:</div>'
+      + first.map(r => '<span class="chip">' + shortName(r.name) + '</span>').join('') + '</div>';
+  } else co.innerHTML = '';
 
-  const body = rows().map(r => {
-    const mag = prot ? -r.dActGated : r.aspr;
-    const w = Math.max(3, Math.round((mag / maxMag) * 150));
-    const num = prot ? r.dActGated.toFixed(3) : '+' + r.aspr.toFixed(2);
-    const barCls = prot ? 'prot' : 'harm';
-    const provBadge = '<span class="prov '+r.prov+'" title="'+PROV_LABEL[r.prov]+'">'
-      + (r.prov==='novel'?'★ novel':r.prov==='holdout'?'⚑ hold-out':'known') + '</span>';
-    const routeCell = '<span class="badge">'+ROUTE_LABEL[r.route]+'</span>';
-    const reachCell = '<span class="dot '+r.reach+'"></span>'
-      + '<span class="reach-txt '+r.reach+'">'+REACH_LABEL[r.reach]+'</span>';
-    const barCell = '<div style="display:flex;gap:8px;align-items:center">'
-      + '<div class="bar '+barCls+'" style="width:'+w+'px"></div>'
-      + '<span class="barnum">'+num+'</span></div>';
+  const shown = showAll ? all : all.slice(0, TOPN);
+  document.getElementById('list').innerHTML =
+    shown.map(r => prot ? cardProtective(r, max) : cardHarmful(r, max)).join('');
 
-    const cells = prot
-      ? ['<td class="rank">'+r.rank+'</td>',
-         '<td class="name">'+r.name+provBadge+'</td>',
-         '<td class="barcell">'+barCell+'</td>',
-         '<td>'+routeCell+'</td>',
-         '<td>'+reachCell+'</td>',
-         '<td class="barnum">'+fmtConc(r)+'</td>']
-      : ['<td class="rank">'+r.rank+'</td>',
-         '<td class="name">'+r.name+provBadge+'</td>',
-         '<td class="barcell">'+barCell+'</td>',
-         '<td>'+routeCell+'</td>',
-         '<td class="barnum">'+fmtConc(r)+'</td>'];
-
-    const span = cols.length;
-    const detail = '<tr class="detail hidden"><td colspan="'+span+'">'
-      + (r.evidence ? '<div><span class="k">why in scope:</span> '+r.evidence+'</div>' : '')
-      + (r.deliveryNotes ? '<div><span class="k">'+(prot?'route detail':'source / reduce via')+':</span> '+r.deliveryNotes+'</div>' : '')
-      + (r.cnsNote ? '<div><span class="k">compartment:</span> '+r.cnsNote+'</div>' : '')
-      + (r.aff!=null && prot ? '<div><span class="k">top dock affinity:</span> '+r.aff.toFixed(2)+' kcal/mol</div>' : '')
-      + '</td></tr>';
-    return '<tr class="mol">'+cells.join('')+'</tr>'+detail;
-  }).join('');
-  tbl.querySelector('tbody').innerHTML = body;
-
-  tbl.querySelectorAll('th').forEach(th => th.onclick = () => {
-    const k = th.dataset.k;
-    if (state.sortKey === k) state.sortAsc = !state.sortAsc;
-    else { state.sortKey = k; state.sortAsc = (k === 'rank' || k === 'name'); }
-    render();
-  });
-  tbl.querySelectorAll('tr.mol').forEach(tr => tr.onclick = () => {
-    const d = tr.nextElementSibling;
-    if (d && d.classList.contains('detail')) d.classList.toggle('hidden');
-  });
-
-  renderMatrix();
-  renderLegend();
+  const more = document.getElementById('more');
+  if (all.length > TOPN) {
+    more.style.display = 'block';
+    more.textContent = showAll ? 'Show fewer' : ('Show all ' + all.length);
+  } else more.style.display = 'none';
 }
 
-function renderMatrix() {
-  const m = document.getElementById('matrix');
-  if (state.panel !== 'protective') { m.innerHTML = ''; return; }
-  const rs = DATA.protective;
-  const mags = rs.map(r => -r.dActGated).sort((a,b)=>a-b);
-  const med = mags[Math.floor(mags.length/2)];
-  const reaches = r => r.reach === 'reaches';
-  const strong = r => (-r.dActGated) >= med;
-  const bucket = (s, re) => rs.filter(r => strong(r)===s && reaches(r)===re)
-    .sort((a,b)=>a.dActGated-b.dActGated)
-    .map(r => '<span class="chip">'+r.name.replace(/\s*\(.*\)/,'')+'</span>').join('');
-  m.innerHTML = '<h2>Actionability matrix — predicted effect × reachability</h2>'
-    + '<div class="msub">Protective candidates split at the median predicted destabilisation. '
-    + 'Top-left = strong predicted effect <i>and</i> reaches the brain natively or through diet — '
-    + 'the first tier worth testing.</div>'
-    + '<div class="grid">'
-    + '<div class="h"></div><div class="h">reaches brain readily</div><div class="h">delivery barrier / conditional</div>'
-    + '<div class="rowlabel">stronger effect</div>'
-    + '<div class="cell first">'+bucket(true,true)+'</div>'
-    + '<div class="cell">'+bucket(true,false)+'</div>'
-    + '<div class="rowlabel">weaker effect</div>'
-    + '<div class="cell">'+bucket(false,true)+'</div>'
-    + '<div class="cell">'+bucket(false,false)+'</div>'
-    + '</div>';
-}
-
-function renderLegend() {
-  document.getElementById('legend').innerHTML =
-    'Reachability: <span class="dot reaches"></span>reaches brain (native / dietary) '
-    + '<span class="dot conditional"></span>conditional (e.g. microbiome producer status) '
-    + '<span class="dot barrier"></span>delivery barrier (low bioavailability / invasive only)<br>'
-    + 'Evidence: <span class="prov novel">★ novel</span> no prior α-syn binding evidence · '
-    + '<span class="prov known">known</span> published modulator · '
-    + '<span class="prov holdout">⚑ hold-out</span> blind sanity-check entry (not a discovery). '
-    + 'Click any row for the delivery / source detail.';
-}
-
-// build filter dropdowns
-function fillSelect(id, label, values, labels) {
-  const sel = document.getElementById(id);
-  sel.innerHTML = '<option value="">all</option>' +
-    values.map(v => '<option value="'+v+'">'+(labels[v]||v)+'</option>').join('');
-}
-function refreshFilters() {
-  const rs = DATA[state.panel];
-  fillSelect('routeFilter','route',[...new Set(rs.map(r=>r.route))],ROUTE_LABEL);
-  fillSelect('reachFilter','reach',[...new Set(rs.map(r=>r.reach))],REACH_LABEL);
-  fillSelect('provFilter','prov',[...new Set(rs.map(r=>r.prov))],PROV_LABEL);
-}
-
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  state = { ...state, panel: t.dataset.panel, route:'', reach:'', prov:'',
-    sortKey:'rank', sortAsc:true };
-  refreshFilters();
-  document.getElementById('routeFilter').value='';
-  document.getElementById('reachFilter').value='';
-  document.getElementById('provFilter').value='';
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+  panel = b.dataset.panel; showAll = false;
+  document.getElementById('bProt').classList.toggle('on', panel === 'protective');
+  document.getElementById('bHarm').classList.toggle('on', panel === 'harmful');
+  window.scrollTo(0, 0);
   render();
 });
-document.getElementById('routeFilter').onchange = e => { state.route=e.target.value; render(); };
-document.getElementById('reachFilter').onchange = e => { state.reach=e.target.value; render(); };
-document.getElementById('provFilter').onchange = e => { state.prov=e.target.value; render(); };
-document.getElementById('showAll').onchange = e => { state.showAll=e.target.checked; render(); };
+document.getElementById('more').onclick = () => { showAll = !showAll; render(); };
 
-refreshFilters();
+document.getElementById('legend').innerHTML =
+  'Reaches brain readily <span class="dot reaches"></span> · conditional <span class="dot conditional"></span> · '
+  + 'delivery barrier <span class="dot barrier"></span>. '
+  + 'Tags: <span class="prov novel" style="font-size:11px">new lead</span> no prior α-syn evidence · '
+  + '<span class="prov known" style="font-size:11px">known</span> published modulator · '
+  + '<span class="prov holdout" style="font-size:11px">sanity-check</span> blind validation entry. '
+  + 'Method &amp; caveats: <a href="https://github.com/xag/asyn-oligomer-screen">repository README</a>.';
+
 render();
 </script>
 </body>

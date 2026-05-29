@@ -147,298 +147,221 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>asyn-oligomer-screen — results</title>
+<title>α-synuclein oligomer screen — results</title>
 <style>
   :root {
-    --bg: #0e1117; --panel: #161b22; --line: #2b3240; --txt: #d7dde5;
-    --dim: #8b95a5; --reaches: #2ea043; --conditional: #d29922; --barrier: #f85149;
-    --unknown: #6e7681; --novel: #58a6ff; --known: #8b95a5; --holdout: #bc8cff;
-    --bar-prot: #3fb950; --bar-harm: #f85149;
+    --bg:#0e1117; --card:#161b22; --line:#2b3240; --txt:#e3e8ef; --dim:#9aa5b4;
+    --reaches:#3fb950; --conditional:#d29922; --barrier:#f0883e; --unknown:#6e7681;
+    --novel:#58a6ff; --known:#8b95a5; --holdout:#bc8cff;
+    --prot:#3fb950; --harm:#f85149;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--txt);
-    font: 14px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-  header { padding: 22px 28px 8px; }
-  h1 { font-size: 19px; margin: 0 0 4px; }
-  .sub { color: var(--dim); font-size: 13px; max-width: 860px; }
-  .warn { color: var(--conditional); }
-  .wrap { padding: 0 28px 60px; }
-  .tabs { display: flex; gap: 8px; margin: 18px 0 6px; }
-  .tab { padding: 7px 16px; border: 1px solid var(--line); background: var(--panel);
-    color: var(--dim); border-radius: 7px 7px 0 0; cursor: pointer; font-weight: 600; }
-  .tab.active { color: var(--txt); border-bottom-color: var(--bg); background: var(--bg); }
-  .tab.harm.active { color: var(--barrier); }
-  .tab.prot.active { color: var(--bar-prot); }
-  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
-    padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
-    border-radius: 0 7px 7px 7px; margin-bottom: 14px; }
-  .controls label { color: var(--dim); font-size: 12px; cursor: pointer; user-select: none; }
-  .controls .grp { display: flex; gap: 9px; align-items: center; }
-  .controls .grp b { color: var(--txt); font-size: 11px; text-transform: uppercase;
-    letter-spacing: .04em; }
-  select { background: var(--bg); color: var(--txt); border: 1px solid var(--line);
-    border-radius: 5px; padding: 4px 7px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line);
-    vertical-align: top; }
-  th { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    cursor: pointer; white-space: nowrap; user-select: none; }
-  th.sorted::after { content: " \\25BC"; font-size: 9px; }
-  th.sorted.asc::after { content: " \\25B2"; }
-  td.rank { color: var(--dim); width: 34px; }
-  td.name { font-weight: 600; }
-  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px;
-    border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
-  .prov { font-size: 10px; padding: 1px 6px; border-radius: 999px; margin-left: 6px;
-    vertical-align: middle; }
-  .prov.novel { color: var(--novel); border: 1px solid var(--novel); }
-  .prov.known { color: var(--known); border: 1px solid var(--known); }
-  .prov.holdout { color: var(--holdout); border: 1px solid var(--holdout); }
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px;
-    vertical-align: middle; }
-  .dot.reaches { background: var(--reaches); }
-  .dot.conditional { background: var(--conditional); }
-  .dot.barrier { background: var(--barrier); }
-  .dot.unknown { background: var(--unknown); }
-  .reach-txt.barrier { color: var(--barrier); }
-  .reach-txt.conditional { color: var(--conditional); }
-  .barcell { width: 190px; }
-  .bar { height: 9px; border-radius: 3px; }
-  .bar.prot { background: var(--bar-prot); }
-  .bar.harm { background: var(--bar-harm); }
-  .barnum { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
-  tr.mol { cursor: pointer; }
-  tr.mol:hover td { background: #1b2230; }
-  tr.detail td { background: #10141c; color: var(--dim); font-size: 12.5px; padding: 4px 14px 14px 44px; }
-  tr.detail .k { color: var(--txt); }
-  .hidden { display: none; }
-  .matrix { margin: 26px 0 6px; }
-  .matrix h2 { font-size: 14px; margin: 0 0 4px; }
-  .matrix .msub { color: var(--dim); font-size: 12px; margin-bottom: 10px; }
-  .grid { display: grid; grid-template-columns: 130px 1fr 1fr; gap: 8px; }
-  .grid .h { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    align-self: end; padding-bottom: 4px; }
-  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-    padding: 11px 13px; min-height: 64px; }
-  .cell.first { background: #11261a; border-color: #1f6f3a; }
-  .rowlabel { color: var(--dim); font-size: 12px; display: flex; align-items: center; }
-  .chip { display: inline-block; margin: 3px 5px 0 0; padding: 2px 9px; border-radius: 999px;
-    font-size: 12px; background: var(--bg); border: 1px solid var(--line); }
-  .legend { color: var(--dim); font-size: 11.5px; margin: 14px 0 0; line-height: 1.9; }
-  .legend .dot { margin-left: 2px; }
-  code { background: #1b2230; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-  a { color: var(--novel); }
+  * { box-sizing:border-box; -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:680px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:18px; margin:0 0 6px; line-height:1.3; }
+  .disc { color:var(--dim); font-size:13px; margin:0 0 4px; }
+  .disc b { color:var(--conditional); }
+
+  /* segmented toggle */
+  .seg { display:flex; gap:6px; margin:18px 0 6px; position:sticky; top:0;
+    background:var(--bg); padding:8px 0; z-index:5; }
+  .seg button { flex:1; min-height:46px; border:1px solid var(--line); background:var(--card);
+    color:var(--dim); border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+  .seg button.on.prot { color:#0e1117; background:var(--prot); border-color:var(--prot); }
+  .seg button.on.harm { color:#0e1117; background:var(--harm); border-color:var(--harm); }
+  .intro { color:var(--dim); font-size:13px; margin:2px 0 10px; }
+
+  .callout { background:#11261a; border:1px solid #1f6f3a; border-radius:12px;
+    padding:12px 14px; margin:0 0 16px; }
+  .callout h2 { font-size:13px; margin:0 0 6px; color:var(--reaches);
+    text-transform:uppercase; letter-spacing:.04em; }
+  .chip { display:inline-block; margin:3px 6px 0 0; padding:3px 11px; border-radius:999px;
+    font-size:13px; background:var(--bg); border:1px solid #1f6f3a; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:13px 14px; margin:0 0 11px; }
+  .top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .rk { color:var(--dim); font-variant-numeric:tabular-nums; font-size:13px; }
+  .nm { font-weight:700; font-size:16px; flex:1; min-width:130px; }
+  .prov { font-size:11px; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .prov.novel { color:var(--novel); border:1px solid var(--novel); }
+  .prov.known { color:var(--known); border:1px solid var(--known); }
+  .prov.holdout { color:var(--holdout); border:1px solid var(--holdout); }
+
+  .eff { display:flex; align-items:center; gap:9px; margin:9px 0 11px; }
+  .bar { height:8px; border-radius:4px; flex:0 0 auto; }
+  .bar.prot { background:var(--prot); } .bar.harm { background:var(--harm); }
+  .efftxt { color:var(--dim); font-size:12.5px; }
+
+  .how { font-size:13.5px; line-height:1.5; border-top:1px solid var(--line); padding-top:10px; }
+  .how .lbl { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .how .lbl b { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
+  .dot { width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+  .dot.reaches{background:var(--reaches);} .dot.conditional{background:var(--conditional);}
+  .dot.barrier{background:var(--barrier);} .dot.unknown{background:var(--unknown);}
+  .route { display:inline-block; padding:1px 9px; border-radius:999px; font-size:12px;
+    background:var(--bg); border:1px solid var(--line); color:var(--dim); }
+  .reachline { margin:2px 0; }
+  .reachline.barrier { color:var(--barrier); }
+  .reachline.conditional { color:var(--conditional); }
+  .notes { color:var(--dim); }
+  .lever { color:var(--reaches); }
+
+  .more { display:block; width:100%; min-height:46px; margin:6px 0 0; border:1px solid var(--line);
+    background:var(--card); color:var(--txt); border-radius:10px; font-size:14px; cursor:pointer; }
+  .legend { color:var(--dim); font-size:12px; margin:18px 0 0; line-height:1.9; }
+  .legend .dot { display:inline-block; vertical-align:middle; margin:0 3px 0 6px; }
+  a { color:var(--novel); }
 </style>
 </head>
 <body>
-<header>
-  <h1>α-synuclein oligomer screen — candidate display</h1>
-  <div class="sub">
-    Ranked outputs of the Stage 3 perturbation screen against the toxic-oligomer model,
-    joined with each molecule's route to the brain. <span class="warn">These are
-    unvalidated computational hypotheses, not medical or dietary advice.</span>
-    Rankings order molecules; they do not measure effect size. Reachability is
-    <b>not</b> in the score — it is shown alongside so a tightly-binding but
-    poorly-bioavailable hit is not mistaken for an actionable one.
-  </div>
-</header>
 <div class="wrap">
-  <div class="tabs">
-    <div class="tab prot active" data-panel="protective">Protective — candidates to test</div>
-    <div class="tab harm" data-panel="harmful">Suspected harmful — anti-targets</div>
-  </div>
-  <div class="controls">
-    <div class="grp"><b>Route</b><select id="routeFilter"></select></div>
-    <div class="grp"><b>Reach</b><select id="reachFilter"></select></div>
-    <div class="grp"><b>Evidence</b><select id="provFilter"></select></div>
-    <label><input type="checkbox" id="showAll"> show all rows</label>
-  </div>
-  <table id="tbl"><thead></thead><tbody></tbody></table>
+  <h1>α-synuclein oligomer screen — results</h1>
+  <p class="disc">Molecules ranked by a computational model of the toxic α-synuclein
+    oligomer in Parkinson's, shown with how each typically reaches the brain.
+    <b>Unvalidated hypotheses — not medical or dietary advice.</b> Ranks order
+    molecules; they do not measure effect size.</p>
 
-  <div class="matrix" id="matrix"></div>
+  <div class="seg">
+    <button id="bProt" class="prot on" data-panel="protective">Worth testing</button>
+    <button id="bHarm" class="harm" data-panel="harmful">Reduce exposure</button>
+  </div>
+  <p class="intro" id="intro"></p>
+
+  <div id="callout"></div>
+  <div id="list"></div>
+  <button class="more" id="more"></button>
 
   <div class="legend" id="legend"></div>
 </div>
 
 <script>
 const DATA = ${payload};
+const TOPN = 20;
+let panel = 'protective', showAll = false;
+
 const ROUTE_LABEL = {
-  endogenous: 'endogenous', diet: 'diet', supplement: 'supplement',
-  precursor: 'precursor', microbiome: 'microbiome', environmental: 'environmental',
-  injection: 'injection', 'none-known': 'none known',
+  endogenous:'made by the body', diet:'diet', supplement:'supplement',
+  precursor:'dietary precursor', microbiome:'gut microbiome', environmental:'environmental',
+  injection:'injection', 'none-known':'route unknown',
 };
-const REACH_LABEL = {
-  reaches: 'reaches brain', conditional: 'conditional', barrier: 'delivery barrier',
-  unknown: 'unknown',
-};
-const PROV_LABEL = { novel: 'novel hypothesis', known: 'known modulator', holdout: 'hold-out (sanity check)' };
 
-let state = { panel: 'protective', route: '', reach: '', prov: '', showAll: false,
-  sortKey: 'rank', sortAsc: true };
-
-const tbl = document.getElementById('tbl');
-const TOPN = 25;
-
-function rows() {
-  let rs = DATA[state.panel].slice();
-  if (state.route) rs = rs.filter(r => r.route === state.route);
-  if (state.reach) rs = rs.filter(r => r.reach === state.reach);
-  if (state.prov) rs = rs.filter(r => r.prov === state.prov);
-  const k = state.sortKey, asc = state.sortAsc ? 1 : -1;
-  rs.sort((a, b) => {
-    let av = a[k], bv = b[k];
-    if (typeof av === 'string') return av.localeCompare(bv) * asc;
-    return (av - bv) * asc;
-  });
-  if (!state.showAll && !state.route && !state.reach && !state.prov) rs = rs.slice(0, TOPN);
-  return rs;
+// plain-language "does it reach the brain", from feasibility + route
+function reachSentence(r) {
+  if (r.reach === 'conditional')
+    return 'Made by gut bacteria — reaches the brain only in people whose microbiome produces it.';
+  switch (r.feasibility) {
+    case 'native': return 'The body makes it; already present in the brain.';
+    case 'achievable': return 'Reaches the brain at useful levels from diet or supplements.';
+    case 'low-bioavailability':
+      return 'Poorly absorbed — little reaches the brain without special formulation.';
+    case 'invasive-only': return 'Only reaches the brain by injection or infusion.';
+    default: return 'Brain delivery not well characterised.';
+  }
 }
 
-function fmtConc(r) {
-  if (r.cnsLow && r.cnsHigh) return r.cnsLow + '–' + r.cnsHigh;
-  if (r.cnsLow) return r.cnsLow;
-  return '—';
+// actionable lever for an anti-target, keyword-derived from its source notes
+// only (not the mechanism text, which can mention "oxidative" etc. spuriously)
+function harmLever(r) {
+  const t = r.deliveryNotes.toLowerCase();
+  const out = [];
+  if (/glyc|\\bage\\b|ages|browning|maillard|hyperglyc/.test(t)) out.push('lower glycaemic load; limit browned & ultra-processed foods');
+  if (/lipid peroxidation|polyunsaturat|oxidative|peroxid/.test(t)) out.push('antioxidant status; avoid oxidised / rancid fats');
+  if (/smok|tobacco/.test(t)) out.push('avoid tobacco smoke');
+  if (/heated|overheat|cooking oil|frying/.test(t)) out.push('avoid overheated cooking oils');
+  return out.length ? out.join('; ') : null;
+}
+
+function shortName(n){ return n.replace(/\\s*\\(.*\\)/, ''); }
+
+function cardProtective(r, max) {
+  const w = Math.max(4, Math.round((-r.dActGated / max) * 140));
+  const reachCls = r.reach === 'barrier' ? 'barrier' : r.reach === 'conditional' ? 'conditional' : '';
+  return \`<div class="card">
+    <div class="top">
+      <span class="rk">#\${r.rank}</span>
+      <span class="nm">\${shortName(r.name)}</span>
+      <span class="prov \${r.prov}">\${r.prov === 'novel' ? 'new lead' : r.prov === 'holdout' ? 'sanity-check' : 'known'}</span>
+    </div>
+    <div class="eff"><span class="bar prot" style="width:\${w}px"></span>
+      <span class="efftxt">predicted to destabilise — rank \${r.rank} of \${DATA.protective.length}</span></div>
+    <div class="how">
+      <div class="lbl"><span class="dot \${r.reach}"></span><b>Getting it to the brain</b>
+        <span class="route">\${ROUTE_LABEL[r.route]}</span></div>
+      <div class="reachline \${reachCls}">\${reachSentence(r)}</div>
+      \${r.deliveryNotes ? '<div class="notes">' + r.deliveryNotes + '.</div>' : ''}
+    </div>
+  </div>\`;
+}
+
+function cardHarmful(r, max) {
+  const w = Math.max(4, Math.round((r.aspr / max) * 140));
+  const lever = harmLever(r);
+  return \`<div class="card">
+    <div class="top">
+      <span class="rk">#\${r.rank}</span>
+      <span class="nm">\${shortName(r.name)}</span>
+      <span class="prov \${r.prov}">\${r.prov === 'known' ? 'documented' : 'suspected'}</span>
+    </div>
+    <div class="eff"><span class="bar harm" style="width:\${w}px"></span>
+      <span class="efftxt">reactivity toward α-synuclein — +\${r.aspr.toFixed(2)}</span></div>
+    <div class="how">
+      <div class="lbl"><b>Where it comes from</b></div>
+      \${r.deliveryNotes ? '<div class="notes">' + r.deliveryNotes + '.</div>' : ''}
+      \${lever ? '<div class="reachline"><b style="color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Lower it by</b><br><span class="lever">' + lever + '</span></div>' : ''}
+    </div>
+  </div>\`;
 }
 
 function render() {
-  const prot = state.panel === 'protective';
-  const all = DATA[state.panel];
-  const maxMag = prot
-    ? Math.max(...all.map(r => -r.dActGated))
-    : Math.max(...all.map(r => r.aspr));
+  const prot = panel === 'protective';
+  const all = DATA[panel];
+  const max = prot ? Math.max(...all.map(r => -r.dActGated)) : Math.max(...all.map(r => r.aspr));
 
-  const cols = prot
-    ? [['rank','#'],['name','molecule'],['dActGated','predicted destabilisation'],
-       ['route','route to brain'],['reach','reachability'],['cns','CNS conc.']]
-    : [['rank','#'],['name','molecule'],['aspr','adduct reactivity'],
-       ['route','origin'],['cns','CNS conc.']];
+  document.getElementById('intro').textContent = prot
+    ? 'Candidates the model predicts could break up the toxic oligomer. Top of the list = strongest predicted effect.'
+    : 'Reactive molecules the model flags as likely to damage α-synuclein and accelerate aggregation. These are exposures to reduce, not things to take.';
 
-  tbl.querySelector('thead').innerHTML = '<tr>' + cols.map(([k,l]) => {
-    const sorted = state.sortKey === k;
-    const cls = sorted ? 'sorted ' + (state.sortAsc ? 'asc' : '') : '';
-    return '<th class="'+cls+'" data-k="'+k+'">'+l+'</th>';
-  }).join('') + '</tr>';
+  // "test first" callout: strong predicted effect AND reaches the brain readily
+  const co = document.getElementById('callout');
+  if (prot) {
+    const mags = all.map(r => -r.dActGated).sort((a,b)=>a-b);
+    const med = mags[Math.floor(mags.length/2)];
+    const first = all.filter(r => (-r.dActGated) >= med && r.reach === 'reaches');
+    co.innerHTML = '<div class="callout"><h2>Most actionable to test first</h2>'
+      + '<div>Strong predicted effect <i>and</i> already reaches the brain from the body or diet:</div>'
+      + first.map(r => '<span class="chip">' + shortName(r.name) + '</span>').join('') + '</div>';
+  } else co.innerHTML = '';
 
-  const body = rows().map(r => {
-    const mag = prot ? -r.dActGated : r.aspr;
-    const w = Math.max(3, Math.round((mag / maxMag) * 150));
-    const num = prot ? r.dActGated.toFixed(3) : '+' + r.aspr.toFixed(2);
-    const barCls = prot ? 'prot' : 'harm';
-    const provBadge = '<span class="prov '+r.prov+'" title="'+PROV_LABEL[r.prov]+'">'
-      + (r.prov==='novel'?'★ novel':r.prov==='holdout'?'⚑ hold-out':'known') + '</span>';
-    const routeCell = '<span class="badge">'+ROUTE_LABEL[r.route]+'</span>';
-    const reachCell = '<span class="dot '+r.reach+'"></span>'
-      + '<span class="reach-txt '+r.reach+'">'+REACH_LABEL[r.reach]+'</span>';
-    const barCell = '<div style="display:flex;gap:8px;align-items:center">'
-      + '<div class="bar '+barCls+'" style="width:'+w+'px"></div>'
-      + '<span class="barnum">'+num+'</span></div>';
+  const shown = showAll ? all : all.slice(0, TOPN);
+  document.getElementById('list').innerHTML =
+    shown.map(r => prot ? cardProtective(r, max) : cardHarmful(r, max)).join('');
 
-    const cells = prot
-      ? ['<td class="rank">'+r.rank+'</td>',
-         '<td class="name">'+r.name+provBadge+'</td>',
-         '<td class="barcell">'+barCell+'</td>',
-         '<td>'+routeCell+'</td>',
-         '<td>'+reachCell+'</td>',
-         '<td class="barnum">'+fmtConc(r)+'</td>']
-      : ['<td class="rank">'+r.rank+'</td>',
-         '<td class="name">'+r.name+provBadge+'</td>',
-         '<td class="barcell">'+barCell+'</td>',
-         '<td>'+routeCell+'</td>',
-         '<td class="barnum">'+fmtConc(r)+'</td>'];
-
-    const span = cols.length;
-    const detail = '<tr class="detail hidden"><td colspan="'+span+'">'
-      + (r.evidence ? '<div><span class="k">why in scope:</span> '+r.evidence+'</div>' : '')
-      + (r.deliveryNotes ? '<div><span class="k">'+(prot?'route detail':'source / reduce via')+':</span> '+r.deliveryNotes+'</div>' : '')
-      + (r.cnsNote ? '<div><span class="k">compartment:</span> '+r.cnsNote+'</div>' : '')
-      + (r.aff!=null && prot ? '<div><span class="k">top dock affinity:</span> '+r.aff.toFixed(2)+' kcal/mol</div>' : '')
-      + '</td></tr>';
-    return '<tr class="mol">'+cells.join('')+'</tr>'+detail;
-  }).join('');
-  tbl.querySelector('tbody').innerHTML = body;
-
-  tbl.querySelectorAll('th').forEach(th => th.onclick = () => {
-    const k = th.dataset.k;
-    if (state.sortKey === k) state.sortAsc = !state.sortAsc;
-    else { state.sortKey = k; state.sortAsc = (k === 'rank' || k === 'name'); }
-    render();
-  });
-  tbl.querySelectorAll('tr.mol').forEach(tr => tr.onclick = () => {
-    const d = tr.nextElementSibling;
-    if (d && d.classList.contains('detail')) d.classList.toggle('hidden');
-  });
-
-  renderMatrix();
-  renderLegend();
+  const more = document.getElementById('more');
+  if (all.length > TOPN) {
+    more.style.display = 'block';
+    more.textContent = showAll ? 'Show fewer' : ('Show all ' + all.length);
+  } else more.style.display = 'none';
 }
 
-function renderMatrix() {
-  const m = document.getElementById('matrix');
-  if (state.panel !== 'protective') { m.innerHTML = ''; return; }
-  const rs = DATA.protective;
-  const mags = rs.map(r => -r.dActGated).sort((a,b)=>a-b);
-  const med = mags[Math.floor(mags.length/2)];
-  const reaches = r => r.reach === 'reaches';
-  const strong = r => (-r.dActGated) >= med;
-  const bucket = (s, re) => rs.filter(r => strong(r)===s && reaches(r)===re)
-    .sort((a,b)=>a.dActGated-b.dActGated)
-    .map(r => '<span class="chip">'+r.name.replace(/\\s*\\(.*\\)/,'')+'</span>').join('');
-  m.innerHTML = '<h2>Actionability matrix — predicted effect × reachability</h2>'
-    + '<div class="msub">Protective candidates split at the median predicted destabilisation. '
-    + 'Top-left = strong predicted effect <i>and</i> reaches the brain natively or through diet — '
-    + 'the first tier worth testing.</div>'
-    + '<div class="grid">'
-    + '<div class="h"></div><div class="h">reaches brain readily</div><div class="h">delivery barrier / conditional</div>'
-    + '<div class="rowlabel">stronger effect</div>'
-    + '<div class="cell first">'+bucket(true,true)+'</div>'
-    + '<div class="cell">'+bucket(true,false)+'</div>'
-    + '<div class="rowlabel">weaker effect</div>'
-    + '<div class="cell">'+bucket(false,true)+'</div>'
-    + '<div class="cell">'+bucket(false,false)+'</div>'
-    + '</div>';
-}
-
-function renderLegend() {
-  document.getElementById('legend').innerHTML =
-    'Reachability: <span class="dot reaches"></span>reaches brain (native / dietary) '
-    + '<span class="dot conditional"></span>conditional (e.g. microbiome producer status) '
-    + '<span class="dot barrier"></span>delivery barrier (low bioavailability / invasive only)<br>'
-    + 'Evidence: <span class="prov novel">★ novel</span> no prior α-syn binding evidence · '
-    + '<span class="prov known">known</span> published modulator · '
-    + '<span class="prov holdout">⚑ hold-out</span> blind sanity-check entry (not a discovery). '
-    + 'Click any row for the delivery / source detail.';
-}
-
-// build filter dropdowns
-function fillSelect(id, label, values, labels) {
-  const sel = document.getElementById(id);
-  sel.innerHTML = '<option value="">all</option>' +
-    values.map(v => '<option value="'+v+'">'+(labels[v]||v)+'</option>').join('');
-}
-function refreshFilters() {
-  const rs = DATA[state.panel];
-  fillSelect('routeFilter','route',[...new Set(rs.map(r=>r.route))],ROUTE_LABEL);
-  fillSelect('reachFilter','reach',[...new Set(rs.map(r=>r.reach))],REACH_LABEL);
-  fillSelect('provFilter','prov',[...new Set(rs.map(r=>r.prov))],PROV_LABEL);
-}
-
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  state = { ...state, panel: t.dataset.panel, route:'', reach:'', prov:'',
-    sortKey:'rank', sortAsc:true };
-  refreshFilters();
-  document.getElementById('routeFilter').value='';
-  document.getElementById('reachFilter').value='';
-  document.getElementById('provFilter').value='';
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+  panel = b.dataset.panel; showAll = false;
+  document.getElementById('bProt').classList.toggle('on', panel === 'protective');
+  document.getElementById('bHarm').classList.toggle('on', panel === 'harmful');
+  window.scrollTo(0, 0);
   render();
 });
-document.getElementById('routeFilter').onchange = e => { state.route=e.target.value; render(); };
-document.getElementById('reachFilter').onchange = e => { state.reach=e.target.value; render(); };
-document.getElementById('provFilter').onchange = e => { state.prov=e.target.value; render(); };
-document.getElementById('showAll').onchange = e => { state.showAll=e.target.checked; render(); };
+document.getElementById('more').onclick = () => { showAll = !showAll; render(); };
 
-refreshFilters();
+document.getElementById('legend').innerHTML =
+  'Reaches brain readily <span class="dot reaches"></span> · conditional <span class="dot conditional"></span> · '
+  + 'delivery barrier <span class="dot barrier"></span>. '
+  + 'Tags: <span class="prov novel" style="font-size:11px">new lead</span> no prior α-syn evidence · '
+  + '<span class="prov known" style="font-size:11px">known</span> published modulator · '
+  + '<span class="prov holdout" style="font-size:11px">sanity-check</span> blind validation entry. '
+  + 'Method &amp; caveats: <a href="https://github.com/xag/asyn-oligomer-screen">repository README</a>.';
+
 render();
 </script>
 </body>
