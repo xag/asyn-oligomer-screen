@@ -16,12 +16,6 @@ The candidate list was assembled under one inclusion rule: every molecule is non
 
 Releasing the full pipeline — receptor model, candidate list, scoring code, every ranking, every documented limitation — is intended to lower the barrier to grassroots follow-up: independent re-runs, alternative receptor models, ThT or DLS assays on specific candidates, dietary-epidemiology re-analyses. The output is a hypothesis-generator, not a drug pipeline.
 
-### Contributing does not require specialist training
-
-This paper is grassroots-shaped on purpose. The framework spans structural biology, docking, organic chemistry, and dietary epidemiology — no single contributor is expected to be expert in all of it, and most useful contributions do not require expertise in any of it: critiques of the assumptions, suggestions of candidate molecules with a citation, references to relevant epidemiology, bug reports, and offers of wet-lab follow-up are all valuable.
-
-Dense passages throughout this README carry a collapsible **Plain English** block underneath; expand as needed. A [GLOSSARY.md](GLOSSARY.md) defines the recurring technical terms in plain English. For anything still opaque, modern AI assistants (Claude, ChatGPT, Copilot, Gemini) handle the whole file in one paste — use them to translate a passage into your background, explain a code file, summarise a referenced paper, draft an issue, or propose a change. AI-assisted contribution is encouraged.
-
 ### Get in touch
 
 Critiques and counter-evidence are as welcome as confirmations.
