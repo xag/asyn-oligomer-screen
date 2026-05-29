@@ -271,7 +271,7 @@ function render() {
   const all = DATA[panel];
   const max = prot ? Math.max(...all.map(r => -r.dActGated)) : Math.max(...all.map(r => r.aspr));
   document.getElementById('intro').textContent = prot
-    ? 'Candidates the model predicts could break up the toxic clump, grouped by whether you can actually get more of them into the brain. Longer bar = stronger predicted effect.'
+    ? 'Candidates the model predicts could break up the toxic clump. Longer bar = stronger predicted effect.'
     : 'Reactive molecules the model flags as damaging to α-synuclein. These are exposures to reduce — longer bar = more reactive.';
 
   const list = document.getElementById('list');
