@@ -32,7 +32,7 @@ Full list: [issues with `result` label](https://github.com/xag/asyn-oligomer-scr
 | Issue | Move |
 | ----- | ---- |
 | [#11](https://github.com/xag/asyn-oligomer-screen/issues/11) | Wet-lab handoff on the 7 novel candidates + 4 reactive metabolites — **package drafted** ([docs/HANDOFF.md](docs/HANDOFF.md), `node docs/build_handoff.mjs`); awaiting wet-lab partner |
-| [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — **harness in repo** (`screen/dwell_time.py`, `screen/shape_metrics.py`); apo per-replica chunking validated on a basic GPU (pip-only, OpenCL, `--rect-box`); complex side pending conda OpenFF. Superseded simpler MD relaxation (closed [#13](https://github.com/xag/asyn-oligomer-screen/issues/13)) |
+| [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — harness in repo; apo chunking validated, complex side pending conda OpenFF |
 | [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) | Anti-target flagging — stabilisers of toxic shapes (symmetric output of [#14](https://github.com/xag/asyn-oligomer-screen/issues/14)) |
 | [#12](https://github.com/xag/asyn-oligomer-screen/issues/12) | Sensitivity sweep on the −6 kcal/mol affinity gate |
 | [#16](https://github.com/xag/asyn-oligomer-screen/issues/16) | Refine `aspr_score`: PROPKA local-pKa + pose-aware geometric filter |
