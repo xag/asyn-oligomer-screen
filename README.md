@@ -439,10 +439,11 @@ Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activ
 .venv/bin/python screen/adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
 ```
 
-**MD relaxation (optional)**. The OpenMM + openff-toolkit + openmmforcefields stack does not co-exist cleanly with the pip pipeline; create a separate conda environment and point at it via the `ASYN_MD_PYTHON` environment variable:
+**MD relaxation**. The OpenMM + openff-toolkit + openmmforcefields stack does not co-exist cleanly with the pip pipeline; create a separate conda environment and point at it via the `ASYN_MD_PYTHON` environment variable:
 
 ```bash
-conda create -n asyn-md python=3.11 openmm openff-toolkit openmmforcefields -c conda-forge
+conda create -n asyn-md -c conda-forge python=3.11 \
+    openmm pdbfixer openff-toolkit openff-nagl openff-nagl-models openmmforcefields rdkit
 export ASYN_MD_PYTHON="$HOME/miniforge3/envs/asyn-md/bin/python"
 .venv/bin/python screen/md_stage3.py
 ```
