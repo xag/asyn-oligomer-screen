@@ -34,6 +34,16 @@ model: it touched README + STATUS + docs together):
 - [ ] Regenerate `docs/` via `build_*.mjs` if the handoff/display changed.
 - [ ] Commit message references the **issue #** and names the doc deltas.
 
+**Prefer subtractive edits.** Many doc updates should make the file *shorter*,
+not longer. When a next-step, caveat, limitation, or "not in scope" item is
+resolved or superseded, **delete it** from the README / STATUS lists rather than
+appending a "done / now-implemented / superseded" note beside it — the closed
+issue holds the history, so the living docs stay lean. The model is commit
+`f7e2285`, whose whole README delta was `README.md | 1 -`: landing the channel
+*removed* it from the next-steps list. Resist accreting "update" sentences onto
+an existing bullet; rewrite or remove the bullet instead. Next-step / caveat /
+not-in-scope lists should shrink as work lands, not grow.
+
 ## Conventions
 
 - **Dependencies: `uv add`** (and `uv add --group <name>` for optional stacks),
