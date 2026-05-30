@@ -1,6 +1,6 @@
 # Pipeline status
 
-Last update: 2026-05-30 (crowdsource-compute scope: #33 pilot, #34 coordinator, #35 contributor runtime).
+Last update: 2026-05-30.
 
 This file is the entry point for a fresh thread. It is a short index. **The GitHub issue tracker is the source of truth** for results, next moves, open decisions, and caveats. After reading this file, read [`ANCHORS.md`](ANCHORS.md) for anchor curation context, then [`../IN_SILICO_PLAN.md`](../IN_SILICO_PLAN.md) for the overall project shape, then [`oligomers/README.md`](oligomers/README.md) for the Track A direction.
 
@@ -33,7 +33,7 @@ Full list: [issues with `result` label](https://github.com/xag/asyn-oligomer-scr
 | ----- | ---- |
 | [#11](https://github.com/xag/asyn-oligomer-screen/issues/11) | Wet-lab handoff on the 7 novel candidates + 4 reactive metabolites — **package drafted** ([docs/HANDOFF.md](docs/HANDOFF.md), `node docs/build_handoff.mjs`); awaiting wet-lab partner |
 | [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — harness in repo; apo chunking validated, complex side pending conda OpenFF |
-| [#33](https://github.com/xag/asyn-oligomer-screen/issues/33) | Provision GPU + run the [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) pilot (local 2 GB laptop first) — the decision gate that unblocks [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) |
+| [#33](https://github.com/xag/asyn-oligomer-screen/issues/33) | Provision GPU + run the [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) pilot (local 2 GB laptop first) — unblocks [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) |
 | [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) | Anti-target flagging — stabilisers of toxic shapes (symmetric output of [#14](https://github.com/xag/asyn-oligomer-screen/issues/14)) |
 | [#12](https://github.com/xag/asyn-oligomer-screen/issues/12) | Sensitivity sweep on the −6 kcal/mol affinity gate |
 | [#16](https://github.com/xag/asyn-oligomer-screen/issues/16) | Refine `aspr_score`: PROPKA local-pKa + pose-aware geometric filter |
@@ -67,7 +67,7 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 
 - Stage 1 generator (fragment-MC, generative model, latent dynamics). The topology-prior build is a proxy for Stage 1.
 - Any website surface (the `/compute` front door, browser client, results pages).
-- The off-Vercel coordinator + result store for volunteer-compute dispatch ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)) and the contributor-runtime choice — BOINC vs in-browser WebGPU vs native helper ([#35](https://github.com/xag/asyn-oligomer-screen/issues/35)). The per-replica MD *chunk* it would dispatch now exists and is validated on a basic GPU ([#14](https://github.com/xag/asyn-oligomer-screen/issues/14)). Both chunk classes are distributable: the apo chunk is pip-only today, and the docked-complex chunk becomes pip-only once parametrised centrally into a serialised OpenMM `System` (the planned `prepare_complex_system` / `--system-xml` split in [#34](https://github.com/xag/asyn-oligomer-screen/issues/34)), so no conda is needed on a contributor's machine. The coordinator and front door themselves are still not built.
+- The off-Vercel coordinator + result store for volunteer-compute dispatch ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)); contributor runtime — BOINC vs WebGPU vs native helper ([#35](https://github.com/xag/asyn-oligomer-screen/issues/35)). The per-replica chunk it dispatches exists and runs pip-only for apo and docked-complex alike ([#14](https://github.com/xag/asyn-oligomer-screen/issues/14), [#34](https://github.com/xag/asyn-oligomer-screen/issues/34)).
 
 ## How to pick this up in a fresh thread
 
