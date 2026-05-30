@@ -44,16 +44,26 @@ issue holds the history, so the living docs stay lean. The model is commit
 an existing bullet; rewrite or remove the bullet instead. Next-step / caveat /
 not-in-scope lists should shrink as work lands, not grow.
 
+**"Not in scope yet" lists only *unbuilt* things.** The moment a thing is built
+/ runs / lands, **delete** its line from that section in the same change — never
+leave it with a "now exists / validated" clause. Built work parked under a
+NOT-in-scope heading is a self-contradiction; the fix is a deletion, not a
+reword. And land a trivial subtractive doc fix straight on `main` — don't strand
+it in an unmerged branch, or `main` (what the reader sees) stays stale.
+
 ## Conventions
 
 - **Dependencies: `uv add`** (and `uv add --group <name>` for optional stacks),
   not `uv pip install`. The `md` group holds the pip-installable MD deps
   (`openmm`, `pdbfixer`).
-- **MD environment is split.** The *apo* dwell-time / relaxation path runs
-  pip-only (`uv sync --group md`, OpenCL/CPU/CUDA via `pick_platform`). The
-  *docked-complex* path needs OpenFF/SMIRNOFF, which is **not pip-installable**
-  (`openff-toolkit` is yanked from PyPI), so it needs a conda env pointed at by
-  `$ASYN_MD_PYTHON`. Keep OpenFF imports lazy so the apo path never requires it.
+- **MD environment is split — but only for *building* a complex system.** All
+  dwell/relaxation *dynamics* run pip-only (`uv sync --group md`, OpenCL/CPU/CUDA
+  via `pick_platform`): the apo path natively, and the docked-complex path via a
+  serialised OpenMM `System` (`md_relax --system-xml/--solvated-pdb`, #34/#37).
+  Only the one-time ligand parametrisation (`md_relax --prepare-only`) needs
+  OpenFF/SMIRNOFF, which is **not pip-installable** (`openff-toolkit` yanked from
+  PyPI) → a conda env pointed at by `$ASYN_MD_PYTHON`. Keep OpenFF imports lazy
+  so every run path except `--prepare-only` stays pip-only.
 - **Distributed-chunk direction:** the dwell-time MD is meant to split into
   independent per-replica chunks small enough for a volunteer's basic GPU
   (truncate to the NAC core + `md_relax --rect-box` → ~55k atoms), with central
