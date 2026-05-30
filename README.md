@@ -6,7 +6,7 @@
 
 **▶ [Interactive results page](https://xag.github.io/asyn-oligomer-screen/)** — protective candidates and suspected-harmful anti-targets, ranked and cross-referenced with how each molecule reaches the brain. Source in [docs/](docs/); regenerate with `node docs/build_display.mjs`.
 
-**▶ [Wet-lab handoff package](docs/HANDOFF.md)** — the 7 novel protective candidates + 4 reactive metabolites packaged for orthogonal-mechanism assays, with predicted mechanism, suggested readout, and actionable category per molecule ([#11](https://github.com/xag/asyn-oligomer-screen/issues/11)). Generated from the live sweep with `node docs/build_handoff.mjs`.
+**▶ [Wet-lab handoff package](https://github.com/xag/asyn-oligomer-screen/blob/main/docs/HANDOFF.md)** — the 7 novel protective candidates + 4 reactive metabolites packaged for orthogonal-mechanism assays, with predicted mechanism, suggested readout, and actionable category per molecule ([#11](https://github.com/xag/asyn-oligomer-screen/issues/11)). Generated from the live sweep with `node docs/build_handoff.mjs`.
 
 ## Plain English Summary
 
