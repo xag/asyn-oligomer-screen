@@ -67,7 +67,7 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 
 - Stage 1 generator (fragment-MC, generative model, latent dynamics). The topology-prior build is a proxy for Stage 1.
 - Any website surface (the `/compute` front door, browser client, results pages).
-- The off-Vercel coordinator + result store for volunteer-compute dispatch ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)); contributor runtime — BOINC vs WebGPU vs native helper ([#35](https://github.com/xag/asyn-oligomer-screen/issues/35)).
+- The off-Vercel coordinator for volunteer-compute dispatch ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)) and contributor runtime ([#35](https://github.com/xag/asyn-oligomer-screen/issues/35)).
 
 ## How to pick this up in a fresh thread
 
