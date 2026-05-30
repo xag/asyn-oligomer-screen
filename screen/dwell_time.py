@@ -97,6 +97,13 @@ PILOT_SHAPES = [
 ]
 PILOT_LIGANDS = ["silibinin", "dhea", "trehalose", "caffeine"]
 
+# The MD chunk is the NAC core, not the full tail-bearing oligomer. The full
+# 3-mer's disordered tails balloon the solvent box (~850k atoms) and are where
+# the fixed-charge force field is least reliable; cropping to this window
+# (which contains the toxic β-core 70–88 and the docked pose) lands one chunk
+# at ~55k atoms with `--rect-box`, the basic-GPU target. See issue #33.
+CHUNK_RANGE = (58, 102)
+
 N_REPLICAS = 10
 EQUIL_PS = 100.0
 PROD_NS = 2.0
@@ -307,7 +314,7 @@ def run_apo_replicas(
             continue
         cmd = [
             str(md_python), str(md_relax),
-            "--apo-pdb", str(apo_pdb),
+            "--apo-pdb", str(apo_pdb), "--rect-box",
             "--out-pdb", str(out_dir / f"apo_rep{i:02d}_final.pdb"),
             "--equil-ps", str(equil_ps), "--prod-ps", str(prod_ns * 1000.0),
             "--seed", str(base_seed + i),
@@ -337,6 +344,7 @@ def run_complex_replicas(
         cmd = [
             str(md_python), str(md_relax),
             "--complex-pdb", str(complex_pdb), "--ligand-smiles", ligand_smiles,
+            "--rect-box",
             "--out-pdb", str(out_dir / f"{tag}_rep{i:02d}_final.pdb"),
             "--equil-ps", str(equil_ps), "--prod-ps", str(prod_ns * 1000.0),
             "--seed", str(base_seed + i),
@@ -364,6 +372,27 @@ def _ensure_complex(mol_id: str, shape_stem: str) -> tuple[Path, str]:
     return complex_pdb, smiles
 
 
+def _truncate_chunk(src_pdb: Path, out_pdb: Path, lo: int, hi: int) -> Path:
+    """Crop a shape/complex to the NAC-core MD chunk: protein residues in
+    [lo, hi] across all chains, plus any ligand residue (HETATM). Drops the
+    disordered tails (see CHUNK_RANGE)."""
+    from Bio.PDB import PDBParser, PDBIO, Select
+
+    class _CoreOrLigand(Select):
+        def accept_residue(self, residue):
+            if residue.get_id()[0] != " ":                  # HETATM: keep ligand,
+                return residue.get_resname() not in ("HOH", "WAT")  # not water
+            return lo <= residue.get_id()[1] <= hi
+
+    parser = PDBParser(QUIET=True)
+    s = parser.get_structure(src_pdb.stem, str(src_pdb))
+    out_pdb.parent.mkdir(parents=True, exist_ok=True)
+    io = PDBIO()
+    io.set_structure(s)
+    io.save(str(out_pdb), _CoreOrLigand())
+    return out_pdb
+
+
 def run_pilot(
     shapes: list[str] = PILOT_SHAPES, ligands: list[str] = PILOT_LIGANDS,
     n_replicas: int = N_REPLICAS, prod_ns: float = PROD_NS,
@@ -378,21 +407,27 @@ def run_pilot(
         "min_occupancy": MIN_OCCUPANCY,
     }, "pairs": []}
 
+    lo, hi = CHUNK_RANGE
     for shape_stem in shapes:
         shape_pdb = ROOT / "results" / "oligomers" / f"{shape_stem}.pdb"
         if not shape_pdb.exists():
             raise FileNotFoundError(f"shape PDB not found: {shape_pdb}")
         shape_dir = DWELL_DIR / shape_stem
-        print(f"\n=== shape {shape_stem}: {n_replicas} apo replicas ===", flush=True)
-        apo_trajs = run_apo_replicas(shape_pdb, shape_dir, n_replicas, prod_ns=prod_ns,
+        # MD runs on the NAC-core chunk; the truncated core is also the toxic
+        # reference the trajectories are scored against.
+        apo_chunk = _truncate_chunk(shape_pdb, shape_dir / f"apo_core{lo}-{hi}.pdb", lo, hi)
+        print(f"\n=== shape {shape_stem}: {n_replicas} apo replicas (core {lo}-{hi}) ===", flush=True)
+        apo_trajs = run_apo_replicas(apo_chunk, shape_dir, n_replicas, prod_ns=prod_ns,
                                      skip_existing=skip_existing)
         for mol_id in ligands:
             print(f"\n=== {mol_id} × {shape_stem} ===", flush=True)
             complex_pdb, smiles = _ensure_complex(mol_id, shape_stem)
-            cpx_trajs = run_complex_replicas(complex_pdb, smiles, shape_dir, mol_id,
+            cpx_chunk = _truncate_chunk(
+                complex_pdb, shape_dir / f"{mol_id}_core{lo}-{hi}_complex.pdb", lo, hi)
+            cpx_trajs = run_complex_replicas(cpx_chunk, smiles, shape_dir, mol_id,
                                              n_replicas, prod_ns=prod_ns,
                                              skip_existing=skip_existing)
-            pair = summarise_pair(shape_pdb, apo_trajs, cpx_trajs,
+            pair = summarise_pair(apo_chunk, apo_trajs, cpx_trajs,
                                   seed=hash((shape_stem, mol_id)) & 0xFFFF)
             pair["shape"] = shape_stem
             pair["ligand"] = mol_id
