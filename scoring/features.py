@@ -137,8 +137,8 @@ def _attach_sasa(structure: Structure) -> None:
 def dssp_ss_map(structure: Structure) -> dict:
     """Per-residue DSSP secondary-structure code ('H', 'E', '-') keyed by
     residue full_id. Replaces the previous φ/ψ box heuristic — much less
-    noisy on NMR ensembles whose dihedrals are dispersed (STATUS.md
-    problem 2). pydssp's strand detection relies on the H-bond pattern
+    noisy on NMR ensembles whose dihedrals are dispersed. pydssp's
+    strand detection relies on the H-bond pattern
     in a 3×3 neighbourhood window, which only resolves correctly when
     all chains of the biological assembly are passed together: a single
     fibril chain has no intra-chain H-bonds, so per-chain DSSP would

@@ -7,8 +7,7 @@ Lys-Schiff, …), which Vina cannot model. The absolute-affinity gate in
 stage3 correctly collapses their Δactivity_gated to ~0; that is the
 right default, but it leaves a real channel of biology unscored.
 
-This module is the cheap first pass called out in STATUS.md
-"Recommended next moves" item 1:
+This module is the cheap first pass for the covalent-adduct channel:
 
     aspr_score = (1/n_chains) · Σ_chains Σ_relevant_r
                      min(1, sasa(r) / SASA_REF) · rxty(ligand, restype(r))

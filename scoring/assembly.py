@@ -4,7 +4,7 @@ The asymmetric unit deposited in a PDB entry is often a fraction of the
 biologically relevant multimer — three chains of a nine-chain fibril
 block (8A9L), for example. Stage 2 features must compare equivalent
 assemblies across anchors, otherwise rankings reflect depositor
-formatting rather than biology (see STATUS.md, problem 1).
+formatting rather than biology.
 
 This module reconstructs the BIOMOLECULE 1 assembly from BIOMT records.
 It also exposes `inner_chain_ids`, which picks the most buried chain(s)

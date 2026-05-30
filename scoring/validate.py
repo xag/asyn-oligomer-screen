@@ -5,7 +5,7 @@ By default, structures are expanded to their REMARK 350 BIOMOLECULE 1
 biological assembly and feature accumulation runs on the most buried
 chain of that assembly. This addresses the asymmetric-unit-size confound
 where structures with smaller deposited units (e.g. 8A9L) get inflated
-SASA-based features (see STATUS.md, problem 1).
+SASA-based features.
 
 Usage:
     python validate.py            # assembly + inner chain (default)
@@ -90,7 +90,7 @@ def compute_features(mode: str = "assembly_inner", use_core_mask: bool = True) -
     `use_core_mask`: when True, every per-residue feature accumulates only
     over the structurally ordered core (Cα with ≥6 non-sequential
     neighbours within 8 Å). Equalises NMR full-length and cryo-EM
-    core-only structures (STATUS.md problem 1).
+    core-only structures.
     """
     rows = []
     for anchor in ANCHORS:

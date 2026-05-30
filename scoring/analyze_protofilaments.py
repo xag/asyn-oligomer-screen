@@ -1,4 +1,4 @@
-"""Test the within-class hypothesis from STATUS.md (2026-05-26):
+"""Test the within-class hypothesis (issue #8):
 
   "single-protofilament fibrils score higher than paired-protofilament
    fibrils within each class"

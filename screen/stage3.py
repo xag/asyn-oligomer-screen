@@ -23,8 +23,7 @@ PDB id C, this script:
      anchor z-table — both the top-pose Δactivity and the
      Boltzmann-weighted Δactivity are emitted.
 
-This is the prototype called for by IN_SILICO_PLAN.md and the "Stage 3
-algorithm prototype" item in STATUS.md. It deliberately skips MD
+This is the prototype called for by IN_SILICO_PLAN.md. It deliberately skips MD
 relaxation: a static docked complex catches the SASA-occlusion and
 contact-density components of the perturbation but not conformational
 rearrangement. MD comes later.
@@ -946,7 +945,7 @@ if __name__ == "__main__":
 #       under the pose lose surface area and the activity score drops.
 #     - Ligand-aware contact_density: Cα–LIG heavy-atom contacts inside the
 #       8 Å cutoff inflate the stability proxy in proportion to binding
-#       footprint (see STATUS.md "contact_density sees the ligand").
+#       footprint.
 #     - Multi-pose aggregation: each of Vina's --num_modes poses is
 #       individually scored on Stage 2 features and the per-pose
 #       Δactivity values are combined with Boltzmann weights
@@ -966,5 +965,5 @@ if __name__ == "__main__":
 #     - Absolute-affinity gate. delta_activity_gated = gate * weighted
 #       where gate = min(1, exp((thr - aff_top) / RT)) at thr=-6 kcal/mol.
 #       Penalises ligands whose top-pose affinity is itself weak, on top
-#       of the intra-ligand Boltzmann pose weighting. See STATUS.md.
+#       of the intra-ligand Boltzmann pose weighting.
 # -----------------------------------------------------------------------------

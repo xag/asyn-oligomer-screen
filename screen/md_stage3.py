@@ -24,8 +24,7 @@ static-pose feature weights, Δactivity is bounded above by zero
 (any docked pose occludes SASA and adds Cα–LIG contacts, both of
 which subtract from activity). The only path to a sign flip is
 conformational rearrangement of the receptor around the bound pose,
-which is exactly what NPT MD provides. See STATUS.md "Recommended
-next moves" #1.
+which is exactly what NPT MD provides.
 
 Usage:
     python md_stage3.py                    # all 6 PAIRS, defaults

@@ -15,8 +15,8 @@ runs `features.py` on each chain, averages across chains, and reports:
 Default chain behaviour — all chains averaged:
     The auto-inner single-chain default was sensitive to which chain the
     OBC2 collapse happened to expose; a lucky tail conformation on the
-    most-buried chain could inflate the score by 2× (see STATUS.md
-    "s777 outlier"). The new default averages features over every protein
+    most-buried chain could inflate the score by 2× (the "s777
+    outlier" case). The new default averages features over every protein
     chain in the structure before scoring, giving a more representative
     and reproducible number.
 

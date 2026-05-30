@@ -17,8 +17,7 @@ Defaults to 100 ps total equilibration (NVT + NPT) + 100 ps production
 NPT at 300 K, 1 atm, TIP3P, 0.15 M NaCl, 1 nm padding, 2 fs steps with
 HBonds constraints. Bumpable via flags.
 
-The point of this step is the same as STATUS.md "Recommended next moves
-#1": MD relaxation around the docked pose so the receptor side-chains
+The point of this step: MD relaxation around the docked pose so the receptor side-chains
 and backbone can rearrange, which is the only mechanism through which
 Δactivity can flip positive under the Stage 2 feature weights
 (static-pose features only ever subtract from activity).

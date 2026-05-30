@@ -10,7 +10,7 @@ labels: next-step
 ## Why this matters
 
 <!-- Compulsory. One or two sentences on what gap this closes for the project — tie back
-     to the three-step pipeline in STATUS.md, or to a named caveat / decision / sibling
+     to the three-step pipeline in README.md, or to a named caveat / decision / sibling
      issue. Keep concise. Don't write a book. -->
 
 ## Move

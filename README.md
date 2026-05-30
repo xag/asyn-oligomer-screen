@@ -29,19 +29,7 @@ Critiques and counter-evidence are as welcome as confirmations.
 
 ## Status — work in progress
 
-This is a first iteration. The pipeline runs end-to-end and every result below is reproducible from the code and inputs in this repository, but it is not a finished framework. The pre-registered hold-out (§6) is light — five polyphenols from the chemical class that already dominates the published α-syn modulator literature; it shows the framework can recover known hits within that class but says little about its accuracy outside it. Three known method gaps also systematically hide signal already present in the candidate list — the dopamine / catechol-quinone axis, the metals axis, and any stabilising binding mode that requires receptor rearrangement. Closing the gaps and broadening the validation is the next-steps queue.
-
-**In-repo, computational:**
-
-- **Add catechol-quinone covalent chemistry to `screen/adduct_score.py`.** Extend the per-ligand `rxty` table with dopamine, DOPAC, norepinephrine, aminochrome, and 6-OHDA entries. Currently these score as weakly protective on the reversible channel, even though the published mechanism is α-syn oligomer stabilisation via quinone-mediated Lys-Schiff and Cys-Michael adducts — the same chemistry family the covalent channel already handles for MDA, acrolein, 4-HNE, and MGO (Conway et al. 2001; Norris et al. 2005; Mazzulli et al. 2006).
-- **Build a metal-coordination scoring channel.** Cu²⁺, Fe²⁺/³⁺ currently fail at the Meeko PDBQT stage (single-atom-ligand limitation) and drop out of the rankings entirely. Replace with parametrised-ion MD against α-syn, or with a coordination-chemistry score against the N-terminal Cu/Fe sites (Rasia et al. 2005; Davies et al. 2011).
-- **Build alternative receptor models** under the same Fusco topology constraints, to test how strongly the ranking depends on the specific relaxed geometry used here.
-- **Re-score as new α-synuclein structures and topology constraints are deposited.**
-
-**Experimental, collaboration-dependent:**
-
-- **ThT aggregation kinetics or DLS sizing** on the unvalidated top candidates (DHEA, allopregnanolone, retinoic acid, urolithin A, trehalose, piperine, THC).
-- **LC-MS adduct mapping** for the four reactive aldehydes in the covalent channel.
+This is a first iteration. The pipeline runs end-to-end and every result below is reproducible from the code and inputs in this repository, but it is not a finished framework. The pre-registered hold-out (§6) is light — five polyphenols from the chemical class that already dominates the published α-syn modulator literature; it shows the framework can recover known hits within that class but says little about its accuracy outside it. Three known method gaps also systematically hide signal already present in the candidate list — the dopamine / catechol-quinone axis, the metals axis, and any stabilising binding mode that requires receptor rearrangement. The open work — closing those gaps, broadening the validation, and the experimental handoff — is tracked in the [GitHub issues](https://github.com/xag/asyn-oligomer-screen/issues) (`next-step` label).
 
 ## Abstract
 
@@ -212,7 +200,7 @@ Docking only finds molecules that bind reversibly — they sit on the protein an
 
 The risk that a framework calibrated on a feature set could self-reinforce in evaluation was controlled by a pre-registered blind hold-out conducted after the Stage 2 weights, ligand-aware `contact_density`, Boltzmann weighting parameters, and gate threshold were frozen.
 
-Five entries marked `validation_holdout: true` in `data/vicinity_molecules.js` constitute the cohort: silibinin, EGCG, rosmarinic acid, fisetin, and caffeic acid phenethyl ester (CAPE). All five have strong published in-vitro evidence for α-syn aggregation modulation (Ehrnhoefer et al. 2008; Bieschke et al. 2010; Pérez-Sánchez et al. 2016; Ono & Yamada 2006; Ardah et al. 2016; Morroni et al. 2018). Three (silibinin, EGCG, rosmarinic acid) were present in `data/vicinity_molecules.js` from inception with `smiles: null` and could never have been docked during framework development; fisetin and CAPE were added after the framework was locked. Predictions (rank range, affinity range, `delta_activity_gated` range) and pass criteria were recorded in `STATUS.md` before the docking run.
+Five entries marked `validation_holdout: true` in `data/vicinity_molecules.js` constitute the cohort: silibinin, EGCG, rosmarinic acid, fisetin, and caffeic acid phenethyl ester (CAPE). All five have strong published in-vitro evidence for α-syn aggregation modulation (Ehrnhoefer et al. 2008; Bieschke et al. 2010; Pérez-Sánchez et al. 2016; Ono & Yamada 2006; Ardah et al. 2016; Morroni et al. 2018). Three (silibinin, EGCG, rosmarinic acid) were present in `data/vicinity_molecules.js` from inception with `smiles: null` and could never have been docked during framework development; fisetin and CAPE were added after the framework was locked. Predictions (rank range, affinity range, `delta_activity_gated` range) and pass criteria were recorded in [issue #6](https://github.com/xag/asyn-oligomer-screen/issues/6) before the docking run.
 
 Pass criteria (pre-registered):
 
@@ -235,7 +223,7 @@ Outcome: pass (4/5 in top 25; none below rank 60). No code, weight, or threshold
 <details>
 <summary><b>Plain English</b></summary>
 
-When you build a scoring framework and then test it on examples, there is a risk you have unconsciously tuned it to pass the test. To rule this out, before running the validation we wrote down exactly what we expected — which molecules should rank where, what would count as a success, what would count as a failure — and saved that prediction publicly in `STATUS.md`. Then we ran the experiment without modifying anything. Four of five known α-syn-modulating molecules landed in the top 25 of 122; none below rank 60. That meets the pre-registered "pass" bar. The framework is not perfect (CAPE missed by quite a bit), but it correctly ranks the molecules the literature already validates, which is the minimum bar for trusting the rankings on molecules the literature has *not* yet validated.
+When you build a scoring framework and then test it on examples, there is a risk you have unconsciously tuned it to pass the test. To rule this out, before running the validation we wrote down exactly what we expected — which molecules should rank where, what would count as a success, what would count as a failure — and saved that prediction publicly in [issue #6](https://github.com/xag/asyn-oligomer-screen/issues/6). Then we ran the experiment without modifying anything. Four of five known α-syn-modulating molecules landed in the top 25 of 122; none below rank 60. That meets the pre-registered "pass" bar. The framework is not perfect (CAPE missed by quite a bit), but it correctly ranks the molecules the literature already validates, which is the minimum bar for trusting the rankings on molecules the literature has *not* yet validated.
 </details>
 
 ## 7. Results
@@ -491,7 +479,7 @@ Each top-level directory carries a `README.md` describing its contents:
 [results/](results/) (calibration outputs, ensemble, sweep),
 [bin/](bin/) (Vina binary).
 
-`STATUS.md` records the chronological development log including framework fixes, abandoned approaches, and decisions made during construction. It is the source of truth for the reasoning behind every choice and is the natural entry point for anyone extending the work.
+The [GitHub issue tracker](https://github.com/xag/asyn-oligomer-screen/issues) is the source of truth for results, next moves, open decisions, and caveats (labelled `result` / `next-step` / `decision` / `caveat`), including framework fixes, abandoned approaches, and the reasoning behind every choice. It is the natural entry point for anyone extending the work.
 
 ## 10. References
 
