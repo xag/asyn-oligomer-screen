@@ -38,10 +38,11 @@ import openmm.app as app
 import openmm.unit as u
 from pdbfixer import PDBFixer
 
-from openff.toolkit import ForceField as OFFForceField, Molecule
-from openff.toolkit.utils.nagl_wrapper import NAGLToolkitWrapper
-
-from openmmforcefields.generators import SMIRNOFFTemplateGenerator
+# OpenFF / openmmforcefields are imported lazily inside the ligand-parameterising
+# functions (offmol_from_rdkit, build_system). They are only needed for the
+# *complex* path; the *apo* baseline (off_ligand=None) uses amber14 + TIP3P
+# only, so it runs in a pip-only env (openmm + pdbfixer) without the OpenFF
+# stack — which, unlike OpenMM, is not currently installable from PyPI.
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -127,7 +128,10 @@ def ligand_from_pdb_and_smiles(ligand_pdb_text: str, smiles: str) -> Chem.Mol:
 # Build an OpenFF Molecule with NAGL charges from an RDKit Mol.
 # -----------------------------------------------------------------------------
 
-def offmol_from_rdkit(rdkit_mol: Chem.Mol) -> Molecule:
+def offmol_from_rdkit(rdkit_mol: Chem.Mol) -> "Molecule":
+    from openff.toolkit import Molecule
+    from openff.toolkit.utils.nagl_wrapper import NAGLToolkitWrapper
+
     off = Molecule.from_rdkit(rdkit_mol, allow_undefined_stereo=True)
     off.name = "LIG"
     off.assign_partial_charges(NAGL_MODEL, toolkit_registry=NAGLToolkitWrapper())
@@ -164,6 +168,7 @@ def build_system(
     modeller = app.Modeller(protein_topology, protein_positions)
 
     if off_ligand is not None:
+        from openmmforcefields.generators import SMIRNOFFTemplateGenerator
         smirnoff_gen = SMIRNOFFTemplateGenerator(molecules=[off_ligand], forcefield=OFF_FF.replace(".offxml", ""))
         forcefield.registerTemplateGenerator(smirnoff_gen.generator)
         lig_top = off_ligand.to_topology().to_openmm()
