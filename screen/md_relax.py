@@ -147,6 +147,7 @@ def build_system(
     off_ligand: Molecule | None,
     padding_nm: float,
     salt_mol: float,
+    rectangular_box: bool = False,
 ):
     # Use PDBFixer to add missing Hs to the protein. PDB chains here are
     # rebuilt by stage3 and already have all heavy atoms.
@@ -176,14 +177,35 @@ def build_system(
         modeller.add(lig_top, lig_pos)
 
     # Box + solvent + ions.
-    modeller.addSolvent(
-        forcefield,
-        model="tip3p",
-        padding=padding_nm * u.nanometers,
-        ionicStrength=salt_mol * u.molar,
-        positiveIon="Na+",
-        negativeIon="Cl-",
-    )
+    #
+    # padding= makes addSolvent build a *cubic* box sized to the largest
+    # solute dimension. For an elongated construct (an extended β-strand is
+    # ~14 nm long but only ~4 nm wide) that cube is mostly water: the
+    # core58-102 chunk solvates to ~390k atoms cubic vs ~55k rectangular.
+    # rectangular_box=True instead fits a tight box to the solute's actual
+    # bounding box + padding on each axis — same 1 nm minimum-image clearance,
+    # ~7× fewer atoms, which is what keeps one dwell chunk on a basic GPU.
+    if rectangular_box:
+        pos_nm = np.array(modeller.positions.value_in_unit(u.nanometer))
+        extent = pos_nm.max(axis=0) - pos_nm.min(axis=0)
+        box = extent + 2.0 * padding_nm
+        modeller.addSolvent(
+            forcefield,
+            model="tip3p",
+            boxSize=openmm.Vec3(*box) * u.nanometers,
+            ionicStrength=salt_mol * u.molar,
+            positiveIon="Na+",
+            negativeIon="Cl-",
+        )
+    else:
+        modeller.addSolvent(
+            forcefield,
+            model="tip3p",
+            padding=padding_nm * u.nanometers,
+            ionicStrength=salt_mol * u.molar,
+            positiveIon="Na+",
+            negativeIon="Cl-",
+        )
 
     system = forcefield.createSystem(
         modeller.topology,
@@ -442,6 +464,7 @@ def relax(
     seed: int | None = None,
     traj_out: Path | None = None,
     traj_interval_ps: float = 0.0,
+    rectangular_box: bool = False,
 ):
     t0 = time.time()
     if complex_pdb is not None:
@@ -486,7 +509,8 @@ def relax(
     else:
         raise ValueError("md_relax requires --complex-pdb (+ --ligand-smiles) or --apo-pdb")
 
-    modeller, system = build_system(prot_pdb_text, off_lig, padding_nm=padding_nm, salt_mol=salt_mol)
+    modeller, system = build_system(prot_pdb_text, off_lig, padding_nm=padding_nm, salt_mol=salt_mol,
+                                    rectangular_box=rectangular_box)
 
     # Re-apply position restraints on the explicit-solvent system so the
     # β-core topology survives equilibration + production at full T.
@@ -727,6 +751,14 @@ class HeavyTrajectoryWriter:
 
 
 def main() -> None:
+    # Progress lines use non-ASCII (β, Å, →); force UTF-8 so a redirected or
+    # subprocess-captured stdout on a Windows cp1252 console doesn't crash the
+    # whole MD run on a print. dwell_time.py captures this stdout, so the same
+    # fix is needed there for the pilot.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--complex-pdb", type=Path, default=None,
                    help="apo + docked LIG on chain Z (mutually exclusive with --apo-pdb)")
@@ -776,6 +808,11 @@ def main() -> None:
                         "Each MODEL is one dwell-time frame.")
     p.add_argument("--traj-interval-ps", type=float, default=0.0,
                    help="ps between trajectory frames (requires --traj-out)")
+    p.add_argument("--rect-box", action="store_true",
+                   help="solvate in a tight rectangular box (solute bounding box "
+                        "+ padding per axis) instead of a cube sized to the largest "
+                        "dimension. ~7× fewer atoms for an elongated β-strand "
+                        "construct — keeps one dwell chunk on a basic GPU.")
     args = p.parse_args()
 
     if args.traj_out is not None and args.traj_interval_ps <= 0:
@@ -808,6 +845,7 @@ def main() -> None:
         seed=args.seed,
         traj_out=args.traj_out,
         traj_interval_ps=args.traj_interval_ps,
+        rectangular_box=args.rect_box,
     )
 
 
