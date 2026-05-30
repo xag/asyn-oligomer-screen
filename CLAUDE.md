@@ -57,10 +57,10 @@ the reader sees) stays stale.
   dwell/relaxation *dynamics* run pip-only (`uv sync --group md`, OpenCL/CPU/CUDA
   via `pick_platform`): the apo path natively, and the docked-complex path via a
   serialised OpenMM `System` (`md_relax --system-xml/--solvated-pdb`, #34/#37).
-  Only the one-time ligand parametrisation (`md_relax --prepare-only`) needs
-  OpenFF/SMIRNOFF, which is **not pip-installable** (`openff-toolkit` yanked from
-  PyPI) → a conda env pointed at by `$ASYN_MD_PYTHON`. Keep OpenFF imports lazy
-  so every run path except `--prepare-only` stays pip-only.
+  Only the one-time ligand parametrisation (`md_relax --prepare-only`) uses
+  OpenFF/SMIRNOFF, which runs in the conda MD env (`environment-md.yml`, located
+  automatically by `screen/md_env.py`). Keep OpenFF imports lazy so every run
+  path except `--prepare-only` stays pip-only.
 - **Distributed-chunk direction:** the dwell-time MD is meant to split into
   independent per-replica chunks small enough for a volunteer's basic GPU
   (truncate to the NAC core + `md_relax --rect-box` → ~55k atoms), with central

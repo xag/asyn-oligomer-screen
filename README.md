@@ -27,10 +27,6 @@ Critiques and counter-evidence are as welcome as confirmations.
 - **[Issues](https://github.com/xag/asyn-oligomer-screen/issues)** — technical questions, framework critiques, suggested candidates, bug reports, wet-lab follow-up interest. Preferred channel because it is public and archived.
 - **[Discussions](https://github.com/xag/asyn-oligomer-screen/discussions)** — broader conversation about the approach or the open-research model.
 
-## Status — work in progress
-
-This is a first iteration. The pipeline runs end-to-end and every result below is reproducible from the code and inputs in this repository, but it is not a finished framework. The pre-registered hold-out (§6) is light — five polyphenols from the chemical class that already dominates the published α-syn modulator literature; it shows the framework can recover known hits within that class but says little about its accuracy outside it. Three known method gaps also systematically hide signal already present in the candidate list — the dopamine / catechol-quinone axis, the metals axis, and any stabilising binding mode that requires receptor rearrangement. The open work — closing those gaps, broadening the validation, and the experimental handoff — is tracked in the [GitHub issues](https://github.com/xag/asyn-oligomer-screen/issues) (`next-step` label).
-
 ## Abstract
 
 α-Synuclein aggregation underlies the molecular pathology of Parkinson's disease, but the toxic species are pre-fibrillar oligomers for which no atomic-resolution structure has been deposited in the PDB. We construct a model of the canonical "Type B*" toxic oligomer of Fusco et al. (2017) under a published topology prior — three monomers, parallel β-sheet across residues 70–88, disordered N- and C-tails — and relax it under implicit-solvent MD with restrained β-core Cα atoms. A weighted structure-based activity score, calibrated on 14 deposited α-syn structures (graded-active vs inert pairwise AUC ≈ 0.84), assigns the relaxed trimer an activity ~4× higher than the most active deposited fibril, with no overlap across an 11-topology ensemble. We dock 127 candidate small molecules (polyphenols, steroid hormones, gut metabolites, dietary compounds, reactive aldehydes, neurosteroids) against the trimer using AutoDock Vina 1.2.5, score Δactivity per pose under Boltzmann pose weights and an absolute-affinity gate, and report a separate covalent-adduct reactivity channel for ligands docking cannot see. A pre-registered blind hold-out on five gold-standard α-syn modulators (silibinin, EGCG, fisetin, rosmarinic acid, CAPE) confirms the ranking: 4/5 fall in the top 25 of 122, including silibinin (#1) and EGCG (#3). Beyond the polyphenol class that already dominates the α-syn modulator literature, seven candidates without prior α-syn direct-binding evidence enter the top 25: dehydroepiandrosterone (DHEA), all-*trans* retinoic acid, allopregnanolone, Δ9-tetrahydrocannabinol, piperine, urolithin A, and trehalose. The covalent channel resurfaces malondialdehyde, acrolein, 4-hydroxynonenal, and methylglyoxal in the order predicted by α-syn's lysine-rich, arginine-free sequence composition.
@@ -427,12 +423,10 @@ Writes `results/anchor_features.csv`, `results/anchor_scores.csv`, and the activ
 .venv/bin/python screen/adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb
 ```
 
-**MD relaxation**. The OpenMM + openff-toolkit + openmmforcefields stack does not co-exist cleanly with the pip pipeline; create a separate conda environment and point at it via the `ASYN_MD_PYTHON` environment variable:
+**MD relaxation**. The OpenFF parametrisation step runs in a conda env; create it once from the checked-in spec (`screen/md_env.py` then finds it automatically — no env var to set):
 
 ```bash
-conda create -n asyn-md -c conda-forge python=3.11 \
-    openmm pdbfixer openff-toolkit openff-nagl openff-nagl-models openmmforcefields rdkit
-export ASYN_MD_PYTHON="$HOME/miniforge3/envs/asyn-md/bin/python"
+conda env create -f environment-md.yml
 .venv/bin/python screen/md_stage3.py
 ```
 
@@ -456,11 +450,11 @@ uv sync --group md
     --traj-out apo_rep00.pdb --traj-interval-ps 20
 ```
 
-The docked-*complex* side needs OpenFF/SMIRNOFF to parameterise the ligand, which is conda-only — but only to *build* the force field, not to run dynamics ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). So that one-time, GPU-free step is split off (`--prepare-only`, under the `ASYN_MD_PYTHON` conda env), serialising a ready-to-run OpenMM `System`; the per-replica GPU dynamics then run from it with **pip-only OpenMM — no conda** (`--system-xml`/`--solvated-pdb`), exactly like the apo chunk:
+The docked-*complex* side uses OpenFF/SMIRNOFF to parameterise the ligand — a one-time, GPU-free step that runs in the conda MD env ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). It is split off (`--prepare-only`), serialising a ready-to-run OpenMM `System`; the per-replica GPU dynamics then run from it with **pip-only OpenMM** (`--system-xml`/`--solvated-pdb`), exactly like the apo chunk:
 
 ```bash
 # central, GPU-free, conda (OpenFF): parametrise once → system.xml + solvated.pdb
-$ASYN_MD_PYTHON screen/md_relax.py --complex-pdb <pair>_complex.pdb \
+conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb \
     --ligand-smiles "<SMILES>" --rect-box --prepare-only results/dwell/<pair>
 
 # any contributor's GPU, pip-only openmm: integrate a velocity-seeded replica

@@ -1,9 +1,8 @@
 """MD relaxation of a Stage 3 docked complex (OpenMM + OpenFF).
 
-Runs INSIDE a conda env with OpenMM + openff-toolkit + openmmforcefields
-installed (the interpreter is pointed at via the ASYN_MD_PYTHON env var;
-see README.md). Cannot be imported from the pip venv that runs the rest
-of the pipeline (those packages aren't installed there). `stage3.py` and
+The `--prepare-only` build path runs in the conda MD env (`environment-md.yml`,
+located by `md_env.py`); the OpenFF packages it imports aren't in the pip venv.
+The `--system-xml` dynamics path runs in the pip venv. `stage3.py` and
 `md_stage3.py` invoke this script via subprocess.
 
 Inputs:
@@ -30,7 +29,7 @@ docked-complex dwell chunk can run on a volunteer's basic GPU with no conda:
   --prepare-only PREFIX   build + solvate + parametrise, serialise the OpenMM
       System to PREFIX_system.xml and the solvated topology/positions to
       PREFIX_solvated.pdb, then exit without running dynamics. This is the
-      *only* step that needs OpenFF/conda (runs under $ASYN_MD_PYTHON).
+      *only* step that uses OpenFF (runs in the conda MD env).
   --system-xml/--solvated-pdb  run the dynamics from a serialised System
       instead of building one. Needs *only* pip-installed openmm — no OpenFF,
       no conda — because every force-field term (including the ligand's

@@ -14,6 +14,7 @@ PeptideBuilder>=1.1
 # once from github.com/ccsb-scripps/AutoDock-Vina/releases. On Linux/macOS,
 # adapt the binary name and path in stage3.py.
 #
-# OpenMM-based MD relaxation (md_relax.py, md_stage3.py, oligomers/run_ensemble.py)
-# uses a SEPARATE conda env pointed at via the ASYN_MD_PYTHON env var. See README.md
-# (Reproduction / MD relaxation).
+# The OpenFF ligand-parametrisation step (md_relax.py --prepare-only,
+# md_stage3.py, oligomers/run_ensemble.py) runs in a conda env: create it with
+# `conda env create -f environment-md.yml` (screen/md_env.py finds it). The MD
+# dynamics run in this pip venv.

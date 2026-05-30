@@ -19,9 +19,8 @@ Flags:
 Two Python binaries:
     VENV_PY — this script's own interpreter (pipeline venv; has PeptideBuilder,
                pydssp, biopython, pandas)
-    MD_PY   — set via the ASYN_MD_PYTHON env var; a conda env with OpenMM
-               + openff-toolkit + openmmforcefields installed; used for
-               md_relax.py.
+    MD_PY   — the conda MD env (environment-md.yml), located automatically by
+               screen/md_env.py; used for md_relax.py.
 
 MD relaxation parameters (same as the reference trimer, 2026-05-27):
     --vacuum-min-iter 5000   resolve inter-chain clashes before solvation
@@ -35,7 +34,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import re
 import subprocess
 import sys
@@ -56,25 +54,19 @@ RESULTS    = PIPELINE / "results" / "oligomers"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
 VENV_PY = sys.executable                                    # this interpreter
-# MD_PY is only needed for the build/relax subprocesses. `--summary-only`
-# re-scores existing relaxed PDBs and never invokes MD, so the env-var
-# check is deferred into _require_md_py() and called from main() only when
+# The conda MD env is only needed for the build/relax subprocesses.
+# `--summary-only` re-scores existing relaxed PDBs and never invokes MD, so
+# resolving it is deferred into _require_md_py(), called from main() only when
 # MD work will actually be performed.
-MD_PY: Path | None = (
-    Path(os.environ["ASYN_MD_PYTHON"]) if os.environ.get("ASYN_MD_PYTHON") else None
-)
 
 
 def _require_md_py() -> Path:
-    if MD_PY is None:
-        sys.exit(
-            "ERROR: Set ASYN_MD_PYTHON to the python interpreter of a conda env that "
-            "has OpenMM + openff-toolkit + openmmforcefields installed. "
-            "See README.md (Reproduction / MD relaxation)."
-        )
-    if not MD_PY.exists():
-        sys.exit(f"ERROR: ASYN_MD_PYTHON points to {MD_PY}, which does not exist.")
-    return MD_PY
+    sys.path.insert(0, str(PIPELINE / "screen"))
+    from md_env import md_python  # locates the conda MD env (environment-md.yml)
+    py = md_python()
+    if not py.exists():
+        sys.exit(f"ERROR: MD conda python {py} does not exist.")
+    return py
 
 # ---------------------------------------------------------------------------
 # Topology grid

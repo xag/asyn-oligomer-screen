@@ -41,10 +41,10 @@ reversibly — these are anti-targets, not candidates.
 
 ## Optional MD relaxation
 
-`md_relax.py` and `md_stage3.py` run OpenMM MD around docked complexes.
-They require a separate conda env with OpenMM + openff-toolkit +
-openmmforcefields (the pip pipeline cannot host them cleanly); point
-`$ASYN_MD_PYTHON` at that interpreter before invoking.
+`md_relax.py --prepare-only` and `md_stage3.py` build a ligand force field
+with OpenFF, which lives in the conda MD env. Create it once with
+`conda env create -f environment-md.yml`; `md_env.py` finds it automatically.
+The per-replica dynamics (`--system-xml`) run in the pip venv.
 
 ## Examples
 

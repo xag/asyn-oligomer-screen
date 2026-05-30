@@ -1,0 +1,131 @@
+{
+  "molecule_id": "silibinin",
+  "molecule_name": "Silibinin (silybin A)",
+  "receptor_type": "oligomer",
+  "receptor_pdb": "results\\oligomers\\fusco_parallel_3mer_core70-88_relaxed.pdb",
+  "receptor_stem": "fusco_parallel_3mer_core70-88_relaxed",
+  "protein_chain_ids": [
+    "A",
+    "B",
+    "C"
+  ],
+  "smiles": "Oc1cc(O)c2C(=O)[C@H](O)[C@@H](c3cc4O[C@@H](c5ccc(O)c(OC)c5)[C@H](CO)Oc4cc3)Oc2c1",
+  "vina_top_affinity_kcal_per_mol": -5.799,
+  "vina_all_affinities_kcal_per_mol": [
+    -5.799,
+    -5.737,
+    -5.667,
+    -5.586,
+    -5.511
+  ],
+  "n_ligand_atoms": 40,
+  "n_poses": 5,
+  "apo_features": {
+    "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+    "membrane_insertion_propensity": 0.562700854042622,
+    "nac_active_score": 12.612347570423182,
+    "contact_density": 7.073618538324421,
+    "disordered_hydrophobic_exposure": 21.18221576788534
+  },
+  "complex_features_top": {
+    "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+    "membrane_insertion_propensity": 0.562700854042622,
+    "nac_active_score": 12.76118525840483,
+    "contact_density": 7.846345811051694,
+    "disordered_hydrophobic_exposure": 20.94409964758441
+  },
+  "delta_features_top": {
+    "exposed_hydrophobic_beta_sasa": 0.0,
+    "membrane_insertion_propensity": 0.0,
+    "nac_active_score": 0.1488376879816471,
+    "contact_density": 0.7727272727272725,
+    "disordered_hydrophobic_exposure": -0.23811612030092988
+  },
+  "activity_apo": 17.775005580521217,
+  "activity_complex_top": 17.276934599760256,
+  "delta_activity_top": -0.4980709807609607,
+  "activity_complex_weighted": 17.193722022857852,
+  "delta_activity_weighted": -0.5812835576633644,
+  "affinity_gate_threshold_kcal_per_mol": -6.0,
+  "affinity_gate": 0.7137966712727363,
+  "delta_activity_gated": -0.41491826852568314,
+  "aspr_score": 0.0,
+  "aspr_reactive": false,
+  "poses": [
+    {
+      "rank": 1,
+      "affinity_kcal_per_mol": -5.799,
+      "weight": 0.24881468172269489,
+      "n_ligand_atoms": 40,
+      "complex_features": {
+        "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+        "membrane_insertion_propensity": 0.562700854042622,
+        "nac_active_score": 12.76118525840483,
+        "contact_density": 7.846345811051694,
+        "disordered_hydrophobic_exposure": 20.94409964758441
+      },
+      "activity_complex": 17.276934599760256,
+      "delta_activity": -0.4980709807609607
+    },
+    {
+      "rank": 2,
+      "affinity_kcal_per_mol": -5.737,
+      "weight": 0.22423837320780388,
+      "n_ligand_atoms": 40,
+      "complex_features": {
+        "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+        "membrane_insertion_propensity": 0.562700854042622,
+        "nac_active_score": 12.470382317706333,
+        "contact_density": 7.764527629233512,
+        "disordered_hydrophobic_exposure": 21.109026179034434
+      },
+      "activity_complex": 17.22311697754001,
+      "delta_activity": -0.551888602981208
+    },
+    {
+      "rank": 3,
+      "affinity_kcal_per_mol": -5.667,
+      "weight": 0.19939579034716637,
+      "n_ligand_atoms": 40,
+      "complex_features": {
+        "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+        "membrane_insertion_propensity": 0.562700854042622,
+        "nac_active_score": 12.73796375545759,
+        "contact_density": 7.646345811051693,
+        "disordered_hydrophobic_exposure": 20.907504853158954
+      },
+      "activity_complex": 17.39283728575902,
+      "delta_activity": -0.3821682947621987
+    },
+    {
+      "rank": 4,
+      "affinity_kcal_per_mol": -5.586,
+      "weight": 0.17406389665801036,
+      "n_ligand_atoms": 40,
+      "complex_features": {
+        "exposed_hydrophobic_beta_sasa": 14.151188466125644,
+        "membrane_insertion_propensity": 0.562700854042622,
+        "nac_active_score": 12.329595977721254,
+        "contact_density": 8.05222816399287,
+        "disordered_hydrophobic_exposure": 21.0109113844695
+      },
+      "activity_complex": 16.75220365524258,
+      "delta_activity": -1.0228019252786353
+    },
+    {
+      "rank": 5,
+      "affinity_kcal_per_mol": -5.511,
+      "weight": 0.1534872580643245,
+      "n_ligand_atoms": 40,
+      "complex_features": {
+        "exposed_hydrophobic_beta_sasa": 14.485384771349308,
+        "membrane_insertion_propensity": 0.562700854042622,
+        "nac_active_score": 12.77652580151883,
+        "contact_density": 7.876648841354723,
+        "disordered_hydrophobic_exposure": 20.914823812044045
+      },
+      "activity_complex": 17.257920672083614,
+      "delta_activity": -0.517084908437603
+    }
+  ]
+}

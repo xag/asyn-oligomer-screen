@@ -34,10 +34,10 @@ Two execution surfaces:
   * Analysis (this pip venv, no MD): `score` and `selftest` subcommands
     operate on trajectory PDBs that already exist. Fully runnable here.
 
-  * MD (`pilot` subcommand): runs the replicas via md_relax.py and needs
-    the conda env with OpenMM, pointed at by $ASYN_MD_PYTHON — same
-    requirement as md_stage3.py. This is the cluster-scale step the issue
-    flags; the pilot is the cheap decision gate before the full sweep.
+  * MD (`pilot` subcommand): runs the replicas via md_relax.py in the conda
+    MD env (`environment-md.yml`, found automatically by md_env.py). This is
+    the cluster-scale step the issue flags; the pilot is the cheap decision
+    gate before the full sweep.
 
 Usage:
     # score trajectories that already exist (pip venv, no GPU):
@@ -49,15 +49,14 @@ Usage:
     # self-test the bootstrap on synthetic dwell fractions (no inputs):
     python screen/dwell_time.py selftest
 
-    # full pilot (needs $ASYN_MD_PYTHON → OpenMM conda env):
-    ASYN_MD_PYTHON=/path/to/conda/md/python python screen/dwell_time.py pilot
+    # full pilot (runs replicas in the conda MD env, found automatically):
+    python screen/dwell_time.py pilot
 """
 from __future__ import annotations
 
 import argparse
 import glob
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -270,19 +269,12 @@ def summarise_pair(
 
 
 # ---------------------------------------------------------------------------
-# MD replica orchestration (needs $ASYN_MD_PYTHON → OpenMM conda env).
+# MD replica orchestration (runs md_relax.py in the conda MD env).
 # ---------------------------------------------------------------------------
 
 def _md_python() -> Path:
-    env = os.environ.get("ASYN_MD_PYTHON")
-    if not env:
-        raise RuntimeError(
-            "Set ASYN_MD_PYTHON to the python of a conda env with OpenMM + "
-            "openff-toolkit + openmmforcefields installed (same requirement as "
-            "md_stage3.py). The dwell-time replicas run there; trajectory "
-            "scoring (the `score` subcommand) runs in the pip venv without it."
-        )
-    return Path(env)
+    from md_env import md_python  # noqa: E402  (resolves the conda MD env)
+    return md_python()
 
 
 def _run_md(cmd: list[str], out_pdb: Path, tag: str) -> None:
@@ -541,7 +533,7 @@ def main() -> None:
     pt = sub.add_parser("selftest", help="bootstrap sanity check on synthetic data (no MD)")
     pt.set_defaults(func=_cmd_selftest)
 
-    pp = sub.add_parser("pilot", help="run the full #14 pilot (needs $ASYN_MD_PYTHON)")
+    pp = sub.add_parser("pilot", help="run the full #14 pilot (uses the conda MD env)")
     pp.add_argument("--replicas", type=int, default=N_REPLICAS)
     pp.add_argument("--prod-ns", type=float, default=PROD_NS)
     pp.add_argument("--no-skip", action="store_true", help="re-run replicas even if cached")

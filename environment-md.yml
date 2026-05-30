@@ -1,0 +1,17 @@
+name: asyn-md
+# Conda env for the one MD step that builds a ligand force field
+# (md_relax --prepare-only / md_stage3): OpenFF parametrisation runs here.
+# Everything else — including the per-replica dynamics — runs in the pip
+# venv. screen/md_env.py finds this env automatically; create it with:
+#     conda env create -f environment-md.yml
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - openmm
+  - pdbfixer
+  - openff-toolkit
+  - openff-nagl
+  - openff-nagl-models
+  - openmmforcefields
+  - rdkit

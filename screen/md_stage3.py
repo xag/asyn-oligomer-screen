@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -55,14 +54,8 @@ from stage3 import (
 
 ROOT = Path(__file__).resolve().parents[1]
 STAGE3 = ROOT / "results" / "stage3"
-_MD_PY_ENV = os.environ.get("ASYN_MD_PYTHON")
-if not _MD_PY_ENV:
-    raise RuntimeError(
-        "Set ASYN_MD_PYTHON to the python interpreter of a conda env that has "
-        "OpenMM + openff-toolkit + openmmforcefields installed. "
-        "See README.md (Reproduction / MD relaxation)."
-    )
-MD_PYTHON = Path(_MD_PY_ENV)
+from md_env import md_python  # noqa: E402  (resolves the conda MD env)
+MD_PYTHON = md_python()
 MD_RELAX = Path(__file__).parent / "md_relax.py"
 
 
