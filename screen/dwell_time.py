@@ -248,7 +248,15 @@ def summarise_pair(
     apo_dwell = [s["dwell_fraction"] for s in apo_scores]
     cpx_dwell = [s["dwell_fraction"] for s in cpx_scores]
     boot = bootstrap_dwell_shift(apo_dwell, cpx_dwell, seed=seed)
-    mean_occ = float(np.nanmean([s["occupancy"] for s in cpx_scores])) if cpx_scores else float("nan")
+    # Average occupancy over the complex replicas that actually carried a
+    # ligand. A nan occupancy means "no LIG residue in this trajectory"
+    # (setup issue), which is distinct from a finite-but-low occupancy
+    # ("ligand diffused off the site"). Keep them apart so the report does
+    # not blame a missing ligand on diffusion — and so np.mean is never
+    # handed an all-nan slice.
+    finite_occ = [s["occupancy"] for s in cpx_scores if np.isfinite(s["occupancy"])]
+    boot["ligand_present"] = bool(finite_occ)
+    mean_occ = float(np.mean(finite_occ)) if finite_occ else float("nan")
     boot["mean_complex_occupancy"] = mean_occ
     boot["occupancy_ok"] = bool(np.isfinite(mean_occ) and mean_occ >= MIN_OCCUPANCY)
     return {
@@ -416,7 +424,12 @@ def run_pilot(
 def _print_pair_line(pair: dict) -> None:
     b = pair["bootstrap"]
     occ = b.get("mean_complex_occupancy", float("nan"))
-    flag = "" if b.get("occupancy_ok", False) else "  [LOW OCCUPANCY]"
+    if not b.get("ligand_present", True):
+        flag = "  [NO LIGAND IN TRAJ]"
+    elif not b.get("occupancy_ok", False):
+        flag = "  [LOW OCCUPANCY]"
+    else:
+        flag = ""
     print(
         f"  {pair.get('ligand',''):14} shift={b['shift']:+.3f} "
         f"CI[{b['ci_low']:+.3f},{b['ci_high']:+.3f}] "
@@ -465,8 +478,13 @@ def _cmd_score(args) -> None:
     print(f"reference: {pair['reference']}")
     print(f"apo dwell fractions:     {[round(x,3) for x in pair['apo_dwell']]}")
     print(f"complex dwell fractions: {[round(x,3) for x in pair['complex_dwell']]}")
-    print(f"mean complex occupancy:  {b.get('mean_complex_occupancy', float('nan')):.3f} "
-          f"({'OK' if b.get('occupancy_ok') else 'LOW — ligand left the site'})")
+    if not b.get("ligand_present", True):
+        occ_note = "no LIG residue in complex trajectories"
+    elif b.get("occupancy_ok"):
+        occ_note = "OK"
+    else:
+        occ_note = "LOW — ligand left the site"
+    print(f"mean complex occupancy:  {b.get('mean_complex_occupancy', float('nan')):.3f} ({occ_note})")
     print(f"dwell shift: {b['shift']:+.4f}  CI95[{b['ci_low']:+.4f}, {b['ci_high']:+.4f}]")
     print(f"P(destabiliser)={b['prob_destabiliser']:.3f}  P(stabiliser)={b['prob_stabiliser']:.3f}")
     print(f"==> {b['classification'].upper()}")
