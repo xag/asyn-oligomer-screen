@@ -30,6 +30,13 @@ results/stage3/*.log
 # Run logs
 results/_logs/
 
+# Dwell-time channel (#14): replica MD trajectories are large + regenerable.
+# pilot_summary.{json,csv} are small; keep them so the pilot result is
+# inspectable without re-running the MD.
+results/dwell/**/*.pdb
+results/dwell/**/*.log
+results/dwell/_scratch/
+
 # Per-topology oligomer build/relax logs (the relaxed PDBs are kept)
 results/oligomers/_*.log
 results/oligomers/*.log
@@ -44,3 +51,6 @@ environment.yml.local
 # Misc transient
 *.tmp
 *.bak
+
+# Outreach
+outreach/

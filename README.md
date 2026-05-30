@@ -34,8 +34,6 @@ This is a first iteration. The pipeline runs end-to-end and every result below i
 **In-repo, computational:**
 
 - **Add catechol-quinone covalent chemistry to `screen/adduct_score.py`.** Extend the per-ligand `rxty` table with dopamine, DOPAC, norepinephrine, aminochrome, and 6-OHDA entries. Currently these score as weakly protective on the reversible channel, even though the published mechanism is α-syn oligomer stabilisation via quinone-mediated Lys-Schiff and Cys-Michael adducts — the same chemistry family the covalent channel already handles for MDA, acrolein, 4-HNE, and MGO (Conway et al. 2001; Norris et al. 2005; Mazzulli et al. 2006).
-- **Run longer-timescale MD around docked poses.** The pilot in `screen/md_stage3.py` was inconclusive at 50 ps. ≥10 ns runs would let stabilising binders show positive Δact through receptor rearrangement, partly removing the §8.3 sign-bound.
-- **Add a shape-stability channel based on multi-replica short MD.** Instead of scoring whether a ligand changes the activity of a static complex, measure whether it narrows the distribution of oligomer shapes at fixed Δt across many MD replicas. Bypasses the §8.3 sign-bound and reuses the 11-topology ensemble for shape coverage.
 - **Build a metal-coordination scoring channel.** Cu²⁺, Fe²⁺/³⁺ currently fail at the Meeko PDBQT stage (single-atom-ligand limitation) and drop out of the rankings entirely. Replace with parametrised-ion MD against α-syn, or with a coordination-chemistry score against the N-terminal Cu/Fe sites (Rasia et al. 2005; Davies et al. 2011).
 - **Build alternative receptor models** under the same Fusco topology constraints, to test how strongly the ranking depends on the specific relaxed geometry used here.
 - **Re-score as new α-synuclein structures and topology constraints are deposited.**
@@ -448,6 +446,28 @@ conda create -n asyn-md python=3.11 openmm openff-toolkit openmmforcefields -c c
 export ASYN_MD_PYTHON="$HOME/miniforge3/envs/asyn-md/bin/python"
 .venv/bin/python screen/md_stage3.py
 ```
+
+**Shape-stability (dwell-time) channel** ([#14](https://github.com/xag/asyn-oligomer-screen/issues/14)). The time-resolved channel that lifts the §8.3 sign-bound: across velocity-seeded short-MD replicas, does the ligand keep the oligomer in its toxic shape (destabiliser → less, stabiliser/anti-target → more)? Two surfaces. The bootstrap self-test and trajectory scoring are pure geometry (β-core Cα RMSD + inter-chain contact Jaccard) and run in the pip venv with **no GPU**:
+
+```bash
+.venv/bin/python screen/dwell_time.py selftest
+.venv/bin/python screen/dwell_time.py score \
+    --reference results/oligomers/<shape>_relaxed.pdb \
+    --apo results/dwell/<shape>/apo_rep*.pdb \
+    --complex results/dwell/<shape>/<ligand>_rep*.pdb
+```
+
+The MD replicas are designed to run as **independent per-replica chunks small enough for a basic GPU** (toward the volunteer-compute direction). The *apo* side needs only `openmm` + `pdbfixer` — the non-default `md` dependency group, no conda. Truncate to the NAC core and solvate in a tight box (`--rect-box`) so one chunk is ~55k atoms (~3.5 min for 80 ps on a 4 GB laptop GPU via OpenCL):
+
+```bash
+uv sync --group md
+.venv/bin/python screen/md_relax.py --apo-pdb <core-truncated>.pdb \
+    --out-pdb apo_rep00_final.pdb --seed 1000 --rect-box \
+    --equil-ps 20 --prod-ps 60 \
+    --traj-out apo_rep00.pdb --traj-interval-ps 20
+```
+
+The docked-*complex* side additionally needs OpenFF/SMIRNOFF to parameterise the ligand (the `ASYN_MD_PYTHON` conda env above) — that part is not currently pip-installable, so it stays on conda.
 
 Each top-level directory carries a `README.md` describing its contents:
 [scoring/](scoring/) (activity score + calibration),
