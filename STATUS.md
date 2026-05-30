@@ -33,6 +33,7 @@ Full list: [issues with `result` label](https://github.com/xag/asyn-oligomer-scr
 | ----- | ---- |
 | [#11](https://github.com/xag/asyn-oligomer-screen/issues/11) | Wet-lab handoff on the 7 novel candidates + 4 reactive metabolites — **package drafted** ([docs/HANDOFF.md](docs/HANDOFF.md), `node docs/build_handoff.mjs`); awaiting wet-lab partner |
 | [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — harness in repo; apo chunking validated, complex side pending conda OpenFF |
+| [#33](https://github.com/xag/asyn-oligomer-screen/issues/33) | Provision GPU + run the [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) pilot (local 2 GB laptop first) — unblocks [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) |
 | [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) | Anti-target flagging — stabilisers of toxic shapes (symmetric output of [#14](https://github.com/xag/asyn-oligomer-screen/issues/14)) |
 | [#12](https://github.com/xag/asyn-oligomer-screen/issues/12) | Sensitivity sweep on the −6 kcal/mol affinity gate |
 | [#16](https://github.com/xag/asyn-oligomer-screen/issues/16) | Refine `aspr_score`: PROPKA local-pKa + pose-aware geometric filter |
@@ -66,7 +67,7 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 
 - Stage 1 generator (fragment-MC, generative model, latent dynamics). The topology-prior build is a proxy for Stage 1.
 - Any website surface (the `/compute` front door, browser client, results pages).
-- The off-Vercel coordinator for volunteer-compute dispatch. (The per-replica MD *chunk* it would dispatch now exists and is validated on a basic GPU — apo side, pip-only, see [#14](https://github.com/xag/asyn-oligomer-screen/issues/14); the coordinator and front door themselves are still not built.)
+- The off-Vercel coordinator for volunteer-compute dispatch ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)) and contributor runtime ([#35](https://github.com/xag/asyn-oligomer-screen/issues/35)).
 
 ## How to pick this up in a fresh thread
 
