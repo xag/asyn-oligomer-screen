@@ -22,6 +22,21 @@ The point of this step is the same as STATUS.md "Recommended next moves
 and backbone can rearrange, which is the only mechanism through which
 Δactivity can flip positive under the Stage 2 feature weights
 (static-pose features only ever subtract from activity).
+
+Distributed / crowdsourced split (issue #34). The OpenFF parametrisation the
+docked-complex path needs is GPU-free and one-time, so it is separable from
+the per-replica GPU dynamics. Two extra modes implement that split so a
+docked-complex dwell chunk can run on a volunteer's basic GPU with no conda:
+
+  --prepare-only PREFIX   build + solvate + parametrise, serialise the OpenMM
+      System to PREFIX_system.xml and the solvated topology/positions to
+      PREFIX_solvated.pdb, then exit without running dynamics. This is the
+      *only* step that needs OpenFF/conda (runs under $ASYN_MD_PYTHON).
+  --system-xml/--solvated-pdb  run the dynamics from a serialised System
+      instead of building one. Needs *only* pip-installed openmm — no OpenFF,
+      no conda — because every force-field term (including the ligand's
+      SMIRNOFF parameters) is already baked into system.xml. This is the
+      chunk a contributor's GPU runs; identical to the apo chunk's runtime.
 """
 from __future__ import annotations
 
@@ -439,83 +454,79 @@ def pick_platform() -> tuple[openmm.Platform, dict]:
 
 
 # -----------------------------------------------------------------------------
-# Main relaxation pipeline.
+# Serialise a prepared (solvated, parametrised) system so the GPU integration
+# can run on a machine with only pip-installed OpenMM — no OpenFF, no conda.
+# This is the split (issue #34) that lets docked-complex dwell chunks be
+# crowdsourced: the one-time, GPU-free SMIRNOFF parametrisation (build_system)
+# happens centrally; the per-replica dynamics (run_dynamics) load the
+# serialised System and run anywhere.
 # -----------------------------------------------------------------------------
 
-def relax(
-    out_pdb: Path,
-    complex_pdb: Path | None = None,
-    ligand_smiles: str | None = None,
-    apo_pdb: Path | None = None,
-    equil_ps: float = 100.0,
-    prod_ps: float = 100.0,
-    temperature_k: float = 300.0,
-    pressure_atm: float = 1.0,
-    salt_mol: float = 0.15,
-    padding_nm: float = 1.0,
-    timestep_fs: float = 2.0,
-    report_interval_ps: float = 10.0,
-    collapse_ps: float = 0.0,
-    vacuum_min_iter: int = 0,
-    no_explicit: bool = False,
-    restrain_range: tuple[int, int] | None = None,
-    restrain_chains: set[str] | None = None,
-    restrain_k: float = 1000.0,
-    seed: int | None = None,
-    traj_out: Path | None = None,
-    traj_interval_ps: float = 0.0,
-    rectangular_box: bool = False,
-):
-    t0 = time.time()
-    if complex_pdb is not None:
-        if collapse_ps > 0:
-            raise ValueError("--collapse-ps is apo-only (ligand has no OBC2 GB parameters)")
-        print(f"=== md_relax (complex): {complex_pdb.name} ===", flush=True)
-        prot_pdb_text, lig_pdb_text = split_complex_pdb(complex_pdb)
-        print("  parsed complex PDB", flush=True)
-        rdkit_lig = ligand_from_pdb_and_smiles(lig_pdb_text, ligand_smiles)
-        print(f"  ligand: {rdkit_lig.GetNumAtoms()} atoms (incl Hs); SMILES = {ligand_smiles}", flush=True)
-        off_lig = offmol_from_rdkit(rdkit_lig)
-        qsum = float(sum(c.m for c in off_lig.partial_charges))
-        print(f"  NAGL charges assigned, sum = {qsum:+.3f} e", flush=True)
-    elif apo_pdb is not None:
-        print(f"=== md_relax (apo): {apo_pdb.name} ===", flush=True)
-        prot_pdb_text = load_apo_pdb(apo_pdb)
-        print("  parsed apo PDB (no ligand)", flush=True)
-        off_lig = None
-        if vacuum_min_iter > 0:
-            prot_pdb_text = vacuum_minimize_apo(
-                prot_pdb_text,
-                max_iterations=vacuum_min_iter,
-                restrain_range=restrain_range,
-                restrain_chains=restrain_chains,
-                restrain_k=restrain_k,
-            )
-        if collapse_ps > 0:
-            prot_pdb_text = implicit_collapse_apo(
-                prot_pdb_text,
-                collapse_ps=collapse_ps,
-                temperature_k=temperature_k,
-                timestep_fs=timestep_fs,
-                restrain_range=restrain_range,
-                restrain_chains=restrain_chains,
-                restrain_k=restrain_k,
-            )
-        if no_explicit:
-            print("  --no-explicit: writing post-collapse structure (heavy atoms only)", flush=True)
-            write_heavy_only_pdb(prot_pdb_text, out_pdb)
-            print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
-            return
-    else:
-        raise ValueError("md_relax requires --complex-pdb (+ --ligand-smiles) or --apo-pdb")
+def serialize_prepared_system(system, topology, positions, prefix: Path) -> tuple[Path, Path]:
+    """Write {prefix}_system.xml (the fully parametrised OpenMM System — ligand
+    SMIRNOFF terms baked in) + {prefix}_solvated.pdb (topology + positions,
+    including water/ions) so load_prepared_system can rebuild a runnable
+    Simulation with pip-only OpenMM. Returns (system_xml, solvated_pdb)."""
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+    sys_xml = prefix.with_name(prefix.name + "_system.xml")
+    solv_pdb = prefix.with_name(prefix.name + "_solvated.pdb")
+    sys_xml.write_text(openmm.XmlSerializer.serialize(system), encoding="utf-8")
+    with solv_pdb.open("w") as f:
+        app.PDBFile.writeFile(topology, positions, f, keepIds=True)
+    return sys_xml, solv_pdb
 
-    modeller, system = build_system(prot_pdb_text, off_lig, padding_nm=padding_nm, salt_mol=salt_mol,
-                                    rectangular_box=rectangular_box)
+
+def load_prepared_system(system_xml: Path, solvated_pdb: Path):
+    """Inverse of serialize_prepared_system: load the serialised System plus the
+    solvated topology/positions. Needs only pip-installed openmm (no OpenFF) —
+    every force-field term, including the ligand's SMIRNOFF parameters, is
+    already inside system_xml. Returns (topology, positions, system)."""
+    pdb = app.PDBFile(str(solvated_pdb))
+    system = openmm.XmlSerializer.deserialize(Path(system_xml).read_text(encoding="utf-8"))
+    if system.getNumParticles() != pdb.topology.getNumAtoms():
+        raise ValueError(
+            f"system/topology mismatch: {system.getNumParticles()} particles vs "
+            f"{pdb.topology.getNumAtoms()} atoms — {Path(system_xml).name} and "
+            f"{Path(solvated_pdb).name} are not a matched pair"
+        )
+    return pdb.topology, pdb.positions, system
+
+
+# -----------------------------------------------------------------------------
+# Dynamics: minimise → NVT warm-up → NPT equilibration → NPT production.
+# Shared by the build path (build_system) and the prepared-system path
+# (load_prepared_system), so a docked-complex chunk runs identically whether
+# OpenFF parametrised it in-process or it arrived as a serialised System on a
+# volunteer's GPU.
+# -----------------------------------------------------------------------------
+
+def run_dynamics(
+    out_pdb: Path,
+    topology,
+    positions,
+    system,
+    *,
+    equil_ps: float,
+    prod_ps: float,
+    temperature_k: float,
+    pressure_atm: float,
+    timestep_fs: float,
+    report_interval_ps: float,
+    restrain_range: tuple[int, int] | None,
+    restrain_chains: set[str] | None,
+    restrain_k: float,
+    seed: int | None,
+    traj_out: Path | None,
+    traj_interval_ps: float,
+    t0: float | None = None,
+) -> None:
+    if t0 is None:
+        t0 = time.time()
 
     # Re-apply position restraints on the explicit-solvent system so the
     # β-core topology survives equilibration + production at full T.
     n_restr = add_position_restraints(
-        system, modeller.topology, modeller.positions,
+        system, topology, positions,
         restrain_range, restrain_chains, restrain_k,
     )
     if n_restr:
@@ -536,14 +547,12 @@ def relax(
     # Seed the integrator's random stream so velocity-seeded replicas
     # (dwell_time.py) diverge deterministically: same seed → same
     # trajectory, different seed → an independent thermal realisation.
-    # Left unseeded (seed=None) OpenMM picks a fresh random seed itself,
-    # preserving the original single-shot behaviour.
     if seed is not None:
         integrator.setRandomNumberSeed(int(seed))
     platform, props = pick_platform()
     print(f"  platform: {platform.getName()} (props={props})", flush=True)
-    sim = app.Simulation(modeller.topology, system, integrator, platform, props)
-    sim.context.setPositions(modeller.positions)
+    sim = app.Simulation(topology, system, integrator, platform, props)
+    sim.context.setPositions(positions)
 
     print("  minimizing...", flush=True)
     sim.minimizeEnergy(maxIterations=10000)
@@ -598,7 +607,7 @@ def relax(
     print(f"  equilibration NPT ({equil_ps:.0f} ps, {equil_steps} steps)", flush=True)
     sim.step(equil_steps)
 
-    top = modeller.topology
+    top = topology
     if traj_out is not None and traj_interval_ps > 0:
         # Production with periodic frame dumps — the dwell-time channel
         # scores the shape at each Δt, not just the endpoint. Heavy-atom
@@ -622,10 +631,128 @@ def relax(
 
     # Strip waters/ions/barostat, dump the final relaxed protein + ligand.
     final = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
-    positions = final.getPositions(asNumpy=True)
+    positions_out = final.getPositions(asNumpy=True)
 
-    write_protein_ligand_pdb(top, positions, out_pdb)
+    write_protein_ligand_pdb(top, positions_out, out_pdb)
     print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
+
+
+# -----------------------------------------------------------------------------
+# Main relaxation pipeline.
+# -----------------------------------------------------------------------------
+
+def relax(
+    out_pdb: Path,
+    complex_pdb: Path | None = None,
+    ligand_smiles: str | None = None,
+    apo_pdb: Path | None = None,
+    equil_ps: float = 100.0,
+    prod_ps: float = 100.0,
+    temperature_k: float = 300.0,
+    pressure_atm: float = 1.0,
+    salt_mol: float = 0.15,
+    padding_nm: float = 1.0,
+    timestep_fs: float = 2.0,
+    report_interval_ps: float = 10.0,
+    collapse_ps: float = 0.0,
+    vacuum_min_iter: int = 0,
+    no_explicit: bool = False,
+    restrain_range: tuple[int, int] | None = None,
+    restrain_chains: set[str] | None = None,
+    restrain_k: float = 1000.0,
+    seed: int | None = None,
+    traj_out: Path | None = None,
+    traj_interval_ps: float = 0.0,
+    rectangular_box: bool = False,
+    system_xml: Path | None = None,
+    solvated_pdb: Path | None = None,
+    prepare_prefix: Path | None = None,
+):
+    t0 = time.time()
+
+    # Edge path: run a pre-parametrised, serialised system with pip-only
+    # OpenMM — no OpenFF, no conda, even for a docked complex (issue #34).
+    if system_xml is not None:
+        print(f"=== md_relax (prepared system): {Path(system_xml).name} ===", flush=True)
+        topology, positions, system = load_prepared_system(Path(system_xml), Path(solvated_pdb))
+        print(f"  loaded {system.getNumParticles()} particles from serialised "
+              f"System (no OpenFF)", flush=True)
+        run_dynamics(
+            out_pdb, topology, positions, system,
+            equil_ps=equil_ps, prod_ps=prod_ps, temperature_k=temperature_k,
+            pressure_atm=pressure_atm, timestep_fs=timestep_fs,
+            report_interval_ps=report_interval_ps, restrain_range=restrain_range,
+            restrain_chains=restrain_chains, restrain_k=restrain_k, seed=seed,
+            traj_out=traj_out, traj_interval_ps=traj_interval_ps, t0=t0,
+        )
+        return
+
+    if complex_pdb is not None:
+        if collapse_ps > 0:
+            raise ValueError("--collapse-ps is apo-only (ligand has no OBC2 GB parameters)")
+        print(f"=== md_relax (complex): {complex_pdb.name} ===", flush=True)
+        prot_pdb_text, lig_pdb_text = split_complex_pdb(complex_pdb)
+        print("  parsed complex PDB", flush=True)
+        rdkit_lig = ligand_from_pdb_and_smiles(lig_pdb_text, ligand_smiles)
+        print(f"  ligand: {rdkit_lig.GetNumAtoms()} atoms (incl Hs); SMILES = {ligand_smiles}", flush=True)
+        off_lig = offmol_from_rdkit(rdkit_lig)
+        qsum = float(sum(c.m for c in off_lig.partial_charges))
+        print(f"  NAGL charges assigned, sum = {qsum:+.3f} e", flush=True)
+    elif apo_pdb is not None:
+        print(f"=== md_relax (apo): {apo_pdb.name} ===", flush=True)
+        prot_pdb_text = load_apo_pdb(apo_pdb)
+        print("  parsed apo PDB (no ligand)", flush=True)
+        off_lig = None
+        if vacuum_min_iter > 0:
+            prot_pdb_text = vacuum_minimize_apo(
+                prot_pdb_text,
+                max_iterations=vacuum_min_iter,
+                restrain_range=restrain_range,
+                restrain_chains=restrain_chains,
+                restrain_k=restrain_k,
+            )
+        if collapse_ps > 0:
+            prot_pdb_text = implicit_collapse_apo(
+                prot_pdb_text,
+                collapse_ps=collapse_ps,
+                temperature_k=temperature_k,
+                timestep_fs=timestep_fs,
+                restrain_range=restrain_range,
+                restrain_chains=restrain_chains,
+                restrain_k=restrain_k,
+            )
+        if no_explicit:
+            print("  --no-explicit: writing post-collapse structure (heavy atoms only)", flush=True)
+            write_heavy_only_pdb(prot_pdb_text, out_pdb)
+            print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
+            return
+    else:
+        raise ValueError("md_relax requires --complex-pdb (+ --ligand-smiles) or --apo-pdb")
+
+    modeller, system = build_system(prot_pdb_text, off_lig, padding_nm=padding_nm, salt_mol=salt_mol,
+                                    rectangular_box=rectangular_box)
+
+    # Prepare-only: serialise the parametrised, solvated system and stop. The
+    # GPU-free, OpenFF-using half of a docked-complex chunk (issue #34). The
+    # serialised System then runs anywhere with pip-only OpenMM via
+    # --system-xml/--solvated-pdb.
+    if prepare_prefix is not None:
+        sys_xml, solv_pdb = serialize_prepared_system(
+            system, modeller.topology, modeller.positions, Path(prepare_prefix),
+        )
+        print(f"  prepared (no dynamics): wrote {sys_xml.name} + {solv_pdb.name}; "
+              f"run anywhere with --system-xml {sys_xml.name} "
+              f"--solvated-pdb {solv_pdb.name}", flush=True)
+        return
+
+    run_dynamics(
+        out_pdb, modeller.topology, modeller.positions, system,
+        equil_ps=equil_ps, prod_ps=prod_ps, temperature_k=temperature_k,
+        pressure_atm=pressure_atm, timestep_fs=timestep_fs,
+        report_interval_ps=report_interval_ps, restrain_range=restrain_range,
+        restrain_chains=restrain_chains, restrain_k=restrain_k, seed=seed,
+        traj_out=traj_out, traj_interval_ps=traj_interval_ps, t0=t0,
+    )
 
 
 SOLVENT_RESNAMES = {"HOH", "WAT", "TIP3", "TIP", "NA", "CL", "Na+", "Cl-", "K+", "MG", "ZN", "CA"}
@@ -766,7 +893,20 @@ def main() -> None:
                    help="SMILES of the ligand; required with --complex-pdb")
     p.add_argument("--apo-pdb", type=Path, default=None,
                    help="protein-only PDB for apo MD baseline (mutually exclusive with --complex-pdb)")
-    p.add_argument("--out-pdb", type=Path, required=True)
+    p.add_argument("--system-xml", type=Path, default=None,
+                   help="run dynamics from a serialised OpenMM System (from "
+                        "--prepare-only) instead of building one. Needs only "
+                        "pip-installed openmm — no OpenFF/conda, even for a "
+                        "docked complex. Requires --solvated-pdb.")
+    p.add_argument("--solvated-pdb", type=Path, default=None,
+                   help="solvated topology+positions paired with --system-xml")
+    p.add_argument("--prepare-only", type=Path, default=None, metavar="PREFIX",
+                   help="build + solvate + parametrise, then serialise to "
+                        "PREFIX_system.xml + PREFIX_solvated.pdb and exit "
+                        "(no dynamics). The OpenFF/conda half of a chunk; the "
+                        "serialised System runs with pip-only OpenMM.")
+    p.add_argument("--out-pdb", type=Path, default=None,
+                   help="output relaxed PDB (required unless --prepare-only)")
     p.add_argument("--equil-ps", type=float, default=100.0)
     p.add_argument("--prod-ps", type=float, default=100.0)
     p.add_argument("--temperature-k", type=float, default=300.0)
@@ -818,16 +958,26 @@ def main() -> None:
     if args.traj_out is not None and args.traj_interval_ps <= 0:
         p.error("--traj-out requires a positive --traj-interval-ps")
 
-    if (args.complex_pdb is None) == (args.apo_pdb is None):
-        p.error("exactly one of --complex-pdb or --apo-pdb must be provided")
+    n_modes = sum(x is not None for x in (args.complex_pdb, args.apo_pdb, args.system_xml))
+    if n_modes != 1:
+        p.error("exactly one of --complex-pdb, --apo-pdb, or --system-xml must be provided")
     if args.complex_pdb is not None and not args.ligand_smiles:
         p.error("--ligand-smiles is required with --complex-pdb")
+    if args.system_xml is not None and args.solvated_pdb is None:
+        p.error("--system-xml requires --solvated-pdb")
+    if args.prepare_only is not None and args.system_xml is not None:
+        p.error("--prepare-only builds a system; it cannot combine with --system-xml")
+    if args.prepare_only is None and args.out_pdb is None:
+        p.error("--out-pdb is required (unless --prepare-only)")
 
     relax(
         complex_pdb=args.complex_pdb,
         ligand_smiles=args.ligand_smiles,
         apo_pdb=args.apo_pdb,
         out_pdb=args.out_pdb,
+        system_xml=args.system_xml,
+        solvated_pdb=args.solvated_pdb,
+        prepare_prefix=args.prepare_only,
         equil_ps=args.equil_ps,
         prod_ps=args.prod_ps,
         temperature_k=args.temperature_k,

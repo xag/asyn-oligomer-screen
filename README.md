@@ -467,7 +467,20 @@ uv sync --group md
     --traj-out apo_rep00.pdb --traj-interval-ps 20
 ```
 
-The docked-*complex* side additionally needs OpenFF/SMIRNOFF to parameterise the ligand (the `ASYN_MD_PYTHON` conda env above) — that part is not currently pip-installable, so it stays on conda.
+The docked-*complex* side needs OpenFF/SMIRNOFF to parameterise the ligand, which is conda-only — but only to *build* the force field, not to run dynamics ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). So that one-time, GPU-free step is split off (`--prepare-only`, under the `ASYN_MD_PYTHON` conda env), serialising a ready-to-run OpenMM `System`; the per-replica GPU dynamics then run from it with **pip-only OpenMM — no conda** (`--system-xml`/`--solvated-pdb`), exactly like the apo chunk:
+
+```bash
+# central, GPU-free, conda (OpenFF): parametrise once → system.xml + solvated.pdb
+$ASYN_MD_PYTHON screen/md_relax.py --complex-pdb <pair>_complex.pdb \
+    --ligand-smiles "<SMILES>" --rect-box --prepare-only results/dwell/<pair>
+
+# any contributor's GPU, pip-only openmm: integrate a velocity-seeded replica
+.venv/bin/python screen/md_relax.py \
+    --system-xml results/dwell/<pair>_system.xml \
+    --solvated-pdb results/dwell/<pair>_solvated.pdb \
+    --out-pdb <pair>_rep00_final.pdb --seed 2000 \
+    --equil-ps 20 --prod-ps 60 --traj-out <pair>_rep00.pdb --traj-interval-ps 20
+```
 
 Each top-level directory carries a `README.md` describing its contents:
 [scoring/](scoring/) (activity score + calibration),
