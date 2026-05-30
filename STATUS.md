@@ -1,6 +1,6 @@
 # Pipeline status
 
-Last update: 2026-05-28.
+Last update: 2026-05-30.
 
 This file is the entry point for a fresh thread. It is a short index. **The GitHub issue tracker is the source of truth** for results, next moves, open decisions, and caveats. After reading this file, read [`ANCHORS.md`](ANCHORS.md) for anchor curation context, then [`../IN_SILICO_PLAN.md`](../IN_SILICO_PLAN.md) for the overall project shape, then [`oligomers/README.md`](oligomers/README.md) for the Track A direction.
 
@@ -32,7 +32,7 @@ Full list: [issues with `result` label](https://github.com/xag/asyn-oligomer-scr
 | Issue | Move |
 | ----- | ---- |
 | [#11](https://github.com/xag/asyn-oligomer-screen/issues/11) | Wet-lab handoff on the 7 novel candidates + 4 reactive metabolites — **package drafted** ([docs/HANDOFF.md](docs/HANDOFF.md), `node docs/build_handoff.mjs`); awaiting wet-lab partner |
-| [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — superseded simpler MD relaxation (closed [#13](https://github.com/xag/asyn-oligomer-screen/issues/13)) |
+| [#14](https://github.com/xag/asyn-oligomer-screen/issues/14) | Shape-stability channel (multi-replica short-MD dwell-time) — **harness in repo** (`screen/dwell_time.py`, `screen/shape_metrics.py`); apo per-replica chunking validated on a basic GPU (pip-only, OpenCL, `--rect-box`); complex side pending conda OpenFF. Superseded simpler MD relaxation (closed [#13](https://github.com/xag/asyn-oligomer-screen/issues/13)) |
 | [#30](https://github.com/xag/asyn-oligomer-screen/issues/30) | Anti-target flagging — stabilisers of toxic shapes (symmetric output of [#14](https://github.com/xag/asyn-oligomer-screen/issues/14)) |
 | [#12](https://github.com/xag/asyn-oligomer-screen/issues/12) | Sensitivity sweep on the −6 kcal/mol affinity gate |
 | [#16](https://github.com/xag/asyn-oligomer-screen/issues/16) | Refine `aspr_score`: PROPKA local-pKa + pose-aware geometric filter |
@@ -66,7 +66,7 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 
 - Stage 1 generator (fragment-MC, generative model, latent dynamics). The topology-prior build is a proxy for Stage 1.
 - Any website surface (the `/compute` front door, browser client, results pages).
-- The off-Vercel coordinator for volunteer-compute dispatch.
+- The off-Vercel coordinator for volunteer-compute dispatch. (The per-replica MD *chunk* it would dispatch now exists and is validated on a basic GPU — apo side, pip-only, see [#14](https://github.com/xag/asyn-oligomer-screen/issues/14); the coordinator and front door themselves are still not built.)
 
 ## How to pick this up in a fresh thread
 
@@ -82,3 +82,4 @@ Full list: [issues with `caveat` label](https://github.com/xag/asyn-oligomer-scr
 6. Reproduce oligomer Stage 3 controls: `python screen/stage3.py curcumin results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb` (needs `bin/vina.exe`). For deposited-anchor pairs: `python screen/stage3.py curcumin 6PEO`.
 7. Inspect the covalent / adduct channel for any reactive ligand: `python screen/adduct_score.py methylglyoxal results/oligomers/fusco_parallel_3mer_core70-88_relaxed.pdb`. Sweep CSV has `aspr_score` column.
 8. Default next move: re-run `python screen/sweep_oligomer.py --skip-existing` to keep the sweep CSV current (cheap; backfills aspr columns onto cached reports). Pick the highest-priority `next-step` issue from the tracker.
+9. Shape-stability / dwell-time channel ([#14](https://github.com/xag/asyn-oligomer-screen/issues/14)): `python screen/dwell_time.py selftest` (bootstrap sanity, no MD) and `score` (aggregate existing replica trajectories) run in the pip venv. The MD replicas run as independent per-GPU chunks: `uv sync --group md`, then `python screen/md_relax.py --apo-pdb <core-truncated>.pdb --rect-box --seed N --traj-out ...` (apo side, pip-only; complex side needs the `ASYN_MD_PYTHON` conda env for OpenFF). See README §9.
