@@ -434,6 +434,9 @@ def relax(
     restrain_range: tuple[int, int] | None = None,
     restrain_chains: set[str] | None = None,
     restrain_k: float = 1000.0,
+    seed: int | None = None,
+    traj_out: Path | None = None,
+    traj_interval_ps: float = 0.0,
 ):
     t0 = time.time()
     if complex_pdb is not None:
@@ -501,6 +504,13 @@ def relax(
         1.0 / u.picosecond,
         timestep_fs * u.femtosecond,
     )
+    # Seed the integrator's random stream so velocity-seeded replicas
+    # (dwell_time.py) diverge deterministically: same seed → same
+    # trajectory, different seed → an independent thermal realisation.
+    # Left unseeded (seed=None) OpenMM picks a fresh random seed itself,
+    # preserving the original single-shot behaviour.
+    if seed is not None:
+        integrator.setRandomNumberSeed(int(seed))
     platform, props = pick_platform()
     print(f"  platform: {platform.getName()} (props={props})", flush=True)
     sim = app.Simulation(modeller.topology, system, integrator, platform, props)
@@ -524,11 +534,18 @@ def relax(
 
     # Add barostat for NPT and restore the production timestep.
     barostat = openmm.MonteCarloBarostat(pressure_atm * u.atmosphere, temperature_k * u.kelvin, 25)
+    if seed is not None:
+        barostat.setRandomNumberSeed(int(seed))
     system.addForce(barostat)
     sim.context.reinitialize(preserveState=True)
     integrator.setStepSize(timestep_fs * u.femtosecond)
 
-    sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin)
+    # Fresh production velocities — seeded per replica so each replica is an
+    # independent draw from the Maxwell-Boltzmann distribution.
+    if seed is not None:
+        sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin, int(seed))
+    else:
+        sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin)
 
     steps_per_ps = int(round(1000.0 / timestep_fs))
     report_every = max(1, int(round(report_interval_ps * steps_per_ps)))
@@ -552,13 +569,31 @@ def relax(
     print(f"  equilibration NPT ({equil_ps:.0f} ps, {equil_steps} steps)", flush=True)
     sim.step(equil_steps)
 
-    print(f"  production NPT ({prod_ps:.0f} ps, {prod_steps} steps)", flush=True)
-    sim.step(prod_steps)
+    top = modeller.topology
+    if traj_out is not None and traj_interval_ps > 0:
+        # Production with periodic frame dumps — the dwell-time channel
+        # scores the shape at each Δt, not just the endpoint. Heavy-atom
+        # protein+ligand frames only (waters/ions stripped per frame).
+        frame_steps = max(1, int(round(traj_interval_ps * steps_per_ps)))
+        n_frames = max(1, prod_steps // frame_steps)
+        writer = HeavyTrajectoryWriter(traj_out, top)
+        print(
+            f"  production NPT ({prod_ps:.0f} ps, {prod_steps} steps) → "
+            f"{n_frames} frames every {traj_interval_ps:.0f} ps to {traj_out.name}",
+            flush=True,
+        )
+        for fi in range(n_frames):
+            sim.step(frame_steps)
+            fr = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+            writer.write_frame(fr.getPositions(asNumpy=True))
+        writer.close()
+    else:
+        print(f"  production NPT ({prod_ps:.0f} ps, {prod_steps} steps)", flush=True)
+        sim.step(prod_steps)
 
-    # Strip waters/ions/barostat, dump relaxed protein + ligand.
+    # Strip waters/ions/barostat, dump the final relaxed protein + ligand.
     final = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
     positions = final.getPositions(asNumpy=True)
-    top = modeller.topology
 
     write_protein_ligand_pdb(top, positions, out_pdb)
     print(f"  wrote {out_pdb} ({(time.time() - t0)/60:.1f} min total)", flush=True)
@@ -577,30 +612,32 @@ def _is_ligand_residue(residue) -> bool:
     return "CA" not in atom_names
 
 
-def write_protein_ligand_pdb(topology: app.Topology, positions, out_pdb: Path) -> None:
-    """Write only protein chains + ligand renamed to chain Z residue LIG; drop
-    water/ions. The Stage 2 / Stage 3 feature recompute keys off chain Z
-    residue 'LIG' to detect appended ligand atoms (see features.py
+def _heavy(atom) -> bool:
+    # Stage 2 anchor features were calibrated on RCSB PDBs that have no
+    # explicit hydrogens (cryo-EM α-syn entries are heavy-atom only). Strip
+    # Hs from the relaxed output so SASA / contact computations remain on
+    # the same axis. MD ran with explicit Hs (correct physics); the saved
+    # PDB just drops them for downstream feature recompute.
+    return atom.element is not None and atom.element.symbol != "H"
+
+
+def build_heavy_subtopology(topology: app.Topology) -> tuple[app.Topology, list[int]]:
+    """Build the heavy-atom protein + ligand sub-topology and the ordered
+    list of original atom indices that map into it. Protein chains keep
+    their ids; the ligand (any non-AA, non-solvent residue) is collected
+    onto chain Z residue LIG. Returns (sub_top, add_order) so a single
+    frame or a whole trajectory can be written against one fixed topology
+    (atom order is identical frame-to-frame).
+
+    The Stage 2 / Stage 3 feature recompute keys off chain Z residue 'LIG'
+    to detect appended ligand atoms (see features.py
     _stage3_ligand_heavy_coords), so we restore that convention here."""
-    keep_atoms: list[int] = []
     ligand_res_atoms: list = []
     for residue in topology.residues():
         if residue.name in SOLVENT_RESNAMES:
             continue
         if _is_ligand_residue(residue):
             ligand_res_atoms.extend(residue.atoms())
-        else:
-            keep_atoms.extend(a.index for a in residue.atoms())
-
-    keep_set = set(keep_atoms) | {a.index for a in ligand_res_atoms}
-
-    # Stage 2 anchor features were calibrated on RCSB PDBs that have no
-    # explicit hydrogens (cryo-EM α-syn entries are heavy-atom only). Strip
-    # Hs from the relaxed output so SASA / contact computations remain on
-    # the same axis. MD ran with explicit Hs (correct physics); the saved
-    # PDB just drops them for downstream feature recompute.
-    def _heavy(atom) -> bool:
-        return atom.element is not None and atom.element.symbol != "H"
 
     sub_top = app.Topology()
     atom_map: dict[int, app.topology.Atom] = {}
@@ -639,11 +676,49 @@ def write_protein_ligand_pdb(topology: app.Topology, positions, out_pdb: Path) -
         if a.index in atom_map and b.index in atom_map:
             sub_top.addBond(atom_map[a.index], atom_map[b.index])
 
-    sub_pos = np.array([positions[i].value_in_unit(u.nanometer) for i in add_order]) * u.nanometer
+    return sub_top, add_order
+
+
+def _subset_positions(positions, add_order: list[int]):
+    return np.array([positions[i].value_in_unit(u.nanometer) for i in add_order]) * u.nanometer
+
+
+def write_protein_ligand_pdb(topology: app.Topology, positions, out_pdb: Path) -> None:
+    """Write only protein chains + ligand renamed to chain Z residue LIG; drop
+    water/ions."""
+    sub_top, add_order = build_heavy_subtopology(topology)
+    sub_pos = _subset_positions(positions, add_order)
 
     out_pdb.parent.mkdir(parents=True, exist_ok=True)
     with out_pdb.open("w") as f:
         app.PDBFile.writeFile(sub_top, sub_pos, f, keepIds=True)
+
+
+class HeavyTrajectoryWriter:
+    """Append heavy-atom protein+ligand frames to a multi-MODEL PDB during
+    production MD. The sub-topology is built once from the full system
+    topology, so every MODEL shares the same atom order — dwell_time.py
+    reads each MODEL back as one frame and scores it with shape_metrics.
+
+    Frames carry only heavy atoms on the same chain/residue convention as
+    write_protein_ligand_pdb (chain Z LIG ligand), so per-frame Stage 2 /
+    shape scoring sees exactly what the single-frame relaxed PDB shows."""
+
+    def __init__(self, out_pdb: Path, topology: app.Topology):
+        self.sub_top, self.add_order = build_heavy_subtopology(topology)
+        out_pdb.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = out_pdb.open("w")
+        app.PDBFile.writeHeader(self.sub_top, self._fh)
+        self._n = 0
+
+    def write_frame(self, positions) -> None:
+        self._n += 1
+        sub_pos = _subset_positions(positions, self.add_order)
+        app.PDBFile.writeModel(self.sub_top, sub_pos, self._fh, modelIndex=self._n, keepIds=True)
+
+    def close(self) -> None:
+        app.PDBFile.writeFooter(self.sub_top, self._fh)
+        self._fh.close()
 
 
 def main() -> None:
@@ -684,7 +759,22 @@ def main() -> None:
                         "(default: all chains)")
     p.add_argument("--restrain-k", type=float, default=1000.0,
                    help="harmonic restraint constant in kJ/mol/nm²")
+    p.add_argument("--seed", type=int, default=None,
+                   help="random seed for the Langevin integrator, barostat, and "
+                        "production velocities. Same seed → identical trajectory; "
+                        "different seed → an independent thermal replica. Used by "
+                        "the dwell-time channel (dwell_time.py) for velocity-seeded "
+                        "replicas. Default: OpenMM picks its own (single-shot mode).")
+    p.add_argument("--traj-out", type=Path, default=None,
+                   help="write a multi-MODEL PDB of heavy-atom protein+ligand "
+                        "frames sampled every --traj-interval-ps during production. "
+                        "Each MODEL is one dwell-time frame.")
+    p.add_argument("--traj-interval-ps", type=float, default=0.0,
+                   help="ps between trajectory frames (requires --traj-out)")
     args = p.parse_args()
+
+    if args.traj_out is not None and args.traj_interval_ps <= 0:
+        p.error("--traj-out requires a positive --traj-interval-ps")
 
     if (args.complex_pdb is None) == (args.apo_pdb is None):
         p.error("exactly one of --complex-pdb or --apo-pdb must be provided")
@@ -710,6 +800,9 @@ def main() -> None:
         restrain_range=parse_residue_range(args.restrain_residues),
         restrain_chains=parse_chain_set(args.restrain_chains),
         restrain_k=args.restrain_k,
+        seed=args.seed,
+        traj_out=args.traj_out,
+        traj_interval_ps=args.traj_interval_ps,
     )
 
 
