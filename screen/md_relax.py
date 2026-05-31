@@ -636,6 +636,168 @@ def run_dynamics(
 
 
 # -----------------------------------------------------------------------------
+# Resumable chunk dynamics (portable State; distributable chunks — issue #34).
+#
+# A replica's production is split so it can be advanced in small, independent
+# steps that any machine can run with pip-only OpenMM:
+#   build (--prepare-only)  → system.xml + solvated.pdb        (once per shape/ligand)
+#   equilibrate_chunk       → state_0.xml                       (per replica seed)
+#   segment_chunk × K       → state_{i+1}.xml + seg_i frames    (chain within a replica)
+# Continuation state travels as a serialised OpenMM State (positions/velocities/
+# box) — portable, unlike a machine-specific binary Checkpoint. The System
+# (forces) travels separately as system.xml. The barostat is re-added identically
+# in both steps so the physics matches; the Langevin noise is memoryless, so a
+# fresh per-step --seed is a valid continuation, not a discontinuity.
+# -----------------------------------------------------------------------------
+
+def serialize_state(sim, state_xml: Path) -> Path:
+    """Serialise positions + velocities + box to portable State XML so another
+    machine can continue the run with pip-only OpenMM."""
+    state = sim.context.getState(getPositions=True, getVelocities=True)
+    Path(state_xml).parent.mkdir(parents=True, exist_ok=True)
+    Path(state_xml).write_text(openmm.XmlSerializer.serialize(state), encoding="utf-8")
+    return Path(state_xml)
+
+
+def restore_state(sim, state_xml: Path) -> None:
+    state = openmm.XmlSerializer.deserialize(Path(state_xml).read_text(encoding="utf-8"))
+    sim.context.setState(state)
+
+
+def add_production_barostat(system, *, pressure_atm: float, temperature_k: float, seed: int | None):
+    """Add the same MonteCarloBarostat run_dynamics uses, so equilibrate/segment
+    chunks share identical NPT physics."""
+    barostat = openmm.MonteCarloBarostat(pressure_atm * u.atmosphere, temperature_k * u.kelvin, 25)
+    if seed is not None:
+        barostat.setRandomNumberSeed(int(seed))
+    system.addForce(barostat)
+    return barostat
+
+
+def equilibrate_chunk(
+    state_out: Path,
+    system_xml: Path,
+    solvated_pdb: Path,
+    *,
+    equil_ps: float,
+    temperature_k: float,
+    pressure_atm: float,
+    timestep_fs: float,
+    report_interval_ps: float,
+    seed: int | None,
+    t0: float | None = None,
+) -> None:
+    """Chunk step 'equilibrate': from a built system (system_xml + solvated_pdb),
+    minimise → NVT warm-up → add barostat → NPT equilibrate, then serialise the
+    end State to state_out. Velocity-seeded per replica. Pip-only OpenMM."""
+    if t0 is None:
+        t0 = time.time()
+    print(f"=== md_relax (equilibrate chunk): {Path(system_xml).name} ===", flush=True)
+    topology, positions, system = load_prepared_system(Path(system_xml), Path(solvated_pdb))
+    print(f"  loaded {system.getNumParticles()} particles", flush=True)
+
+    integrator = openmm.LangevinMiddleIntegrator(
+        temperature_k * u.kelvin, 1.0 / u.picosecond, timestep_fs * u.femtosecond)
+    if seed is not None:
+        integrator.setRandomNumberSeed(int(seed))
+    platform, props = pick_platform()
+    print(f"  platform: {platform.getName()} (props={props})", flush=True)
+    sim = app.Simulation(topology, system, integrator, platform, props)
+    sim.context.setPositions(positions)
+
+    print("  minimizing...", flush=True)
+    sim.minimizeEnergy(maxIterations=10000)
+
+    # NVT thermalization ramp at small dt (mirrors run_dynamics), before NPT.
+    warmup_dt_fs = 0.5
+    warmup_steps_per_ps = int(round(1000.0 / warmup_dt_fs))
+    integrator.setStepSize(warmup_dt_fs * u.femtosecond)
+    for warmup_t in (50.0, 150.0, temperature_k):
+        integrator.setTemperature(warmup_t * u.kelvin)
+        sim.context.setVelocitiesToTemperature(warmup_t * u.kelvin)
+        sim.step(warmup_steps_per_ps)
+    print(f"  warmup: 3 ps NVT ramp 50→150→{temperature_k:.0f} K at 0.5 fs", flush=True)
+
+    add_production_barostat(system, pressure_atm=pressure_atm, temperature_k=temperature_k, seed=seed)
+    sim.context.reinitialize(preserveState=True)
+    integrator.setStepSize(timestep_fs * u.femtosecond)
+    if seed is not None:
+        sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin, int(seed))
+    else:
+        sim.context.setVelocitiesToTemperature(temperature_k * u.kelvin)
+
+    steps_per_ps = int(round(1000.0 / timestep_fs))
+    report_every = max(1, int(round(report_interval_ps * steps_per_ps)))
+    equil_steps = int(round(equil_ps * steps_per_ps))
+    sim.reporters.append(app.StateDataReporter(
+        sys.stdout, report_every, step=True, potentialEnergy=True,
+        temperature=True, volume=True, speed=True, elapsedTime=True))
+    print(f"  equilibration NPT ({equil_ps:.0f} ps, {equil_steps} steps)", flush=True)
+    sim.step(equil_steps)
+
+    serialize_state(sim, Path(state_out))
+    print(f"  wrote {Path(state_out).name} ({(time.time() - t0)/60:.1f} min total)", flush=True)
+
+
+def segment_chunk(
+    state_out: Path,
+    seg_out: Path,
+    system_xml: Path,
+    solvated_pdb: Path,
+    state_in: Path,
+    *,
+    segment_ps: float,
+    traj_interval_ps: float,
+    temperature_k: float,
+    pressure_atm: float,
+    timestep_fs: float,
+    report_interval_ps: float,
+    seed: int | None,
+    t0: float | None = None,
+) -> None:
+    """Chunk step 'segment': continue a replica from state_in for segment_ps,
+    dumping heavy-atom frames to seg_out, then serialise state_out. No minimise/
+    warm-up/equilibrate — velocities come from state_in. Pip-only OpenMM."""
+    if t0 is None:
+        t0 = time.time()
+    print(f"=== md_relax (segment chunk): {Path(state_in).name} → {Path(state_out).name} ===", flush=True)
+    topology, positions, system = load_prepared_system(Path(system_xml), Path(solvated_pdb))
+    add_production_barostat(system, pressure_atm=pressure_atm, temperature_k=temperature_k, seed=seed)
+
+    integrator = openmm.LangevinMiddleIntegrator(
+        temperature_k * u.kelvin, 1.0 / u.picosecond, timestep_fs * u.femtosecond)
+    if seed is not None:
+        integrator.setRandomNumberSeed(int(seed))
+    platform, props = pick_platform()
+    print(f"  platform: {platform.getName()} (props={props})", flush=True)
+    sim = app.Simulation(topology, system, integrator, platform, props)
+    sim.context.setPositions(positions)
+    restore_state(sim, Path(state_in))
+
+    steps_per_ps = int(round(1000.0 / timestep_fs))
+    seg_steps = int(round(segment_ps * steps_per_ps))
+    frame_steps = max(1, int(round(traj_interval_ps * steps_per_ps)))
+    n_frames = max(1, seg_steps // frame_steps)
+    report_every = max(1, int(round(report_interval_ps * steps_per_ps)))
+    sim.reporters.append(app.StateDataReporter(
+        sys.stdout, report_every, step=True, potentialEnergy=True,
+        temperature=True, volume=True, speed=True, elapsedTime=True))
+
+    writer = HeavyTrajectoryWriter(Path(seg_out), topology)
+    print(f"  segment NPT ({segment_ps:.0f} ps, {seg_steps} steps) → "
+          f"{n_frames} frames every {traj_interval_ps:.0f} ps to {Path(seg_out).name}", flush=True)
+    for _ in range(n_frames):
+        sim.step(frame_steps)
+        fr = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+        writer.write_frame(fr.getPositions(asNumpy=True))
+    writer.close()
+
+    serialize_state(sim, Path(state_out))
+    print(f"  wrote {Path(seg_out).name} + {Path(state_out).name} "
+          f"({(time.time() - t0)/60:.1f} min total)", flush=True)
+
+
+# -----------------------------------------------------------------------------
 # Main relaxation pipeline.
 # -----------------------------------------------------------------------------
 
@@ -951,7 +1113,50 @@ def main() -> None:
                         "+ padding per axis) instead of a cube sized to the largest "
                         "dimension. ~7× fewer atoms for an elongated β-strand "
                         "construct — keeps one dwell chunk on a basic GPU.")
+    # Resumable chunk modes (distributable per-replica steps; issue #34). Both
+    # consume a built system (--system-xml + --solvated-pdb from --prepare-only).
+    p.add_argument("--equilibrate", type=Path, default=None, metavar="STATE_OUT",
+                   help="chunk step: minimise + NVT warm-up + NPT equilibrate the "
+                        "built system, serialise the end State to STATE_OUT. "
+                        "Requires --system-xml/--solvated-pdb; velocity-seeded via --seed.")
+    p.add_argument("--segment", action="store_true",
+                   help="chunk step: continue a replica from --state-in for "
+                        "--segment-ps, dump frames to --seg-out, serialise --state-out. "
+                        "Requires --system-xml/--solvated-pdb/--state-in/--state-out/--seg-out.")
+    p.add_argument("--state-in", type=Path, default=None,
+                   help="input serialised State for --segment (from equilibrate or a prior segment)")
+    p.add_argument("--state-out", type=Path, default=None,
+                   help="output serialised State for --segment")
+    p.add_argument("--seg-out", type=Path, default=None,
+                   help="output multi-MODEL frame PDB for --segment")
+    p.add_argument("--segment-ps", type=float, default=100.0,
+                   help="ps of production per --segment step")
     args = p.parse_args()
+
+    # --- Resumable chunk dispatch (pip-only; needs a built --system-xml). ---
+    if args.equilibrate is not None or args.segment:
+        if args.system_xml is None or args.solvated_pdb is None:
+            p.error("--equilibrate/--segment require --system-xml and --solvated-pdb")
+        if args.equilibrate is not None:
+            equilibrate_chunk(
+                args.equilibrate, args.system_xml, args.solvated_pdb,
+                equil_ps=args.equil_ps, temperature_k=args.temperature_k,
+                pressure_atm=args.pressure_atm, timestep_fs=args.timestep_fs,
+                report_interval_ps=args.report_interval_ps, seed=args.seed,
+            )
+            return
+        if not all((args.state_in, args.state_out, args.seg_out)):
+            p.error("--segment requires --state-in, --state-out and --seg-out")
+        if args.traj_interval_ps <= 0:
+            p.error("--segment requires a positive --traj-interval-ps")
+        segment_chunk(
+            args.state_out, args.seg_out, args.system_xml, args.solvated_pdb, args.state_in,
+            segment_ps=args.segment_ps, traj_interval_ps=args.traj_interval_ps,
+            temperature_k=args.temperature_k, pressure_atm=args.pressure_atm,
+            timestep_fs=args.timestep_fs, report_interval_ps=args.report_interval_ps,
+            seed=args.seed,
+        )
+        return
 
     if args.traj_out is not None and args.traj_interval_ps <= 0:
         p.error("--traj-out requires a positive --traj-interval-ps")
