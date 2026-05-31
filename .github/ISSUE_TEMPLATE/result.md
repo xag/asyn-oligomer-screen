@@ -5,6 +5,10 @@ title: ''
 labels: result
 ---
 
+<!-- A result records a completed run — it has no to-do, so CLOSE it on creation
+     (reason: completed). Open = an open loop that needs attention; a result needs
+     none. The body is the permanent record; the README synthesises it. See CLAUDE.md. -->
+
 <!-- One-line headline. -->
 
 ## Why it matters

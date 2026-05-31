@@ -46,8 +46,14 @@ where. Two habits create every stale-duplicate trace; both are banned:
   coexist with no signal which is current, and a cold reader quotes the
   confident-sounding stale one. **Issue comments are for discussion / decisions-
   in-progress only — never status, progress, or audit logs.** An issue's current
-  state lives *only in its body*, overwritten in place; "done" is expressed by
-  **closing** the issue. Open/closed + labels *are* the status.
+  state lives *only in its body*, overwritten in place. **Open/closed carries one
+  meaning across every label: open = an open loop that needs attention, closed =
+  settled** — so the open set *is* the worklist. `next-step` open = to-do,
+  `decision` open = undecided, `caveat` open = active concern; each is **closed**
+  when handled. A **`result` is a record of a completed run — it has no to-do, so
+  it is filed *closed* on creation** (an open `result` reads as work you owe and
+  pollutes the worklist). The README is the readable synthesis; closed `result`
+  issues are the queryable record behind it.
 - **Copies** — the same claim in a body *and* a comment, or in two issues, or
   issue + doc. They drift apart. One owner per fact; everywhere else links.
 
