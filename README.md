@@ -477,7 +477,7 @@ Each top-level directory carries a `README.md` describing its contents:
 [results/](results/) (calibration outputs, ensemble, sweep),
 [bin/](bin/) (Vina binary).
 
-The [GitHub issue tracker](https://github.com/xag/asyn-oligomer-screen/issues) is the source of truth for results, next moves, open decisions, and caveats (labelled `result` / `next-step` / `decision` / `caveat`), including framework fixes, abandoned approaches, and the reasoning behind every choice. It is the natural entry point for anyone extending the work.
+The [GitHub issue tracker](https://github.com/xag/asyn-oligomer-screen/issues) is the source of truth for results, objectives, open decisions, and caveats (labelled `result` / `objective` / `decision` / `caveat`; the open `objective` set is the worklist), including framework fixes, abandoned approaches, and the reasoning behind every choice. It is the natural entry point for anyone extending the work.
 
 ## 10. References
 

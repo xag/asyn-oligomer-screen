@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Project entry point
-    url: https://github.com/xag/asyn-oligomer-screen/blob/main/STATUS.md
-    about: Read STATUS.md first for the three-step project shape and current state.
+    url: https://github.com/xag/asyn-oligomer-screen/blob/main/CLAUDE.md
+    about: Read CLAUDE.md + README.md for the three-step project shape; the open issues are the worklist.
