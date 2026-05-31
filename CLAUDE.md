@@ -38,6 +38,26 @@ layers it touches, **in the same change set**:
 repo. The moment such a list starts forming in a doc it drifts and goes stale —
 link to the issue label instead.
 
+**Status lives in one mutable slot — never append-only, never copied.** Most
+status ("we're leaning 10–20 ns", "X is the gate", "blocked on Y") is judgment,
+not something you can probe — so it *must* be written, and the only question is
+where. Two habits create every stale-duplicate trace; both are banned:
+- **Append-only writes** — issue *comments* and "update: …" notes. Old and new
+  coexist with no signal which is current, and a cold reader quotes the
+  confident-sounding stale one. **Issue comments are for discussion / decisions-
+  in-progress only — never status, progress, or audit logs.** An issue's current
+  state lives *only in its body*, overwritten in place; "done" is expressed by
+  **closing** the issue. Open/closed + labels *are* the status.
+- **Copies** — the same claim in a body *and* a comment, or in two issues, or
+  issue + doc. They drift apart. One owner per fact; everywhere else links.
+
+The cross-cutting **"what's next" is derived, not authored**: make blockers
+explicit with a `Blocked-by #N` line in the body, then "what's next" = open
+`next-step` issues with no open blocker (a `gh` query over the dependency graph).
+Don't hand-maintain a critical-path narrative — that's the STATUS.md trap again.
+Establish current *mechanical* state (env / artifacts / tests) by **running the
+check**, never by reading what a past session wrote about it.
+
 **Prefer subtractive edits.** Many doc updates should make the file *shorter*,
 not longer. When a caveat, limitation, or reproduction note in the README is
 resolved or superseded, **delete it** rather than appending a "done /
