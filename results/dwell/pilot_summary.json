@@ -1,0 +1,155 @@
+{
+  "config": {
+    "shapes": [
+      "fusco_parallel_3mer_core70-88_relaxed"
+    ],
+    "ligands": [
+      "silibinin",
+      "caffeine"
+    ],
+    "n_replicas": 2,
+    "prod_ns": 0.1,
+    "frame_interval_ps": 20.0,
+    "rmsd_max": 3.0,
+    "jaccard_min": 0.5,
+    "min_occupancy": 0.5
+  },
+  "pairs": [
+    {
+      "reference": "apo_core58-102.pdb",
+      "apo_dwell": [
+        0.6,
+        0.6
+      ],
+      "complex_dwell": [
+        1.0,
+        1.0
+      ],
+      "apo_scores": [
+        {
+          "traj": "apo_rep00.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 0.6,
+          "occupancy": NaN,
+          "n_bound": 5,
+          "mean_rmsd": 2.92640297016116,
+          "mean_jaccard": 0.8151092080520964
+        },
+        {
+          "traj": "apo_rep01.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 0.6,
+          "occupancy": NaN,
+          "n_bound": 5,
+          "mean_rmsd": 2.989590057282878,
+          "mean_jaccard": 0.8114933465235519
+        }
+      ],
+      "complex_scores": [
+        {
+          "traj": "silibinin_rep00.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 1.0,
+          "occupancy": 1.0,
+          "n_bound": 5,
+          "mean_rmsd": 2.2097217909592617,
+          "mean_jaccard": 0.8097945761107187
+        },
+        {
+          "traj": "silibinin_rep01.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 1.0,
+          "occupancy": 1.0,
+          "n_bound": 5,
+          "mean_rmsd": 2.0893987873152673,
+          "mean_jaccard": 0.825806773175854
+        }
+      ],
+      "bootstrap": {
+        "shift": 0.4,
+        "ci_low": 0.4,
+        "ci_high": 0.4,
+        "prob_destabiliser": 0.0,
+        "prob_stabiliser": 1.0,
+        "classification": "stabiliser",
+        "n_apo": 2,
+        "n_complex": 2,
+        "n_dropped_apo": 0,
+        "n_dropped_complex": 0,
+        "ligand_present": true,
+        "mean_complex_occupancy": 1.0,
+        "occupancy_ok": true
+      },
+      "shape": "fusco_parallel_3mer_core70-88_relaxed",
+      "ligand": "silibinin"
+    },
+    {
+      "reference": "apo_core58-102.pdb",
+      "apo_dwell": [
+        0.6,
+        0.6
+      ],
+      "complex_dwell": [
+        1.0,
+        1.0
+      ],
+      "apo_scores": [
+        {
+          "traj": "apo_rep00.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 0.6,
+          "occupancy": NaN,
+          "n_bound": 5,
+          "mean_rmsd": 2.92640297016116,
+          "mean_jaccard": 0.8151092080520964
+        },
+        {
+          "traj": "apo_rep01.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 0.6,
+          "occupancy": NaN,
+          "n_bound": 5,
+          "mean_rmsd": 2.989590057282878,
+          "mean_jaccard": 0.8114933465235519
+        }
+      ],
+      "complex_scores": [
+        {
+          "traj": "caffeine_rep00.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 1.0,
+          "occupancy": 1.0,
+          "n_bound": 5,
+          "mean_rmsd": 2.2722382579292484,
+          "mean_jaccard": 0.8137497052723731
+        },
+        {
+          "traj": "caffeine_rep01.pdb",
+          "n_frames": 5,
+          "dwell_fraction": 1.0,
+          "occupancy": 1.0,
+          "n_bound": 5,
+          "mean_rmsd": 2.0471693882304125,
+          "mean_jaccard": 0.8077028228341288
+        }
+      ],
+      "bootstrap": {
+        "shift": 0.4,
+        "ci_low": 0.4,
+        "ci_high": 0.4,
+        "prob_destabiliser": 0.0,
+        "prob_stabiliser": 1.0,
+        "classification": "stabiliser",
+        "n_apo": 2,
+        "n_complex": 2,
+        "n_dropped_apo": 0,
+        "n_dropped_complex": 0,
+        "ligand_present": true,
+        "mean_complex_occupancy": 1.0,
+        "occupancy_ok": true
+      },
+      "shape": "fusco_parallel_3mer_core70-88_relaxed",
+      "ligand": "caffeine"
+    }
+  ]
+}

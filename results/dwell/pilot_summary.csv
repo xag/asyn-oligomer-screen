@@ -1,0 +1,3 @@
+shape,ligand,dwell_shift,ci_low,ci_high,classification,prob_destabiliser,prob_stabiliser,mean_complex_occupancy,occupancy_ok,n_apo,n_complex
+fusco_parallel_3mer_core70-88_relaxed,silibinin,0.4000,0.4000,0.4000,stabiliser,0.0000,1.0000,1.0000,True,2,2
+fusco_parallel_3mer_core70-88_relaxed,caffeine,0.4000,0.4000,0.4000,stabiliser,0.0000,1.0000,1.0000,True,2,2
