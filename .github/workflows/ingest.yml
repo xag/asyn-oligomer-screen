@@ -1,0 +1,32 @@
+name: ingest dwell-time contributions
+
+# Plugged-in coordinator (#34): on a schedule, pull contributor submissions from the
+# dataset repo, verify them (SHA-256 + >=N observable agreement), and write the accepted
+# results into the dataset's authoritative artifacts/ + manifest — no machine to babysit.
+# Requires repo secret HF_TOKEN with write access to the dataset repo.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      min_agree:
+        description: "min independent submissions that must agree before accepting"
+        default: "1"
+
+concurrency:            # never let two ingests race on the manifest
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install huggingface_hub numpy biopython   # scoring is pure geometry, no OpenMM/GPU
+      - name: ingest
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python screen/hf_store.py ingest apo_calib_001 --repo xagg/asyn-dwell-results --min-agree ${{ inputs.min_agree || '1' }}
