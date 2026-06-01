@@ -469,6 +469,21 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
     --equil-ps 20 --prod-ps 60 --traj-out <pair>_rep00.pdb --traj-interval-ps 20
 ```
 
+**Crowdsourced result store** ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). Distribute the chunked sweep through a public Hugging Face Dataset repo:
+
+```bash
+# maintainer (full env): author locally, then publish the runnable chunks' inputs
+.venv/bin/python screen/run_chunks.py create <exp> --shape <shape> --apo --replicas N --prod-ps P
+.venv/bin/python screen/hf_store.py publish <exp> --repo <user>/asyn-dwell-results
+
+# contributor (anywhere; pip-only openmm + huggingface_hub, `hf auth login` once): pull / run / upload
+.venv/bin/python screen/hf_store.py work <exp> --repo <user>/asyn-dwell-results --pr
+
+# maintainer: accept results with >=2 independent submissions agreeing, then re-publish + score
+.venv/bin/python screen/hf_store.py ingest <exp> --repo <user>/asyn-dwell-results --min-agree 2
+.venv/bin/python screen/run_chunks.py score <exp>
+```
+
 Each top-level directory carries a `README.md` describing its contents:
 [scoring/](scoring/) (activity score + calibration),
 [oligomers/](oligomers/) (toxic-oligomer model construction),
