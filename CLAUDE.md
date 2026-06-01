@@ -100,10 +100,8 @@ the reader sees) stays stale.
   path except `--prepare-only` stays pip-only.
 - **Distributed-chunk direction:** the dwell-time MD splits into independent
   per-replica chunks small enough for a volunteer's basic GPU (truncate to the NAC
-  core + `md_relax --rect-box` → ~55k atoms), with central GPU-free scoring via
-  `dwell_time.py score`. The result store is a public Hugging Face Dataset repo
-  (`screen/hf_store.py`, README §9); the contributor front door (one-click
-  submission app) lives in the `health` project — tracked in
+  core + `md_relax --rect-box` → ~55k atoms), scored centrally GPU-free
+  (`dwell_time.py score`). Distribution + contributor front door:
   [#34](https://github.com/xag/asyn-oligomer-screen/issues/34) / [#43](https://github.com/xag/asyn-oligomer-screen/issues/43).
 - Windows host: scripts that print non-ASCII (β, Å, →) must reconfigure stdout
   to UTF-8 in `main()` (cp1252 console + redirect/capture otherwise crashes).
