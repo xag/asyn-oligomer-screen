@@ -188,16 +188,18 @@ def _run(cmd: list[str], tag: str) -> None:
         raise RuntimeError(f"{tag} failed (exit {res.returncode})")
 
 
-def execute_chunk(exp_id: str, manifest: dict, ch: dict) -> dict[str, Path]:
+def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
     """Run the md_relax step for one chunk; return {artifact_id: produced file}.
-    Output files land in the experiment scratch dir; push() content-addresses them."""
-    scratch = store.experiment_dir(exp_id) / "_scratch"
+
+    ``infile(aid)`` resolves a consumed artifact id to a readable local path and
+    ``scratch`` is where outputs are written — both supplied by the caller, so the
+    same execution path serves the local worker (inputs from the on-disk store) and
+    a remote contributor (inputs downloaded from the coordinator). No store access
+    here; ``push`` / the coordinator content-addresses the returned files."""
+    scratch = Path(scratch)
     scratch.mkdir(parents=True, exist_ok=True)
     p = ch["params"]
     kind = ch["kind"]
-
-    def infile(aid: str) -> Path:
-        return store.artifact_file(exp_id, manifest, aid)
 
     if kind == "build":
         core = infile(ch["consumes"][0])
@@ -252,8 +254,10 @@ def cmd_work(args) -> None:
         manifest = store.load_manifest(args.exp_id)
         print(f"\n=== chunk {ch['id']} [{ch['kind']}] ===", flush=True)
         t0 = time.time()
+        scratch = store.experiment_dir(args.exp_id) / "_scratch"
+        infile = lambda aid: store.artifact_file(args.exp_id, manifest, aid)  # noqa: E731
         try:
-            outputs = execute_chunk(args.exp_id, manifest, ch)
+            outputs = execute_chunk(ch, infile, scratch)
         except Exception as e:  # noqa: BLE001 — record + move on
             store.mark_failed(args.exp_id, ch["id"], repr(e))
             print(f"  FAILED: {e}", flush=True)
