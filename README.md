@@ -1,6 +1,6 @@
 # asyn-oligomer-screen
 
-**Computational screen of dietary and endogenous molecules against the toxic α-synuclein oligomer in Parkinson's disease.**
+**Computational screen of dietary and endogenous molecules for their effect on the toxic α-synuclein oligomer in Parkinson's disease.**
 
 > *This repository is computational research output. Nothing in it constitutes medical, dietary, or clinical advice. The rankings are unvalidated hypotheses pending experimental testing.*
 
@@ -10,7 +10,7 @@
 
 ## Plain English Summary
 
-A computational search for dietary, endogenous, and lifestyle-accessible small molecules that may bind and destabilise the toxic α-synuclein oligomer implicated in Parkinson's disease. No atomic structure of that oligomer has been deposited, so the receptor is built from the published topology constraints; ~190 candidates are then docked against it and ranked.
+A computational search for dietary, endogenous, and lifestyle-accessible small molecules that bind the toxic α-synuclein oligomer implicated in Parkinson's disease and shift its stability — in either direction. A molecule that destabilises the toxic shape is a protective hypothesis (to seek out); one that stabilises it is a harmful anti-target (to limit). Both directions are first-class outputs. No atomic structure of that oligomer has been deposited, so the receptor is built from the published topology constraints; ~190 candidates are then docked against it and ranked.
 
 The five top hits are known α-synuclein modulators (silibinin, EGCG, fisetin, curcumin, baicalein), which serves as a sanity check. The next tier contains molecules with no prior published evidence for direct α-synuclein binding: a vitamin A metabolite, two endogenous steroid hormones (DHEA, allopregnanolone), THC, piperine, urolithin A, and trehalose. These are hypotheses for orthogonal experimental testing, not clinical recommendations.
 
