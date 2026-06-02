@@ -1,0 +1,37 @@
+name: coordinate dwell-time crowdsource
+
+# The unattended coordinator loop (#43): accept contributors' submissions by the
+# reputation-weighted, distinct-pseudonym quorum, then fold the resulting
+# outcomes into reputations.json. Both steps are GPU-free, so a small hourly CI
+# job suffices. Spot-checks (which re-run MD) stay a manual/heavier step.
+on:
+  schedule:
+    - cron: "17 * * * *"   # hourly
+  workflow_dispatch: {}
+
+# Don't pile up overlapping coordinator runs (they commit to the same dataset).
+concurrency:
+  group: coordinate
+  cancel-in-progress: false
+
+jobs:
+  ingest-and-fold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Lean: ingest's scorer needs only biopython + numpy; fold needs only the hub.
+      - run: pip install --quiet huggingface_hub biopython numpy
+      - name: ingest (accept by weighted quorum) + fold (outcomes -> reputations.json)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          REPO: ${{ vars.SCREEN_DATASET_REPO }}
+          EXP: ${{ vars.SCREEN_EXP_ID }}
+        run: |
+          python screen/hf_store.py ingest "$EXP" --repo "$REPO" --quorum-weight 1.0
+          python screen/reputation.py fold --repo "$REPO" \
+            --bonus-url "$SITE_URL/screen?action=bonus&secret=$CRON_SECRET"
