@@ -19,7 +19,9 @@ independent — the workload fans out wide. See the approved plan and #34.
 from __future__ import annotations
 
 import argparse
+import collections
 import math
+import os
 import subprocess
 import sys
 import time
@@ -178,14 +180,20 @@ def _conda_python() -> str:
 
 
 def _run(cmd: list[str], tag: str) -> None:
-    print(f"  $ {' '.join(cmd)}", flush=True)
-    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if res.stdout:
-        for line in res.stdout.splitlines():
-            print(f"  md > {line}", flush=True)
-    if res.returncode != 0:
-        sys.stderr.write(res.stderr or "")
-        raise RuntimeError(f"{tag} failed (exit {res.returncode})")
+    # Stream the child's output live (unbuffered) so a contributor sees the MD
+    # heartbeat — step, speed, elapsed — as it happens, instead of silence until
+    # the chunk ends. Keep a tail of recent lines for the error message.
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    tail = collections.deque(maxlen=20)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
+    for line in proc.stdout:
+        line = line.rstrip()
+        tail.append(line)
+        print(f"  · {line}", flush=True)
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"{tag} failed (exit {proc.returncode}):\n" + "\n".join(tail))
 
 
 def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
@@ -222,7 +230,8 @@ def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
         cmd = [_venv_python(), str(MD_RELAX),
                "--system-xml", str(infile(sys_xml)), "--solvated-pdb", str(infile(solv)),
                "--equilibrate", str(out), "--equil-ps", str(p["equil_ps"]),
-               "--temperature-k", str(p["temperature_k"]), "--seed", str(p["seed"])]
+               "--temperature-k", str(p["temperature_k"]), "--seed", str(p["seed"]),
+               "--report-interval-ps", "2"]
         _run(cmd, ch["id"])
         return {state0: out}
 
@@ -236,7 +245,8 @@ def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
                "--state-in", str(infile(state_in)), "--state-out", str(out_state),
                "--seg-out", str(out_seg), "--segment-ps", str(p["segment_ps"]),
                "--traj-interval-ps", str(p["traj_interval_ps"]),
-               "--temperature-k", str(p["temperature_k"]), "--seed", str(p["seed"])]
+               "--temperature-k", str(p["temperature_k"]), "--seed", str(p["seed"]),
+               "--report-interval-ps", "2"]
         _run(cmd, ch["id"])
         return {state_out: out_state, seg_out: out_seg}
 
