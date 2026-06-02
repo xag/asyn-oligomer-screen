@@ -1,10 +1,10 @@
 """Contributor runner for the dwell-time screen (#43).
 
 Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine). No
-Hugging Face account and no email typed into the notebook: identity is paired
-from the website. The contributor sets a time budget; the runner pulls the
-simulation the screen needs next, runs it, sends the result back, and reports
-each step and the time spent so they can stop whenever they like.
+account, no email, no sign-in: it starts immediately with an anonymous session.
+The contributor sets a time budget; the runner pulls the simulation the screen
+needs next, runs it, sends the result back, and reports each step and the time
+spent so they can stop whenever they like.
 """
 from __future__ import annotations
 
@@ -50,27 +50,14 @@ def describe(chunk: dict) -> str:
     return kind
 
 
-# --- pairing: identity handed off from the website (no email typed here) -----
-
-def pair(health_url: str, *, poll_s: float = 3.0, timeout_s: float = 600.0) -> tuple[str, str]:
-    r = requests.post(health_url, params={"action": "pair_start"}, timeout=60)
+def start_session(health_url: str) -> str:
+    """Get an anonymous session token — instant, no account or email."""
+    r = requests.post(health_url, params={"action": "anon_session"}, timeout=60)
     r.raise_for_status()
     d = r.json()
-    if "verification_url" not in d:
-        raise RuntimeError(d.get("error", "pairing not available"))
-    print("Link this session to your account — open:\n"
-          f"    {d['verification_url']}\n"
-          "(you're already signed in there; just confirm). Waiting…", flush=True)
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        pr = requests.get(health_url, params={"action": "pair_poll", "code": d["code"]}, timeout=30).json()
-        if pr.get("status") == "linked":
-            print("Linked.\n", flush=True)
-            return pr["token"], pr.get("broker_url", "")
-        if pr.get("status") == "expired":
-            raise RuntimeError("pairing code expired — re-run to get a fresh one")
-        time.sleep(poll_s)
-    raise RuntimeError("pairing timed out — re-run to try again")
+    if "token" not in d:
+        raise RuntimeError(d.get("error", "could not start a session"))
+    return d["token"]
 
 
 # --- one pull → run → submit cycle ------------------------------------------
@@ -144,7 +131,7 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     Stops on the time budget, when there's no work, or when interrupted —
     always with a clear message, never an opaque loop."""
     print(_gpu_line(), flush=True)
-    token, _ = pair(health_url)
+    token = start_session(health_url)
 
     budget = max(1.0, float(minutes)) * 60.0
     start = time.time()
