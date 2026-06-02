@@ -60,6 +60,24 @@ def start_session(health_url: str) -> str:
     return d["token"]
 
 
+def show_claim_link(health_url: str, token: str) -> None:
+    """Show a one-click link to credit this (anonymous) session to the
+    contributor. Opens in a new tab and does nothing to the kernel, so the run
+    keeps going and they can return to the notebook. Optional — runs count
+    either way."""
+    url = f"{health_url}?action=claim&token={token}"
+    try:
+        from IPython.display import display, HTML
+        display(HTML(
+            '<div style="padding:10px;margin:6px 0;border:1px solid #6c6;border-radius:6px;background:#f3fff3">'
+            '🏅 <b>Optional — credit these runs to you:</b> '
+            f'<a href="{url}" target="_blank" rel="noopener">claim them &amp; build reputation</a> '
+            '<i>(opens a new tab; your notebook keeps running, just come back to it).</i></div>'))
+    except Exception:  # noqa: BLE001 — not in a notebook
+        print("Optional — credit these runs to you (opens in your browser, "
+              f"notebook keeps running):\n    {url}\n", flush=True)
+
+
 # --- one pull → run → submit cycle ------------------------------------------
 
 def dispatch(health_url: str, token: str, done: str | None = None) -> dict:
@@ -132,6 +150,7 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     always with a clear message, never an opaque loop."""
     print(_gpu_line(), flush=True)
     token = start_session(health_url)
+    show_claim_link(health_url, token)
 
     budget = max(1.0, float(minutes)) * 60.0
     start = time.time()
