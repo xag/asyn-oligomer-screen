@@ -13,6 +13,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -62,20 +63,17 @@ def start_session(health_url: str) -> str:
 
 def show_claim_link(health_url: str, token: str) -> None:
     """Show a one-click link to credit this (anonymous) session to the
-    contributor. Opens in a new tab and does nothing to the kernel, so the run
-    keeps going and they can return to the notebook. Optional — runs count
-    either way."""
+    contributor. Touches nothing in the kernel, so the run keeps going whether
+    or not they open it. Optional — runs count either way."""
     url = f"{health_url}?action=claim&token={token}"
     try:
         from IPython.display import display, HTML
         display(HTML(
             '<div style="padding:10px;margin:6px 0;border:1px solid #6c6;border-radius:6px;background:#f3fff3">'
             '🏅 <b>Optional — credit these runs to you:</b> '
-            f'<a href="{url}" target="_blank" rel="noopener">claim them &amp; build reputation</a> '
-            '<i>(opens a new tab; your notebook keeps running, just come back to it).</i></div>'))
+            f'<a href="{url}" target="_blank" rel="noopener">claim them &amp; build reputation</a></div>'))
     except Exception:  # noqa: BLE001 — not in a notebook
-        print("Optional — credit these runs to you (opens in your browser, "
-              f"notebook keeps running):\n    {url}\n", flush=True)
+        print(f"Optional — credit these runs to you:\n    {url}\n", flush=True)
 
 
 # --- one pull → run → submit cycle ------------------------------------------
@@ -159,6 +157,17 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     print(f"Running for up to {int(minutes)} min. Stop whenever you like — an "
           "unfinished task is simply reassigned, so nothing is wasted.\n", flush=True)
 
+    # Steady liveness line every 10 s. Two jobs: shows the run is alive between
+    # the MD heartbeats, and — since Colab redraws a cleared output only when new
+    # output arrives — makes the output reappear within seconds of coming back to
+    # the notebook, so it never looks cancelled.
+    stop_hb = threading.Event()
+
+    def _heartbeat():
+        while not stop_hb.wait(10):
+            print(f"  · still running — {_fmt(time.time() - start)} elapsed, {done_count} done", flush=True)
+    threading.Thread(target=_heartbeat, daemon=True).start()
+
     while True:
         remaining = budget - (time.time() - start)
         if remaining <= 0:
@@ -168,6 +177,7 @@ def contribute(health_url: str, minutes: float = 30) -> None:
         try:
             r = run_once(health_url, token, done=last_lease)
         except KeyboardInterrupt:
+            stop_hb.set()
             print("\nStopped. The current task will be reassigned.", flush=True)
             return
         except Exception as e:  # noqa: BLE001
@@ -182,6 +192,7 @@ def contribute(health_url: str, minutes: float = 30) -> None:
         last_lease = r["lease"]
         print(f"    so far this session: {done_count} simulation(s), {_fmt(compute)} of compute\n", flush=True)
 
+    stop_hb.set()
     print(f"\nThank you — you ran {done_count} simulation(s) ({_fmt(compute)} of compute).", flush=True)
 
 
