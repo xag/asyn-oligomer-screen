@@ -28,10 +28,10 @@ def _fmt(seconds: float) -> str:
 
 
 # Single output sink so the 10-second liveness dots never collide with real
-# log lines (the contributor's own messages AND the streamed MD lines, which we
-# route here via run_chunks._emit). A dot is written without a newline; real
-# text starts on a fresh line if dots were pending, so the log reads as
-# "....<line>" — not a line buried after a long dot trail.
+# log lines (the contributor-facing messages from describe() and the session).
+# A dot is written without a newline; real text starts on a fresh line if dots
+# were pending, so the log reads as "....<line>" — not a line buried after a
+# long dot trail.
 _out_lock = threading.Lock()
 _dots_pending = False
 
@@ -63,16 +63,34 @@ def _gpu_line() -> str:
     return "No GPU detected — set Runtime > Change runtime type > GPU (runs will be slow otherwise)."
 
 
+def _molecule(meta: dict) -> str:
+    """The candidate-molecule id (e.g. 'dopamine', 'l-dopa'), or '' for the apo
+    baseline arm — the id is already human-readable, so it's shown as-is."""
+    lig = meta.get("ligand", "") or ""
+    return "" if lig in ("", "apo") else lig
+
+
 def describe(chunk: dict) -> str:
-    """A plain-language line for what a chunk computes."""
-    p = chunk.get("params", {})
+    """A plain-language line saying, concretely, what this run simulates: the
+    toxic α-synuclein core on its own (the baseline) or with a candidate molecule
+    docked onto it, and which stage of the simulation it is."""
+    meta = chunk.get("meta", {})
+    mol = _molecule(meta)
+    # The system under simulation, named the same way in every stage.
+    system = (f"α-synuclein with {mol} docked onto it" if mol
+              else "the α-synuclein baseline (no molecule)")
     kind = chunk["kind"]
     if kind == "build":
-        return "preparing the simulation system"
+        return (f"Setting up: docking {mol} onto the toxic α-synuclein core and "
+                "surrounding it with water." if mol
+                else "Setting up the baseline: the toxic α-synuclein core alone, "
+                     "surrounded with water.")
     if kind == "equilibrate":
-        return f"warming up a replica (seed {p.get('seed', '?')})"
+        return f"Warming up to body temperature: {system}."
     if kind == "segment":
-        return f"simulating dynamics — segment {p.get('index', '?')}, seed {p.get('seed', '?')}"
+        part = int(chunk.get("params", {}).get("index", 0)) + 1
+        return (f"Simulating {system} — watching whether the toxic shape holds "
+                f"or loosens (part {part}).")
     return kind
 
 
@@ -171,7 +189,12 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     """Pair, then run simulations for up to `minutes`, reporting progress.
     Stops on the time budget, when there's no work, or when interrupted —
     always with a clear message, never an opaque loop."""
-    run_chunks._emit = _say   # streamed MD lines share the sink (dot-safe output)
+    # The MD engine's own per-line output is deliberately not surfaced: it's
+    # low-level (atom counts, energies, scratch file names) and obscures what the
+    # contributor is actually doing. describe() says that in plain words and the
+    # heartbeat dots show it's alive; a failing chunk still reports a log tail
+    # (see run_chunks._run), so nothing diagnostic is lost.
+    run_chunks._emit = lambda *_: None
     _say(_gpu_line())
     token = start_session(health_url)
     show_claim_link(health_url, token)
