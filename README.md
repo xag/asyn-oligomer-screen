@@ -480,8 +480,12 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
 .venv/bin/python screen/hf_store.py work <exp> --repo <user>/asyn-dwell-results --pr
 
 # maintainer: accept results whose agreeing cluster clears the reputation-weighted
-# quorum (a fresh contributor counts 0.1), then re-publish + score
+# quorum (a fresh contributor counts 0.1), then fold the per-contributor outcomes
+# into reputations.json (cross-credit allowlisted contributors via the health
+# endpoint), then re-publish + score
 .venv/bin/python screen/hf_store.py ingest <exp> --repo <user>/asyn-dwell-results --quorum-weight 1.0
+.venv/bin/python screen/reputation.py fold --repo <user>/asyn-dwell-results \
+    --bonus-url "<SITE_URL>/screen?action=bonus&secret=<CRON_SECRET>"
 .venv/bin/python screen/run_chunks.py score <exp>
 ```
 
