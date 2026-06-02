@@ -1,27 +1,23 @@
 """Account-free contributor loop for the dwell-time screen (#43).
 
-This is what runs on a volunteer's GPU (a Colab/Kaggle free GPU, or their own
-machine). It needs no Hugging Face account and no write token — only an email,
-the same identity the health site already uses:
+Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine). It
+needs no Hugging Face account, no write token, and — crucially — no email typed
+into the notebook. Identity is handed off *from the app*: the runner pairs the
+session (a short code + a link the signed-in contributor opens on the site),
+receives a session token carrying only their pseudonym, then:
 
-  1. ask health for a work assignment (a signed lease + the chunk + where to
-     fetch its inputs from the *public* dataset);
-  2. download the inputs (plain HTTPS GET — public dataset, no auth);
-  3. run the MD step with the existing ``run_chunks.execute_chunk``;
-  4. POST the outputs + the lease to the broker, which verifies the lease and
-     writes them into the dataset's ``submissions/`` inbox.
+  1. asks health for an assignment with that token (health decides what to run);
+  2. downloads the chunk's inputs over plain HTTPS (public dataset, no auth);
+  3. runs the MD step via the existing ``run_chunks.execute_chunk``;
+  4. POSTs the outputs + lease to the broker (URL comes back in the dispatch
+     response), which writes them into the dataset's ``submissions/`` inbox.
 
-Health dispatch decides *what* to run (never the contributor), so a given email
-is never handed the same chunk twice and distinct contributors spread across
-distinct chunks. Acceptance happens later in ``hf_store ingest``.
-
-Usage:
-    python contribute_client.py --health-url https://<site>/screen \
-        --broker-url https://<space>.hf.space --email you@example.com --n 3
+Acceptance happens later in ``hf_store ingest``.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import tempfile
 import time
@@ -32,19 +28,41 @@ import requests
 import run_chunks
 
 
-def dispatch(health_url: str, email: str) -> dict:
-    """Request one assignment. Returns the JSON ('assigned' / 'idle' / 'busy')."""
-    r = requests.post(health_url, params={"action": "dispatch", "email": email}, timeout=60)
-    if r.status_code in (429, 503) or not r.ok:
-        try:
-            return r.json()
-        except Exception:  # noqa: BLE001
-            r.raise_for_status()
+# --- pairing: get a session token without typing an email --------------------
+
+def pair(health_url: str, *, poll_s: float = 3.0, timeout_s: float = 600.0) -> tuple[str, str]:
+    """Hand identity off to the app. Prints a link for the (already signed-in)
+    contributor to open, polls until linked, returns (session_token, broker_url)."""
+    r = requests.post(health_url, params={"action": "pair_start"}, timeout=60)
+    r.raise_for_status()
+    d = r.json()
+    if "verification_url" not in d:
+        raise RuntimeError(d.get("error", "pairing not available"))
+    print("To link this session to your account, open:\n"
+          f"    {d['verification_url']}\n"
+          "(you're already signed in there — just confirm). Waiting…", flush=True)
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        pr = requests.get(health_url, params={"action": "pair_poll", "code": d["code"]}, timeout=30).json()
+        if pr.get("status") == "linked":
+            print("  linked — thank you!", flush=True)
+            return pr["token"], pr.get("broker_url", "")
+        if pr.get("status") == "expired":
+            raise RuntimeError("pairing code expired — re-run to get a fresh one")
+        time.sleep(poll_s)
+    raise RuntimeError("pairing timed out — re-run to try again")
+
+
+# --- one pull → run → submit cycle ------------------------------------------
+
+def dispatch(health_url: str, token: str) -> dict:
+    r = requests.post(health_url, params={"action": "dispatch", "token": token}, timeout=60)
+    if not r.ok and r.status_code not in (429, 503):
+        r.raise_for_status()
     return r.json()
 
 
 def download_inputs(resolve_base: str, inputs: dict, scratch: Path) -> dict:
-    """Fetch each consumed artifact to ``scratch``; return {artifact_id: Path}."""
     local: dict[str, Path] = {}
     for aid, path in inputs.items():
         dest = scratch / aid.replace("/", "__")
@@ -59,14 +77,12 @@ def download_inputs(resolve_base: str, inputs: dict, scratch: Path) -> dict:
 
 
 def submit(broker_url: str, lease: str, outputs: dict, wall_s: float) -> dict:
-    """Upload produced artifacts + the lease to the broker."""
     manifest = {aid: Path(p).name for aid, p in outputs.items()}
     files = [("files", (Path(p).name, open(p, "rb"))) for p in outputs.values()]
     try:
-        import json as _json
         r = requests.post(
             broker_url.rstrip("/") + "/submit",
-            data={"lease": lease, "wall_s": str(wall_s), "manifest": _json.dumps(manifest)},
+            data={"lease": lease, "wall_s": str(wall_s), "manifest": json.dumps(manifest)},
             files=files, timeout=600,
         )
     finally:
@@ -76,12 +92,15 @@ def submit(broker_url: str, lease: str, outputs: dict, wall_s: float) -> dict:
     return r.json()
 
 
-def run_once(health_url: str, broker_url: str, email: str) -> str:
+def run_once(health_url: str, token: str) -> str:
     """One pull → run → submit cycle. Returns a short status string."""
-    asg = dispatch(health_url, email)
-    status = asg.get("status")
-    if status != "assigned":
-        return asg.get("message") or status or "no assignment"
+    asg = dispatch(health_url, token)
+    if asg.get("status") != "assigned":
+        return asg.get("message") or asg.get("error") or asg.get("status") or "no assignment"
+
+    broker_url = asg.get("broker_url")
+    if not broker_url:
+        return "the site has no broker configured yet — results can't be submitted"
 
     chunk = asg["chunk"]
     print(f"  assigned {chunk['id']} [{chunk['kind']}]", flush=True)
@@ -101,21 +120,21 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--health-url", required=True, help="https://<site>/screen")
-    ap.add_argument("--broker-url", required=True, help="https://<space>.hf.space")
-    ap.add_argument("--email", required=True)
-    ap.add_argument("--n", type=int, default=1, help="how many chunks to run")
+    ap.add_argument("--token", default=None, help="session token (else pair interactively)")
+    ap.add_argument("--n", type=int, default=5, help="how many chunks to run")
     args = ap.parse_args()
 
+    token = args.token or pair(args.health_url)[0]
     done = 0
     for _ in range(max(1, args.n)):
         try:
-            msg = run_once(args.health_url, args.broker_url, args.email)
-        except Exception as e:  # noqa: BLE001 — report + stop the loop
+            msg = run_once(args.health_url, token)
+        except Exception as e:  # noqa: BLE001
             print(f"  error: {e}", flush=True)
             break
         print(f"  {msg}", flush=True)
         if not msg.startswith("submitted"):
-            break   # idle / busy — nothing more to do right now
+            break
         done += 1
     print(f"\nthank you — ran {done} chunk(s) this session.", flush=True)
 
