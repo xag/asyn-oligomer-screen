@@ -479,8 +479,9 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
 # contributor (anywhere; pip-only openmm + huggingface_hub, `hf auth login` once): pull / run / upload
 .venv/bin/python screen/hf_store.py work <exp> --repo <user>/asyn-dwell-results --pr
 
-# maintainer: accept results with >=2 independent submissions agreeing, then re-publish + score
-.venv/bin/python screen/hf_store.py ingest <exp> --repo <user>/asyn-dwell-results --min-agree 2
+# maintainer: accept results whose agreeing cluster clears the reputation-weighted
+# quorum (a fresh contributor counts 0.1), then re-publish + score
+.venv/bin/python screen/hf_store.py ingest <exp> --repo <user>/asyn-dwell-results --quorum-weight 1.0
 .venv/bin/python screen/run_chunks.py score <exp>
 ```
 

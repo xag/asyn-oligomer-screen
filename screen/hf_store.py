@@ -11,9 +11,11 @@ always-on host. Every contribution arrives the same way, with no privileged path
   submit-local  backfill: submit already-computed local chunk outputs as contributions
                (no recompute), e.g. after a run that predates the HF store.
   ingest       coordinator: pull submissions, verify, and write *accepted* results into
-               the repo's authoritative artifacts/ + manifest. Two gates — SHA-256
-               integrity and >=K observable agreement (dwell-fraction consensus, since
-               cross-platform MD is not bit-identical); outliers quarantined.
+               the repo's authoritative artifacts/ + manifest. Gates (see contrib_gate):
+               SHA-256 integrity, then a distinct-pseudonym, reputation-weighted
+               dwell-fraction consensus (cross-platform MD is not bit-identical), with
+               an optional coordinator spot-check as ground truth. Per-contributor
+               outcomes are written to outcomes/ for health to fold into reputation.
   status       progress from the repo's manifest.
 
 Layout: manifest.json | artifacts/<sha256>.<ext> (accepted) | submissions/<chunk>/<worker>/{<file>, meta.json}.
@@ -31,7 +33,9 @@ import time
 from pathlib import Path
 
 import chunk_store as store
+import contrib_gate
 import run_chunks
+from contrib_gate import Reputation, Submission
 
 DATASET = "dataset"
 
@@ -47,20 +51,54 @@ def _runnable(manifest: dict, ch: dict) -> bool:
     return all(arts.get(aid, {}).get("present") for aid in ch["consumes"])
 
 
-def _largest_agreeing(values: list[float], tol: float) -> list[int]:
-    """Indices of the largest subset whose values all lie within ``tol`` (max-min<=tol)
-    — the consensus cluster; anything outside is an outlier. Pure + unit-testable."""
-    if not values:
-        return []
-    order = sorted(range(len(values)), key=lambda i: values[i])
-    best: list[int] = []
-    lo = 0
-    for hi in range(len(order)):
-        while values[order[hi]] - values[order[lo]] > tol:
-            lo += 1
-        if hi - lo + 1 > len(best):
-            best = order[lo:hi + 1]
-    return sorted(best)
+def _submission_key_sha(outputs_meta: dict) -> str:
+    """The SHA-256 that identifies a submission for de-dup + archiving: the
+    scored trajectory (``.pdb``) if present, else the first output. Pure."""
+    for aid, info in outputs_meta.items():
+        if aid.endswith(".pdb"):
+            return info["sha256"]
+    return next(iter(outputs_meta.values()))["sha256"]
+
+
+def _parse_reputations(obj: dict) -> dict:
+    """Parse health's published ``reputations.json`` into ``{pseudonym:
+    Reputation}``. Pure + unit-testable; missing fields default to fresh."""
+    out: dict[str, Reputation] = {}
+    for pseudo, rec in (obj or {}).items():
+        rec = rec or {}
+        out[pseudo] = Reputation(
+            agreed=int(rec.get("agreed", 0)),
+            outlier=int(rec.get("outlier", 0)),
+            spot_pass=int(rec.get("spot_pass", 0)),
+            spot_fail=int(rec.get("spot_fail", 0)),
+            allowlist_bonus=float(rec.get("allowlist_bonus", 0.0)),
+        )
+    return out
+
+
+def _load_reputations(api, repo: str, token) -> dict:
+    """Download health's ``reputations.json`` from the repo if present, else {}.
+    health publishes it; the dataset stays the single rendezvous point — no
+    direct service-to-service call, so ingest runs offline-of-health."""
+    from huggingface_hub import hf_hub_download
+    try:
+        p = hf_hub_download(repo, "reputations.json", repo_type=DATASET,
+                            token=token, force_download=True)
+    except Exception:  # noqa: BLE001 — absent file = everyone fresh
+        return {}
+    try:
+        return _parse_reputations(json.loads(Path(p).read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _load_spotchecks(path) -> dict:
+    """Optional ``{chunk_id: coordinator_dwell}`` the coordinator produced by
+    re-running sampled chunks itself; absent → no spot-checks this run."""
+    if not path:
+        return {}
+    return {k: float(v) for k, v in
+            json.loads(Path(path).read_text(encoding="utf-8")).items()}
 
 
 def _download_manifest(api, repo: str, token) -> dict:
@@ -192,10 +230,16 @@ def cmd_ingest(args) -> None:
     shape = manifest["spec"]["shape"]
     ref_aid = f"{run_chunks._pair_tag(shape, run_chunks.APO)}/core.pdb"
 
+    reputations = _load_reputations(api, args.repo, args.token)
+    spotchecks = _load_spotchecks(args.spotcheck_file)
+
     files = api.list_repo_files(args.repo, repo_type=DATASET, token=args.token)
     metas = [f for f in files if f.startswith("submissions/") and f.endswith("/meta.json")]
 
-    subs: dict[str, list] = {}
+    # Gather integrity-valid submissions per chunk. Each record keeps the full
+    # output set (to archive on accept) plus the identifying SHA the gate de-dups
+    # on and the contributor pseudonym (the `worker` id minted by the dispatcher).
+    subs: dict[str, list[dict]] = {}
     rejected = 0
     for mp in metas:
         meta = json.loads(Path(hf_hub_download(args.repo, mp, repo_type=DATASET,
@@ -204,59 +248,81 @@ def cmd_ingest(args) -> None:
         if cid in done_ids:
             stale.add(cid)
             continue
-        base = f"submissions/{cid}/{meta['worker']}"
+        worker = meta["worker"]
+        base = f"submissions/{cid}/{worker}"
         outs, ok = {}, True
         for aid, info in meta["outputs"].items():
             fp = Path(hf_hub_download(args.repo, f"{base}/{info['file']}", repo_type=DATASET,
                                       token=args.token))
             if _sha256(fp) != info["sha256"]:
-                print(f"  REJECT {cid} by {meta['worker']}: sha256 mismatch on {aid}", flush=True)
+                print(f"  REJECT {cid} by {worker}: sha256 mismatch on {aid}", flush=True)
                 ok = False
+                rejected += 1
                 break
             outs[aid] = fp
         if ok:
-            subs.setdefault(cid, []).append((meta["worker"], outs, float(meta.get("wall_s", 0.0))))
+            subs.setdefault(cid, []).append({
+                "worker": worker, "outs": outs,
+                "wall": float(meta.get("wall_s", 0.0)),
+                "key_sha": _submission_key_sha(meta["outputs"]),
+                "ts": float(meta.get("iat", 0.0)),
+            })
 
     all_ops, accepted, waiting, quarantined = [], 0, 0, 0
     accepted_cids: set[str] = set()
+    outcomes: list[dict] = []   # per-pseudonym, for health to fold into reputation
     reference = None
-    for cid, sublist in subs.items():
+    now = time.time()
+    for cid, recs in subs.items():
         ch = chunks_by_id[cid]
-        if len(sublist) < args.min_agree:
-            print(f"  awaiting quorum {cid}: {len(sublist)}/{args.min_agree}", flush=True)
-            waiting += 1
-            continue
-        if ch["kind"] == "segment":
+        observable = ch["kind"] == "segment"   # only segments carry a dwell value
+
+        # Score the observable for segment chunks (the existing GPU-free scorer).
+        if observable:
             if reference is None:
                 ref_rec = manifest["artifacts"][ref_aid]
                 reference = dwell_time.load_pdb(hf_hub_download(args.repo, ref_rec["path"],
                                                                repo_type=DATASET, token=args.token))
-            dwell = [dwell_time.score_trajectory(
-                next(p for aid, p in outs.items() if aid.endswith(".pdb")), reference)["dwell_fraction"]
-                for _w, outs, _wl in sublist]
-            cluster = _largest_agreeing(dwell, args.agree_tol)
-            if len(cluster) < args.min_agree:
-                print(f"  QUARANTINE {cid}: no {args.min_agree}-way agreement within "
-                      f"{args.agree_tol} (dwell {[round(x, 3) for x in dwell]})", flush=True)
-                quarantined += 1
-                continue
-            mean = sum(dwell[i] for i in cluster) / len(cluster)
-            rep = min(cluster, key=lambda i: abs(dwell[i] - mean))
-            note = f"{len(cluster)}/{len(sublist)} agree (dwell {[round(x, 3) for x in dwell]})"
-        else:
-            rep, note = 0, f"{ch['kind']}, {len(sublist)} submission(s), integrity ok"
-        worker, outs, wall = sublist[rep]
-        for aid, path in outs.items():
-            sha, ext = _sha256(path), (Path(aid).suffix or ".bin")
-            dest = f"artifacts/{sha}{ext}"
-            all_ops.append(CommitOperationAdd(dest, str(path)))
-            manifest["artifacts"][aid] = {"present": True, "path": dest, "sha256": sha,
-                                          "bytes": Path(path).stat().st_size}
-        ch["status"], ch["wall_s"], ch["lease"], ch["error"] = "done", wall, None, None
-        done_ids.add(cid)
-        accepted_cids.add(cid)
-        accepted += 1
-        print(f"  accepted {cid}: {note}; from {worker}", flush=True)
+            for r in recs:
+                pdb = next(p for aid, p in r["outs"].items() if aid.endswith(".pdb"))
+                r["dwell"] = dwell_time.score_trajectory(pdb, reference)["dwell_fraction"]
+
+        by_key = {r["key_sha"]: r for r in recs}
+        sub_objs = [Submission(pseudonym=r["worker"], sha256=r["key_sha"],
+                               dwell=r.get("dwell"), ts=r["ts"]) for r in recs]
+        d = contrib_gate.decide(sub_objs, reputations, tol=args.agree_tol,
+                                quorum_weight=args.quorum_weight,
+                                coordinator_dwell=spotchecks.get(cid),
+                                observable=observable)
+        contributors = {r["worker"] for r in recs}
+        cluster = set(d.cluster)
+
+        if d.status == "accept":
+            rep = by_key[d.representative]
+            for aid, path in rep["outs"].items():
+                sha, ext = _sha256(path), (Path(aid).suffix or ".bin")
+                dest = f"artifacts/{sha}{ext}"
+                all_ops.append(CommitOperationAdd(dest, str(path)))
+                manifest["artifacts"][aid] = {"present": True, "path": dest, "sha256": sha,
+                                              "bytes": Path(path).stat().st_size}
+            ch["status"], ch["wall_s"], ch["lease"], ch["error"] = "done", rep["wall"], None, None
+            done_ids.add(cid)
+            accepted_cids.add(cid)
+            accepted += 1
+            good = "spot_pass" if cid in spotchecks else "agreed"
+            for w in contributors:
+                outcomes.append({"ts": now, "chunk_id": cid, "pseudonym": w,
+                                 "outcome": good if w in cluster else "outlier"})
+            print(f"  accepted {cid}: {d.note}", flush=True)
+        elif d.status == "spotcheck_fail":
+            quarantined += 1
+            for w in contributors:
+                outcomes.append({"ts": now, "chunk_id": cid, "pseudonym": w,
+                                 "outcome": "spot_fail" if w in cluster else "outlier"})
+            print(f"  QUARANTINE {cid}: {d.note}", flush=True)
+        else:   # awaiting — undecided, emit nothing (never penalise an incomplete)
+            waiting += 1
+            print(f"  awaiting {cid}: {d.note}", flush=True)
 
     # Clean up: drop submissions now folded into artifacts/ (accepted here) or already
     # done (stale) — keeps the inbox lean so the scheduled ingester doesn't reprocess.
@@ -264,11 +330,17 @@ def cmd_ingest(args) -> None:
         all_ops.append(CommitOperationDelete(f"submissions/{cid}", is_folder=True))
     if accepted:
         all_ops.append(CommitOperationAdd("manifest.json", json.dumps(manifest, indent=2).encode("utf-8")))
+    # Outcomes go to a fresh timestamped file (append-only by convention — HF
+    # commits can't append), which health reads to update reputation.
+    if outcomes:
+        all_ops.append(CommitOperationAdd(
+            f"outcomes/{int(now)}.jsonl",
+            ("\n".join(json.dumps(o) for o in outcomes) + "\n").encode("utf-8")))
     if all_ops:
         api.create_commit(args.repo, all_ops, repo_type=DATASET, token=args.token,
                           commit_message=f"ingest +{accepted} accepted, {len(accepted_cids | stale)} cleaned")
     n_done = sum(1 for c in manifest["chunks"] if c["status"] == "done")
-    print(f"\ningest: +{accepted} accepted, {waiting} awaiting-quorum, {quarantined} quarantined, "
+    print(f"\ningest: +{accepted} accepted, {waiting} awaiting, {quarantined} quarantined, "
           f"{rejected} integrity-rejected, {len(stale)} stale-cleaned. "
           f"now {n_done}/{len(manifest['chunks'])} done in the repo.", flush=True)
 
@@ -323,10 +395,15 @@ def main() -> None:
 
     pi = sub.add_parser("ingest", help="coordinator: verify + write accepted results into the repo")
     common(pi)
-    pi.add_argument("--min-agree", type=int, default=1,
-                    help="min independent submissions that must agree before accepting (>=2 = redundancy)")
+    pi.add_argument("--quorum-weight", type=float, default=1.0,
+                    help="summed reputation weight a chunk's agreeing cluster must reach "
+                         "to be accepted (a fresh contributor = 0.1; trust-scaled successor "
+                         "to the old --min-agree count)")
     pi.add_argument("--agree-tol", type=float, default=0.2,
                     help="max dwell-fraction spread within the consensus cluster (research param)")
+    pi.add_argument("--spotcheck-file", default=None,
+                    help="optional JSON {chunk_id: coordinator_dwell} from coordinator "
+                         "re-runs; a chunk whose cluster excludes it is quarantined")
     pi.set_defaults(func=cmd_ingest)
 
     pst = sub.add_parser("status", help="progress from the repo manifest")
