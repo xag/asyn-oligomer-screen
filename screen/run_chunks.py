@@ -179,6 +179,12 @@ def _conda_python() -> str:
     return str(md_python())
 
 
+def _emit(text: str) -> None:
+    """Sink for streamed child output. A caller (the contributor client) can
+    replace this to coordinate the lines with its own liveness ticker."""
+    print(text, flush=True)
+
+
 def _run(cmd: list[str], tag: str) -> None:
     # Stream the child's output live (unbuffered) so a contributor sees the MD
     # heartbeat — step, speed, elapsed — as it happens, instead of silence until
@@ -190,7 +196,7 @@ def _run(cmd: list[str], tag: str) -> None:
     for line in proc.stdout:
         line = line.rstrip()
         tail.append(line)
-        print(f"  · {line}", flush=True)
+        _emit(f"  · {line}")
     proc.wait()
     if proc.returncode != 0:
         raise RuntimeError(f"{tag} failed (exit {proc.returncode}):\n" + "\n".join(tail))

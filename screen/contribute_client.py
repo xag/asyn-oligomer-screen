@@ -27,6 +27,31 @@ def _fmt(seconds: float) -> str:
     return f"{s // 60}:{s % 60:02d} min" if s >= 60 else f"{s}s"
 
 
+# Single output sink so the 10-second liveness dots never collide with real
+# log lines (the contributor's own messages AND the streamed MD lines, which we
+# route here via run_chunks._emit). A dot is written without a newline; real
+# text starts on a fresh line if dots were pending, so the log reads as
+# "....<line>" — not a line buried after a long dot trail.
+_out_lock = threading.Lock()
+_dots_pending = False
+
+
+def _say(msg: str = "") -> None:
+    global _dots_pending
+    with _out_lock:
+        sys.stdout.write(("\n" if _dots_pending else "") + str(msg) + "\n")
+        sys.stdout.flush()
+        _dots_pending = False
+
+
+def _tick() -> None:
+    global _dots_pending
+    with _out_lock:
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        _dots_pending = True
+
+
 def _gpu_line() -> str:
     try:
         out = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -73,7 +98,7 @@ def show_claim_link(health_url: str, token: str) -> None:
             '🏅 <b>Optional — credit these runs to you:</b> '
             f'<a href="{url}" target="_blank" rel="noopener">claim them &amp; build reputation</a></div>'))
     except Exception:  # noqa: BLE001 — not in a notebook
-        print(f"Optional — credit these runs to you:\n    {url}\n", flush=True)
+        _say(f"Optional — credit these runs to you:\n    {url}\n")
 
 
 # --- one pull → run → submit cycle ------------------------------------------
@@ -129,14 +154,14 @@ def run_once(health_url: str, token: str, done: str | None = None) -> dict:
         return {"stop": True, "msg": "this site has no result broker configured yet"}
 
     chunk = asg["chunk"]
-    print(f"  ▶ {describe(chunk)}", flush=True)
+    _say(f"  ▶ {describe(chunk)}")
     scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{chunk['id']}_"))
     local = download_inputs(asg["resolve_base"], asg.get("inputs", {}), scratch)
     t0 = time.time()
     outputs = run_chunks.execute_chunk(chunk, lambda aid: local[aid], scratch)
     secs = time.time() - t0
     submit(broker, asg["lease"], outputs, secs)
-    print(f"    done in {_fmt(secs)} · sent back ✓", flush=True)
+    _say(f"    done in {_fmt(secs)} · sent back ✓")
     return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": asg["lease"]}
 
 
@@ -146,7 +171,8 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     """Pair, then run simulations for up to `minutes`, reporting progress.
     Stops on the time budget, when there's no work, or when interrupted —
     always with a clear message, never an opaque loop."""
-    print(_gpu_line(), flush=True)
+    run_chunks._emit = _say   # streamed MD lines share the sink (dot-safe output)
+    _say(_gpu_line())
     token = start_session(health_url)
     show_claim_link(health_url, token)
 
@@ -154,46 +180,46 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     start = time.time()
     done_count, compute = 0, 0.0
     last_lease = None
-    print(f"Running for up to {int(minutes)} min. Stop whenever you like — an "
-          "unfinished task is simply reassigned, so nothing is wasted.\n", flush=True)
+    _say(f"Running for up to {int(minutes)} min. Stop whenever you like — an "
+         "unfinished task is simply reassigned, so nothing is wasted.\n")
 
-    # Steady liveness line every 10 s. Two jobs: shows the run is alive between
-    # the MD heartbeats, and — since Colab redraws a cleared output only when new
-    # output arrives — makes the output reappear within seconds of coming back to
-    # the notebook, so it never looks cancelled.
+    # A dot every 10 s during quiet stretches keeps output flowing — Colab
+    # redraws cleared output only when new output arrives, so this makes the log
+    # reappear within ~10 s of coming back to the notebook, never looking
+    # cancelled. Real lines reset the trail (see _say), so it's not endless dots.
     stop_hb = threading.Event()
 
     def _heartbeat():
         while not stop_hb.wait(10):
-            print(f"  · still running — {_fmt(time.time() - start)} elapsed, {done_count} done", flush=True)
+            _tick()
     threading.Thread(target=_heartbeat, daemon=True).start()
 
     while True:
         remaining = budget - (time.time() - start)
         if remaining <= 0:
-            print("\nTime budget reached — wrapping up.", flush=True)
+            _say("\nTime budget reached — wrapping up.")
             break
-        print(f"[{_fmt(time.time() - start)} in · {_fmt(remaining)} left]", flush=True)
+        _say(f"[{_fmt(time.time() - start)} in · {_fmt(remaining)} left]")
         try:
             r = run_once(health_url, token, done=last_lease)
         except KeyboardInterrupt:
             stop_hb.set()
-            print("\nStopped. The current task will be reassigned.", flush=True)
+            _say("\nStopped. The current task will be reassigned.")
             return
         except Exception as e:  # noqa: BLE001
-            print(f"    task failed ({e}) — it will be reassigned to someone else\n", flush=True)
+            _say(f"    task failed ({e}) — it will be reassigned to someone else\n")
             last_lease = None
             continue
         if r.get("stop"):
-            print(f"\n{r['msg']}.", flush=True)
+            _say(f"\n{r['msg']}.")
             break
         done_count += 1
         compute += r["seconds"]
         last_lease = r["lease"]
-        print(f"    so far this session: {done_count} simulation(s), {_fmt(compute)} of compute\n", flush=True)
+        _say(f"    so far this session: {done_count} simulation(s), {_fmt(compute)} of compute\n")
 
     stop_hb.set()
-    print(f"\nThank you — you ran {done_count} simulation(s) ({_fmt(compute)} of compute).", flush=True)
+    _say(f"\nThank you — you ran {done_count} simulation(s) ({_fmt(compute)} of compute).")
 
 
 def main() -> None:
