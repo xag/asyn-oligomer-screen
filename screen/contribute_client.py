@@ -1,23 +1,16 @@
-"""Account-free contributor loop for the dwell-time screen (#43).
+"""Contributor runner for the dwell-time screen (#43).
 
-Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine). It
-needs no Hugging Face account, no write token, and — crucially — no email typed
-into the notebook. Identity is handed off *from the app*: the runner pairs the
-session (a short code + a link the signed-in contributor opens on the site),
-receives a session token carrying only their pseudonym, then:
-
-  1. asks health for an assignment with that token (health decides what to run);
-  2. downloads the chunk's inputs over plain HTTPS (public dataset, no auth);
-  3. runs the MD step via the existing ``run_chunks.execute_chunk``;
-  4. POSTs the outputs + lease to the broker (URL comes back in the dispatch
-     response), which writes them into the dataset's ``submissions/`` inbox.
-
-Acceptance happens later in ``hf_store ingest``.
+Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine). No
+Hugging Face account and no email typed into the notebook: identity is paired
+from the website. The contributor sets a time budget; the runner pulls the
+simulation the screen needs next, runs it, sends the result back, and reports
+each step and the time spent so they can stop whenever they like.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import tempfile
 import time
@@ -28,24 +21,51 @@ import requests
 import run_chunks
 
 
-# --- pairing: get a session token without typing an email --------------------
+def _fmt(seconds: float) -> str:
+    s = int(seconds)
+    return f"{s // 60}:{s % 60:02d} min" if s >= 60 else f"{s}s"
+
+
+def _gpu_line() -> str:
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode == 0 and out.stdout.strip():
+            return f"GPU: {out.stdout.strip().splitlines()[0]}"
+    except Exception:  # noqa: BLE001
+        pass
+    return "No GPU detected — set Runtime > Change runtime type > GPU (runs will be slow otherwise)."
+
+
+def describe(chunk: dict) -> str:
+    """A plain-language line for what a chunk computes."""
+    p = chunk.get("params", {})
+    kind = chunk["kind"]
+    if kind == "build":
+        return "preparing the simulation system"
+    if kind == "equilibrate":
+        return f"warming up a replica (seed {p.get('seed', '?')})"
+    if kind == "segment":
+        return f"simulating dynamics — segment {p.get('index', '?')}, seed {p.get('seed', '?')}"
+    return kind
+
+
+# --- pairing: identity handed off from the website (no email typed here) -----
 
 def pair(health_url: str, *, poll_s: float = 3.0, timeout_s: float = 600.0) -> tuple[str, str]:
-    """Hand identity off to the app. Prints a link for the (already signed-in)
-    contributor to open, polls until linked, returns (session_token, broker_url)."""
     r = requests.post(health_url, params={"action": "pair_start"}, timeout=60)
     r.raise_for_status()
     d = r.json()
     if "verification_url" not in d:
         raise RuntimeError(d.get("error", "pairing not available"))
-    print("To link this session to your account, open:\n"
+    print("Link this session to your account — open:\n"
           f"    {d['verification_url']}\n"
-          "(you're already signed in there — just confirm). Waiting…", flush=True)
+          "(you're already signed in there; just confirm). Waiting…", flush=True)
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         pr = requests.get(health_url, params={"action": "pair_poll", "code": d["code"]}, timeout=30).json()
         if pr.get("status") == "linked":
-            print("  linked — thank you!", flush=True)
+            print("Linked.\n", flush=True)
             return pr["token"], pr.get("broker_url", "")
         if pr.get("status") == "expired":
             raise RuntimeError("pairing code expired — re-run to get a fresh one")
@@ -55,8 +75,11 @@ def pair(health_url: str, *, poll_s: float = 3.0, timeout_s: float = 600.0) -> t
 
 # --- one pull → run → submit cycle ------------------------------------------
 
-def dispatch(health_url: str, token: str) -> dict:
-    r = requests.post(health_url, params={"action": "dispatch", "token": token}, timeout=60)
+def dispatch(health_url: str, token: str, done: str | None = None) -> dict:
+    params = {"action": "dispatch", "token": token}
+    if done:
+        params["done"] = done   # release the just-finished lease so the next one can be assigned
+    r = requests.post(health_url, params=params, timeout=60)
     if not r.ok and r.status_code not in (429, 503):
         r.raise_for_status()
     return r.json()
@@ -92,27 +115,68 @@ def submit(broker_url: str, lease: str, outputs: dict, wall_s: float) -> dict:
     return r.json()
 
 
-def run_once(health_url: str, token: str) -> str:
-    """One pull → run → submit cycle. Returns a short status string."""
-    asg = dispatch(health_url, token)
+def run_once(health_url: str, token: str, done: str | None = None) -> dict:
+    """Pull → run → submit one chunk. Returns {stop|chunk_id, seconds, lease, ...}
+    and prints what's happening as it goes."""
+    asg = dispatch(health_url, token, done)
     if asg.get("status") != "assigned":
-        return asg.get("message") or asg.get("error") or asg.get("status") or "no assignment"
-
-    broker_url = asg.get("broker_url")
-    if not broker_url:
-        return "the site has no broker configured yet — results can't be submitted"
+        return {"stop": True, "msg": asg.get("message") or asg.get("error") or "no work available"}
+    broker = asg.get("broker_url")
+    if not broker:
+        return {"stop": True, "msg": "this site has no result broker configured yet"}
 
     chunk = asg["chunk"]
-    print(f"  assigned {chunk['id']} [{chunk['kind']}]", flush=True)
+    print(f"  ▶ {describe(chunk)}", flush=True)
     scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{chunk['id']}_"))
     local = download_inputs(asg["resolve_base"], asg.get("inputs", {}), scratch)
-
     t0 = time.time()
     outputs = run_chunks.execute_chunk(chunk, lambda aid: local[aid], scratch)
-    wall = time.time() - t0
+    secs = time.time() - t0
+    submit(broker, asg["lease"], outputs, secs)
+    print(f"    done in {_fmt(secs)} · sent back ✓", flush=True)
+    return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": asg["lease"]}
 
-    res = submit(broker_url, asg["lease"], outputs, wall)
-    return f"submitted {chunk['id']} ({wall / 60:.1f} min) -> {res.get('status')}"
+
+# --- the contributor's whole session ----------------------------------------
+
+def contribute(health_url: str, minutes: float = 30) -> None:
+    """Pair, then run simulations for up to `minutes`, reporting progress.
+    Stops on the time budget, when there's no work, or when interrupted —
+    always with a clear message, never an opaque loop."""
+    print(_gpu_line(), flush=True)
+    token, _ = pair(health_url)
+
+    budget = max(1.0, float(minutes)) * 60.0
+    start = time.time()
+    done_count, compute = 0, 0.0
+    last_lease = None
+    print(f"Running for up to {int(minutes)} min. Stop whenever you like — an "
+          "unfinished task is simply reassigned, so nothing is wasted.\n", flush=True)
+
+    while True:
+        remaining = budget - (time.time() - start)
+        if remaining <= 0:
+            print("\nTime budget reached — wrapping up.", flush=True)
+            break
+        print(f"[{_fmt(time.time() - start)} in · {_fmt(remaining)} left]", flush=True)
+        try:
+            r = run_once(health_url, token, done=last_lease)
+        except KeyboardInterrupt:
+            print("\nStopped. The current task will be reassigned.", flush=True)
+            return
+        except Exception as e:  # noqa: BLE001
+            print(f"    task failed ({e}) — it will be reassigned to someone else\n", flush=True)
+            last_lease = None
+            continue
+        if r.get("stop"):
+            print(f"\n{r['msg']}.", flush=True)
+            break
+        done_count += 1
+        compute += r["seconds"]
+        last_lease = r["lease"]
+        print(f"    so far this session: {done_count} simulation(s), {_fmt(compute)} of compute\n", flush=True)
+
+    print(f"\nThank you — you ran {done_count} simulation(s) ({_fmt(compute)} of compute).", flush=True)
 
 
 def main() -> None:
@@ -120,23 +184,9 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--health-url", required=True, help="https://<site>/screen")
-    ap.add_argument("--token", default=None, help="session token (else pair interactively)")
-    ap.add_argument("--n", type=int, default=5, help="how many chunks to run")
+    ap.add_argument("--minutes", type=float, default=30, help="how long to run")
     args = ap.parse_args()
-
-    token = args.token or pair(args.health_url)[0]
-    done = 0
-    for _ in range(max(1, args.n)):
-        try:
-            msg = run_once(args.health_url, token)
-        except Exception as e:  # noqa: BLE001
-            print(f"  error: {e}", flush=True)
-            break
-        print(f"  {msg}", flush=True)
-        if not msg.startswith("submitted"):
-            break
-        done += 1
-    print(f"\nthank you — ran {done} chunk(s) this session.", flush=True)
+    contribute(args.health_url, minutes=args.minutes)
 
 
 if __name__ == "__main__":
