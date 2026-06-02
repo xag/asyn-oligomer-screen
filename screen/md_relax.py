@@ -38,6 +38,8 @@ docked-complex dwell chunk can run on a volunteer's basic GPU with no conda:
 """
 from __future__ import annotations
 
+from __future__ import annotations
+
 import argparse
 import io
 import sys
@@ -51,14 +53,11 @@ import openmm.app as app
 import openmm.unit as u
 from pdbfixer import PDBFixer
 
-# OpenFF / openmmforcefields are imported lazily inside the ligand-parameterising
-# functions (offmol_from_rdkit, build_system). They are only needed for the
-# *complex* path; the *apo* baseline (off_ligand=None) uses amber14 + TIP3P
-# only, so it runs in a pip-only env (openmm + pdbfixer) without the OpenFF
-# stack — which, unlike OpenMM, is not currently installable from PyPI.
-
-from rdkit import Chem
-from rdkit.Chem import AllChem
+# RDKit + OpenFF / openmmforcefields are imported lazily inside the
+# ligand-parameterising functions (ligand_from_pdb_and_smiles, offmol_from_rdkit,
+# build_system). They are only needed for the *complex* path; the *apo* baseline
+# (off_ligand=None) uses amber14 + TIP3P only, so it runs in a pip-only env
+# (openmm + pdbfixer) — no RDKit/OpenFF, which aren't installable from PyPI.
 
 
 NAGL_MODEL = "openff-gnn-am1bcc-0.1.0-rc.3.pt"
@@ -111,7 +110,9 @@ def load_apo_pdb(apo_pdb: Path) -> str:
 # the missing hydrogens back with sensible 3D positions.
 # -----------------------------------------------------------------------------
 
-def ligand_from_pdb_and_smiles(ligand_pdb_text: str, smiles: str) -> Chem.Mol:
+def ligand_from_pdb_and_smiles(ligand_pdb_text: str, smiles: str) -> "Chem.Mol":
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
     # Strip the PDB-block Hs — AssignBondOrdersFromTemplate matches heavy atoms.
     pdb_mol_with_h = Chem.MolFromPDBBlock(ligand_pdb_text, removeHs=False, sanitize=False)
     if pdb_mol_with_h is None:
