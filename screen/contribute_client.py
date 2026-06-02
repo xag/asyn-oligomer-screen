@@ -105,18 +105,20 @@ def start_session(health_url: str) -> str:
 
 
 def show_claim_link(health_url: str, token: str) -> None:
-    """Show a one-click link to credit this (anonymous) session to the
-    contributor. Touches nothing in the kernel, so the run keeps going whether
-    or not they open it. Optional — runs count either way."""
+    """Show the link back to the site. It opens in a new tab, so this notebook
+    tab stays open and the run keeps going — that's the point: it's how you get
+    back to browsing without stopping your simulations. It also credits this
+    (anonymous) session to you. Optional — runs count either way."""
     url = f"{health_url}?action=claim&token={token}"
     try:
         from IPython.display import display, HTML
         display(HTML(
             '<div style="padding:10px;margin:6px 0;border:1px solid #6c6;border-radius:6px;background:#f3fff3">'
-            '🏅 <b>Optional — credit these runs to you:</b> '
-            f'<a href="{url}" target="_blank" rel="noopener">claim them &amp; build reputation</a></div>'))
+            '↩ <b>Keep browsing while this runs:</b> '
+            f'<a href="{url}" target="_blank" rel="noopener">back to the site</a> '
+            '(opens a new tab — leave this one open). Also credits these runs to you.</div>'))
     except Exception:  # noqa: BLE001 — not in a notebook
-        _say(f"Optional — credit these runs to you:\n    {url}\n")
+        _say(f"Keep browsing while this runs (opens a new tab, leave this one open):\n    {url}\n")
 
 
 # --- one pull → run → submit cycle ------------------------------------------
