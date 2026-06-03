@@ -32,6 +32,6 @@ jobs:
           REPO: ${{ vars.SCREEN_DATASET_REPO }}
           EXP: ${{ vars.SCREEN_EXP_ID }}
         run: |
-          python screen/hf_store.py ingest "$EXP" --repo "$REPO" --quorum-weight 1.0
+          python screen/hf_store.py ingest "$EXP" --repo "$REPO" --quorum-weight 0.5
           python screen/reputation.py fold --repo "$REPO" \
             --bonus-url "$SITE_URL/screen?action=bonus&secret=$CRON_SECRET"
