@@ -132,6 +132,21 @@ def cmd_publish(args) -> None:
     from huggingface_hub import HfApi, CommitOperationAdd
     api = HfApi(token=args.token)
     api.create_repo(args.repo, repo_type=DATASET, exist_ok=True)
+    # Guard the single manifest slot: re-publishing seeds the manifest to
+    # all-pending and orphans every artifact a different live experiment had
+    # accepted. A `demo`/test publish silently wiping a real run is exactly how
+    # 48 h of accepted results became unreferenced. So refuse to overwrite a
+    # manifest whose exp_id differs from this one unless --force is given.
+    try:
+        existing = _download_manifest(api, args.repo, args.token)
+    except Exception:  # noqa: BLE001 — no manifest yet = first publish, nothing to clobber
+        existing = None
+    if existing and existing.get("exp_id") not in (None, args.exp_id) and not args.force:
+        raise SystemExit(
+            f"refusing to publish '{args.exp_id}': the repo already holds a different "
+            f"live experiment '{existing.get('exp_id')}'. Publishing would reset its "
+            f"manifest and orphan its accepted artifacts. Re-run with --force to override."
+        )
     local = store.load_manifest(args.exp_id)
     produced = {aid for c in local["chunks"] for aid in c["produces"]}
     seed = copy.deepcopy(local)
@@ -377,6 +392,9 @@ def main() -> None:
 
     pp = sub.add_parser("publish", help="seed the repo from a local experiment (manifest pending + inputs)")
     common(pp)
+    pp.add_argument("--force", action="store_true",
+                    help="overwrite even if the repo holds a different live experiment "
+                         "(orphans its accepted artifacts)")
     pp.set_defaults(func=cmd_publish)
 
     pw = sub.add_parser("work", help="contributor: pull/run/submit runnable chunks")

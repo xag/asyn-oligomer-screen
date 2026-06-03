@@ -119,15 +119,31 @@ def test_spot_fail_history_zeroes_weight():
     assert g.decide(subs, reps, tol=0.05, quorum_weight=0.5).status == "awaiting"
 
 
-# --- non-observable kinds (build / equilibrate) -------------------------------
+# --- non-observable kinds (build / equilibrate) = setup, accept on first valid -
 
-def test_non_observable_kind_gated_on_distinct_weight():
-    reps = {"vet1": Reputation(agreed=20, allowlist_bonus=1.0),
-            "vet2": Reputation(agreed=20, allowlist_bonus=1.0)}
-    subs = [Submission("vet1", sha256="s1"), Submission("vet2", sha256="s2")]
-    d = g.decide(subs, reps, tol=0.05, quorum_weight=1.0, observable=False)
+def test_setup_chunk_accepts_on_first_valid_result():
+    # build / equilibrate are deterministic setup, not a measurement: one valid
+    # upload is enough, even from a single fresh (floor-weight) contributor —
+    # no quorum wait, so the pipeline is never stuck re-dispatching setup.
+    reps: dict[str, Reputation] = {}
+    d = g.decide([Submission("new0", sha256="s1")],
+                 reps, tol=0.05, quorum_weight=1.0, observable=False)
     assert d.status == "accept"
-    assert d.representative in {"s1", "s2"}
+    assert d.representative == "s1"
+
+
+def test_setup_chunk_awaits_only_when_no_valid_submission():
+    d = g.decide([], {}, tol=0.05, quorum_weight=1.0, observable=False)
+    assert d.status == "awaiting"
+
+
+def test_setup_chunk_dedups_replays_to_one_contributor():
+    # The Sybil defence still applies: the same bytes under many pseudonyms is
+    # one vote; we still accept (it's setup), under the de-duplicated identity.
+    subs = [Submission(f"sock{i}", sha256="SAME") for i in range(5)]
+    d = g.decide(subs, {}, tol=0.05, quorum_weight=1.0, observable=False)
+    assert d.status == "accept"
+    assert len(d.cluster) == 1
 
 
 def _run_all():

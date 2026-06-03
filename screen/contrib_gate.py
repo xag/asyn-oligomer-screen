@@ -167,23 +167,30 @@ def decide(
 ) -> Decision:
     """Decide one chunk's fate from its submissions and contributor history.
 
-    ``observable=False`` is the build / equilibrate path: no dwell value to
-    cluster, so acceptance is the summed weight of the distinct contributors who
-    produced an integrity-valid output. ``coordinator_dwell`` is supplied only
-    when this chunk was sampled for a spot-check re-run.
+    ``observable=False`` is the build / equilibrate path: deterministic *setup*,
+    not a measurement, so there is nothing to corroborate — accept on the first
+    integrity-valid result. ``coordinator_dwell`` is supplied only when this
+    chunk was sampled for a spot-check re-run.
     """
     deduped = dedup(subs)
     reps = reputations
 
     if not observable:
-        wsum = _cluster_weight(deduped, reps)
-        if wsum < quorum_weight:
-            return Decision("awaiting", wsum,
-                            note=f"{len(deduped)} distinct contributor(s), "
-                                 f"weight {wsum:.2f}/{quorum_weight:.2f}")
+        # Setup chunks (build / equilibrate) construct and warm up the system;
+        # the output is preparation, not a value to agree on. A bad setup is
+        # caught downstream — the chunks that consume it crash or land outside
+        # the segment consensus — so waiting for a distinct-pseudonym quorum here
+        # buys no safety and, for a small or early crowd, is never reached: the
+        # chunk stays pending and is re-dispatched forever. So accept the first
+        # integrity-valid upload. Quorum is kept only for the observable segment
+        # path below, where the dwell value genuinely needs corroboration.
+        if not deduped:
+            return Decision("awaiting", 0.0, note="no integrity-valid submissions yet")
         rep = max(deduped, key=lambda s: weight_for(reps.get(s.pseudonym)))
+        wsum = _cluster_weight(deduped, reps)
         return Decision("accept", wsum, [s.pseudonym for s in deduped], rep.sha256,
-                        note=f"integrity ok, weight {wsum:.2f}")
+                        note=f"setup chunk accepted on first valid result "
+                             f"({len(deduped)} contributor(s))")
 
     scored = [s for s in deduped if s.dwell is not None]
     if not scored:

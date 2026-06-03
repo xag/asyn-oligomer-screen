@@ -95,30 +95,15 @@ def describe(chunk: dict) -> str:
 
 
 def start_session(health_url: str) -> str:
-    """Get an anonymous session token — instant, no account or email."""
+    """Get an anonymous session token — instant, no account or email. Used only
+    when the notebook was opened without a personal identity token (the no-sign-in
+    path); the per-user notebook from the site already carries its own token."""
     r = requests.post(health_url, params={"action": "anon_session"}, timeout=60)
     r.raise_for_status()
     d = r.json()
     if "token" not in d:
         raise RuntimeError(d.get("error", "could not start a session"))
     return d["token"]
-
-
-def show_claim_link(health_url: str, token: str) -> None:
-    """Show the link back to the site. It opens in a new tab, so this notebook
-    tab stays open and the run keeps going — that's the point: it's how you get
-    back to browsing without stopping your simulations. It also credits this
-    (anonymous) session to you. Optional — runs count either way."""
-    url = f"{health_url}?action=claim&token={token}"
-    try:
-        from IPython.display import display, HTML
-        display(HTML(
-            '<div style="padding:10px;margin:6px 0;border:1px solid #6c6;border-radius:6px;background:#f3fff3">'
-            '↩ <b>Keep browsing while this runs:</b> '
-            f'<a href="{url}" target="_blank" rel="noopener">back to the site</a> '
-            '(opens a new tab — leave this one open). Also credits these runs to you.</div>'))
-    except Exception:  # noqa: BLE001 — not in a notebook
-        _say(f"Keep browsing while this runs (opens a new tab, leave this one open):\n    {url}\n")
 
 
 # --- one pull → run → submit cycle ------------------------------------------
@@ -187,10 +172,16 @@ def run_once(health_url: str, token: str, done: str | None = None) -> dict:
 
 # --- the contributor's whole session ----------------------------------------
 
-def contribute(health_url: str, minutes: float = 30) -> None:
-    """Pair, then run simulations for up to `minutes`, reporting progress.
-    Stops on the time budget, when there's no work, or when interrupted —
-    always with a clear message, never an opaque loop."""
+def contribute(health_url: str, minutes: float = 30, token: str | None = None) -> None:
+    """Run simulations for up to `minutes`, reporting progress. Stops on the time
+    budget, when there's no work, or when interrupted — always with a clear
+    message, never an opaque loop.
+
+    `token` is the personal identity token baked into the notebook the site
+    generated, so every run is credited to the signed-in contributor with no
+    link to click. Opened without one (the plain repo notebook), it falls back to
+    an anonymous session — runs still count, they're just not credited to anyone.
+    """
     # The MD engine's own per-line output is deliberately not surfaced: it's
     # low-level (atom counts, energies, scratch file names) and obscures what the
     # contributor is actually doing. describe() says that in plain words and the
@@ -198,8 +189,10 @@ def contribute(health_url: str, minutes: float = 30) -> None:
     # (see run_chunks._run), so nothing diagnostic is lost.
     run_chunks._emit = lambda *_: None
     _say(_gpu_line())
-    token = start_session(health_url)
-    show_claim_link(health_url, token)
+    if not token:
+        token = start_session(health_url)
+        _say("Running anonymously (no sign-in) — your runs count but aren't "
+             "credited to you. Open the notebook from the site to get credit.\n")
 
     budget = max(1.0, float(minutes)) * 60.0
     start = time.time()
@@ -253,8 +246,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--health-url", required=True, help="https://<site>/screen")
     ap.add_argument("--minutes", type=float, default=30, help="how long to run")
+    ap.add_argument("--token", default=None,
+                    help="personal identity token (the site's notebook bakes this in; "
+                         "omit to run anonymously)")
     args = ap.parse_args()
-    contribute(args.health_url, minutes=args.minutes)
+    contribute(args.health_url, minutes=args.minutes, token=args.token)
 
 
 if __name__ == "__main__":
