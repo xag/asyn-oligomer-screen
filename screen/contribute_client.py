@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -177,10 +178,12 @@ def contribute(health_url: str, minutes: float = 30, token: str | None = None) -
     budget, when there's no work, or when interrupted — always with a clear
     message, never an opaque loop.
 
-    `token` is the personal identity token baked into the notebook the site
-    generated, so every run is credited to the signed-in contributor with no
-    link to click. Opened without one (the plain repo notebook), it falls back to
-    an anonymous session — runs still count, they're just not credited to anyone.
+    `token` is the personal identity token, so every run is credited to the
+    signed-in contributor with nothing to click. The site's per-user notebook
+    injects it via the ``ASYN_CONTRIB_TOKEN`` env var (picked up below) rather
+    than editing this call, so the canonical notebook stays the single source of
+    truth. Opened with no token at all (the plain repo notebook run directly), it
+    falls back to an anonymous session — runs still count, just uncredited.
     """
     # The MD engine's own per-line output is deliberately not surfaced: it's
     # low-level (atom counts, energies, scratch file names) and obscures what the
@@ -189,6 +192,7 @@ def contribute(health_url: str, minutes: float = 30, token: str | None = None) -
     # (see run_chunks._run), so nothing diagnostic is lost.
     run_chunks._emit = lambda *_: None
     _say(_gpu_line())
+    token = token or os.environ.get("ASYN_CONTRIB_TOKEN")
     if not token:
         token = start_session(health_url)
         _say("Running anonymously (no sign-in) — your runs count but aren't "

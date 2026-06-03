@@ -338,9 +338,19 @@ def cmd_score(args) -> None:
     manifest = store.load_manifest(args.exp_id)
     spec = manifest["spec"]
     shape = spec["shape"]
-    n_seg = max(1, math.ceil(spec["prod_ps"] / spec["segment_ps"]))
     merged_dir = store.experiment_dir(args.exp_id) / "_scored"
     merged_dir.mkdir(parents=True, exist_ok=True)
+
+    # A replica's segments come straight from the manifest, ordered by index —
+    # never assumed uniform. Replicas may carry different segment counts (e.g.
+    # coarse legacy segments alongside a finer re-segmented continuation), so the
+    # per-seed list is derived from the chunks, not from prod_ps/segment_ps.
+    def replica_segments(pair: str, seed: int) -> list[str]:
+        segs = sorted(
+            (c for c in manifest["chunks"]
+             if c["id"].startswith(f"seg__{pair}__s{seed}__")),
+            key=lambda c: c["params"]["index"])
+        return [next(a for a in c["produces"] if a.endswith(".pdb")) for c in segs]
 
     # Reference = the apo NAC-core (the toxic shape); fall back to first ligand.
     ref_ligand = APO if APO in spec["ligands"] else spec["ligands"][0]
@@ -352,8 +362,8 @@ def cmd_score(args) -> None:
         pair = _pair_tag(shape, ligand)
         trajs: list[Path] = []
         for seed in spec["seeds"]:
-            seg_ids = [f"{pair}/s{seed}/seg_{i}.pdb" for i in range(n_seg)]
-            if not all(manifest["artifacts"].get(a, {}).get("present") for a in seg_ids):
+            seg_ids = replica_segments(pair, seed)
+            if not seg_ids or not all(manifest["artifacts"].get(a, {}).get("present") for a in seg_ids):
                 continue  # replica not finished yet
             seg_files = [store.artifact_file(args.exp_id, manifest, a) for a in seg_ids]
             traj = merge_segments(seg_files, merged_dir / f"{pair}_s{seed}.pdb")
