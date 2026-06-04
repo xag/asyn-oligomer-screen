@@ -1,10 +1,20 @@
-"""Contributor runner for the dwell-time screen (#43).
+"""Reference contributor runner for the dwell-time screen (#43).
 
-Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine). No
-account, no email, no sign-in: it starts immediately with an anonymous session.
-The contributor sets a time budget; the runner pulls the simulation the screen
-needs next, runs it, sends the result back, and reports each step and the time
-spent so they can stop whenever they like.
+Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine) and
+speaks the public contributor API:
+
+  GET  {base}/api/screen/v1/work     lease the next simulation
+  POST {results_url}                 send its outputs back (URL comes from /work)
+
+No sign-in is required: omit the token to run anonymously (runs still count, just
+uncredited). To get credit, pass the email-verified token from {base}/screen —
+either ``--token`` or the ``ASYN_CONTRIB_TOKEN`` env var. There is no session to
+create; the token is a long-lived credential carried on every call.
+
+This is just *one* client. Any program that speaks the API works — the point of
+the API is that the runner is replaceable (a pip CLI, a curl one-liner, a Colab
+cell). It reports each step and the time spent so a contributor can stop whenever
+they like.
 """
 from __future__ import annotations
 
@@ -22,6 +32,8 @@ import requests
 
 import run_chunks
 
+DEFAULT_BASE_URL = "https://health-two-iota.vercel.app"
+
 
 def _fmt(seconds: float) -> str:
     s = int(seconds)
@@ -29,10 +41,9 @@ def _fmt(seconds: float) -> str:
 
 
 # Single output sink so the 10-second liveness dots never collide with real
-# log lines (the contributor-facing messages from describe() and the session).
-# A dot is written without a newline; real text starts on a fresh line if dots
-# were pending, so the log reads as "....<line>" — not a line buried after a
-# long dot trail.
+# log lines (the contributor-facing messages from the session). A dot is written
+# without a newline; real text starts on a fresh line if dots were pending, so
+# the log reads as "....<line>" — not a line buried after a long dot trail.
 _out_lock = threading.Lock()
 _dots_pending = False
 
@@ -64,56 +75,23 @@ def _gpu_line() -> str:
     return "No GPU detected — set Runtime > Change runtime type > GPU (runs will be slow otherwise)."
 
 
-def _molecule(meta: dict) -> str:
-    """The candidate-molecule id (e.g. 'dopamine', 'l-dopa'), or '' for the apo
-    baseline arm — the id is already human-readable, so it's shown as-is."""
-    lig = meta.get("ligand", "") or ""
-    return "" if lig in ("", "apo") else lig
+# --- API endpoints ----------------------------------------------------------
+
+def _work_url(base: str) -> str:
+    return base.rstrip("/") + "/api/screen/v1/work"
 
 
-def describe(chunk: dict) -> str:
-    """A plain-language line saying, concretely, what this run simulates: the
-    toxic α-synuclein core on its own (the baseline) or with a candidate molecule
-    docked onto it, and which stage of the simulation it is."""
-    meta = chunk.get("meta", {})
-    mol = _molecule(meta)
-    # The system under simulation, named the same way in every stage.
-    system = (f"α-synuclein with {mol} docked onto it" if mol
-              else "the α-synuclein baseline (no molecule)")
-    kind = chunk["kind"]
-    if kind == "build":
-        return (f"Setting up: docking {mol} onto the toxic α-synuclein core and "
-                "surrounding it with water." if mol
-                else "Setting up the baseline: the toxic α-synuclein core alone, "
-                     "surrounded with water.")
-    if kind == "equilibrate":
-        return f"Warming up to body temperature: {system}."
-    if kind == "segment":
-        part = int(chunk.get("params", {}).get("index", 0)) + 1
-        return (f"Simulating {system} — watching whether the toxic shape holds "
-                f"or loosens (part {part}).")
-    return kind
-
-
-def start_session(health_url: str) -> str:
-    """Get an anonymous session token — instant, no account or email. Used only
-    when the notebook was opened without a personal identity token (the no-sign-in
-    path); the per-user notebook from the site already carries its own token."""
-    r = requests.post(health_url, params={"action": "anon_session"}, timeout=60)
-    r.raise_for_status()
-    d = r.json()
-    if "token" not in d:
-        raise RuntimeError(d.get("error", "could not start a session"))
-    return d["token"]
-
-
-# --- one pull → run → submit cycle ------------------------------------------
-
-def dispatch(health_url: str, token: str, done: str | None = None) -> dict:
-    params = {"action": "dispatch", "token": token}
+def get_work(base: str, token: str | None, molecules: str | None,
+             done: str | None) -> dict:
+    """GET the next simulation. `molecules` is a comma-separated preference list
+    in decreasing interest; `done` releases the lease just finished."""
+    params: dict[str, str] = {}
+    if molecules:
+        params["molecules"] = molecules
     if done:
-        params["done"] = done   # release the just-finished lease so the next one can be assigned
-    r = requests.post(health_url, params=params, timeout=60)
+        params["done"] = done
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    r = requests.get(_work_url(base), params=params, headers=headers, timeout=60)
     if not r.ok and r.status_code not in (429, 503):
         r.raise_for_status()
     return r.json()
@@ -133,15 +111,15 @@ def download_inputs(resolve_base: str, inputs: dict, scratch: Path) -> dict:
     return local
 
 
-def submit(broker_url: str, lease: str, outputs: dict, wall_s: float) -> dict:
+def submit_results(results_url: str, lease: str, token: str | None,
+                   outputs: dict, wall_s: float) -> dict:
     manifest = {aid: Path(p).name for aid, p in outputs.items()}
+    data = {"lease": lease, "wall_s": str(wall_s), "manifest": json.dumps(manifest)}
+    if token:
+        data["token"] = token
     files = [("files", (Path(p).name, open(p, "rb"))) for p in outputs.values()]
     try:
-        r = requests.post(
-            broker_url.rstrip("/") + "/submit",
-            data={"lease": lease, "wall_s": str(wall_s), "manifest": json.dumps(manifest)},
-            files=files, timeout=600,
-        )
+        r = requests.post(results_url, data=data, files=files, timeout=600)
     finally:
         for _, (_, fh) in files:
             fh.close()
@@ -149,60 +127,65 @@ def submit(broker_url: str, lease: str, outputs: dict, wall_s: float) -> dict:
     return r.json()
 
 
-def run_once(health_url: str, token: str, done: str | None = None) -> dict:
+# --- one work → run → submit cycle ------------------------------------------
+
+def run_once(base: str, token: str | None, molecules: str | None,
+             done: str | None = None) -> dict:
     """Pull → run → submit one chunk. Returns {stop|chunk_id, seconds, lease, ...}
     and prints what's happening as it goes."""
-    asg = dispatch(health_url, token, done)
-    if asg.get("status") != "assigned":
-        return {"stop": True, "msg": asg.get("message") or asg.get("error") or "no work available"}
-    broker = asg.get("broker_url")
-    if not broker:
+    w = get_work(base, token, molecules, done)
+    if w.get("status") in ("idle", "busy"):
+        return {"stop": True, "msg": w.get("message") or w.get("status")}
+    if "chunk" not in w:
+        return {"stop": True, "msg": w.get("error") or "no work available"}
+    results_url = w.get("results_url")
+    if not results_url:
         return {"stop": True, "msg": "this site has no result broker configured yet"}
 
-    chunk = asg["chunk"]
-    _say(f"  ▶ {describe(chunk)}")
+    chunk = w["chunk"]
+    _say(f"  ▶ {chunk.get('label') or chunk.get('kind')}")
     scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{chunk['id']}_"))
-    local = download_inputs(asg["resolve_base"], asg.get("inputs", {}), scratch)
+    local = download_inputs(w["resolve_base"], w.get("inputs", {}), scratch)
     t0 = time.time()
     outputs = run_chunks.execute_chunk(chunk, lambda aid: local[aid], scratch)
     secs = time.time() - t0
-    submit(broker, asg["lease"], outputs, secs)
+    submit_results(results_url, w["lease"], token, outputs, secs)
     _say(f"    done in {_fmt(secs)} · sent back ✓")
-    return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": asg["lease"]}
+    return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": w["lease"]}
 
 
 # --- the contributor's whole session ----------------------------------------
 
-def contribute(health_url: str, minutes: float | None = None, token: str | None = None) -> None:
+def contribute(base: str = DEFAULT_BASE_URL, minutes: float | None = None,
+               token: str | None = None, molecules: str | None = None) -> None:
     """Run simulations, reporting progress. Runs until the contributor presses
     stop (or work runs out); pass `minutes` for a fixed time budget instead.
     Always ends with a clear message, never an opaque loop.
 
-    `token` is the personal identity token, so every run is credited to the
-    signed-in contributor with nothing to click. The site's per-user notebook
-    injects it via the ``ASYN_CONTRIB_TOKEN`` env var (picked up below) rather
-    than editing this call, so the canonical notebook stays the single source of
-    truth. Opened with no token at all (the plain repo notebook run directly), it
-    falls back to an anonymous session — runs still count, just uncredited.
+    `token` credits every run to the signed-in contributor — get it from
+    {base}/screen. The personal notebook / launcher injects it via the
+    ``ASYN_CONTRIB_TOKEN`` env var (picked up below). With no token at all, runs
+    are anonymous — they still count, just uncredited. `molecules` restricts work
+    to a comma-separated preference list (decreasing interest); omit it to run
+    whatever the screen needs next.
     """
     # The MD engine's own per-line output is deliberately not surfaced: it's
     # low-level (atom counts, energies, scratch file names) and obscures what the
-    # contributor is actually doing. describe() says that in plain words and the
-    # heartbeat dots show it's alive; a failing chunk still reports a log tail
+    # contributor is actually doing. The chunk label says that in plain words and
+    # the heartbeat dots show it's alive; a failing chunk still reports a log tail
     # (see run_chunks._run), so nothing diagnostic is lost.
     run_chunks._emit = lambda *_: None
     _say(_gpu_line())
     token = token or os.environ.get("ASYN_CONTRIB_TOKEN")
     if not token:
-        token = start_session(health_url)
-        _say("Running anonymously (no sign-in) — your runs count but aren't "
-             "credited to you. Open the notebook from the site to get credit.\n")
+        _say("Running anonymously (no token) — your runs count but aren't "
+             "credited to you. Get a token at the site's /screen page for credit.\n")
 
     budget = None if minutes is None else max(1.0, float(minutes)) * 60.0
     start = time.time()
     done_count, compute = 0, 0.0
     last_lease = None
-    _say("Running until you press the stop button (the ■ in this cell) — an "
+    _say("Running until you stop it (interrupt the cell / Ctrl-C) — an "
          "unfinished task is simply reassigned, so nothing is wasted.\n"
          if budget is None else
          f"Running for up to {int(minutes)} min. Stop whenever you like — an "
@@ -227,7 +210,7 @@ def contribute(health_url: str, minutes: float | None = None, token: str | None 
         _say(f"[{_fmt(elapsed)} in · {_fmt(budget - elapsed)} left]"
              if budget is not None else f"[{_fmt(elapsed)} in]")
         try:
-            r = run_once(health_url, token, done=last_lease)
+            r = run_once(base, token, molecules, done=last_lease)
         except KeyboardInterrupt:
             stop_hb.set()
             _say("\nStopped. The current task will be reassigned.")
@@ -252,14 +235,16 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--health-url", required=True, help="https://<site>/screen")
+    ap.add_argument("--base-url", default=DEFAULT_BASE_URL,
+                    help="site root, e.g. https://<site> (the API is at <base>/api/screen/v1)")
     ap.add_argument("--minutes", type=float, default=None,
                     help="optional fixed time budget; default runs until stopped or out of work")
     ap.add_argument("--token", default=None,
-                    help="personal identity token (the site's notebook bakes this in; "
-                         "omit to run anonymously)")
+                    help="email-verified identity token from <base>/screen; omit to run anonymously")
+    ap.add_argument("--molecules", default=None,
+                    help="comma-separated molecule ids in decreasing priority; omit to trust the queue")
     args = ap.parse_args()
-    contribute(args.health_url, minutes=args.minutes, token=args.token)
+    contribute(args.base_url, minutes=args.minutes, token=args.token, molecules=args.molecules)
 
 
 if __name__ == "__main__":

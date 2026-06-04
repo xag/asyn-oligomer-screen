@@ -485,8 +485,13 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
 # endpoint), then re-publish + score
 .venv/bin/python screen/hf_store.py ingest <exp> --repo <user>/asyn-dwell-results --quorum-weight 1.0
 .venv/bin/python screen/reputation.py fold --repo <user>/asyn-dwell-results \
-    --bonus-url "<SITE_URL>/screen?action=bonus&secret=<CRON_SECRET>"
+    --bonus-url "<SITE_URL>/api/screen/v1/reputation-bonus?secret=<CRON_SECRET>"
 .venv/bin/python screen/run_chunks.py score <exp>
+
+# maintainer: publish the candidate-molecule registry health's GET /molecules reads
+# (primary seed list; merges so contributor proposals are preserved)
+node scripts/build_molecules_json.mjs molecules.json
+.venv/bin/python screen/hf_store.py publish-molecules --repo <user>/asyn-dwell-results --file molecules.json
 ```
 
 Each top-level directory carries a `README.md` describing its contents:
