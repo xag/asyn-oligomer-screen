@@ -173,10 +173,10 @@ def run_once(health_url: str, token: str, done: str | None = None) -> dict:
 
 # --- the contributor's whole session ----------------------------------------
 
-def contribute(health_url: str, minutes: float = 30, token: str | None = None) -> None:
-    """Run simulations for up to `minutes`, reporting progress. Stops on the time
-    budget, when there's no work, or when interrupted — always with a clear
-    message, never an opaque loop.
+def contribute(health_url: str, minutes: float | None = None, token: str | None = None) -> None:
+    """Run simulations, reporting progress. Runs until the contributor presses
+    stop (or work runs out); pass `minutes` for a fixed time budget instead.
+    Always ends with a clear message, never an opaque loop.
 
     `token` is the personal identity token, so every run is credited to the
     signed-in contributor with nothing to click. The site's per-user notebook
@@ -198,11 +198,14 @@ def contribute(health_url: str, minutes: float = 30, token: str | None = None) -
         _say("Running anonymously (no sign-in) — your runs count but aren't "
              "credited to you. Open the notebook from the site to get credit.\n")
 
-    budget = max(1.0, float(minutes)) * 60.0
+    budget = None if minutes is None else max(1.0, float(minutes)) * 60.0
     start = time.time()
     done_count, compute = 0, 0.0
     last_lease = None
-    _say(f"Running for up to {int(minutes)} min. Stop whenever you like — an "
+    _say("Running until you press the stop button (the ■ in this cell) — an "
+         "unfinished task is simply reassigned, so nothing is wasted.\n"
+         if budget is None else
+         f"Running for up to {int(minutes)} min. Stop whenever you like — an "
          "unfinished task is simply reassigned, so nothing is wasted.\n")
 
     # A dot every 10 s during quiet stretches keeps output flowing — Colab
@@ -217,11 +220,12 @@ def contribute(health_url: str, minutes: float = 30, token: str | None = None) -
     threading.Thread(target=_heartbeat, daemon=True).start()
 
     while True:
-        remaining = budget - (time.time() - start)
-        if remaining <= 0:
+        elapsed = time.time() - start
+        if budget is not None and budget - elapsed <= 0:
             _say("\nTime budget reached — wrapping up.")
             break
-        _say(f"[{_fmt(time.time() - start)} in · {_fmt(remaining)} left]")
+        _say(f"[{_fmt(elapsed)} in · {_fmt(budget - elapsed)} left]"
+             if budget is not None else f"[{_fmt(elapsed)} in]")
         try:
             r = run_once(health_url, token, done=last_lease)
         except KeyboardInterrupt:
@@ -249,7 +253,8 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--health-url", required=True, help="https://<site>/screen")
-    ap.add_argument("--minutes", type=float, default=30, help="how long to run")
+    ap.add_argument("--minutes", type=float, default=None,
+                    help="optional fixed time budget; default runs until stopped or out of work")
     ap.add_argument("--token", default=None,
                     help="personal identity token (the site's notebook bakes this in; "
                          "omit to run anonymously)")
