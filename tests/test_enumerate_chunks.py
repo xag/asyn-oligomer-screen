@@ -35,10 +35,10 @@ def _by_kind(chunks):
     return out
 
 
-def test_apo_arm_has_no_dock_or_param_and_builds_from_apo_core():
+def test_apo_arm_has_no_dock_and_builds_from_apo_core():
     chunks = rc.enumerate_chunks(_spec(ligands=["apo"]))
     kinds = _by_kind(chunks)
-    assert "dock" not in kinds and "param" not in kinds
+    assert "dock" not in kinds
     build = kinds["build"]
     assert len(build) == 1
     assert build[0]["consumes"] == ["shp__apo/core.pdb"]
@@ -47,14 +47,12 @@ def test_apo_arm_has_no_dock_or_param_and_builds_from_apo_core():
     assert len(kinds["segment"]) == 4
 
 
-def test_complex_parametrises_once_and_docks_an_ensemble():
+def test_complex_docks_an_ensemble_onto_the_shared_receptor():
     chunks = rc.enumerate_chunks(_spec(ligands=["egcg"], n_poses=3))
     kinds = _by_kind(chunks)
-    # one param (pose-independent) and one dock (produces all poses) per ligand
-    assert len(kinds["param"]) == 1
+    # one dock per ligand, producing all poses; docking is the only setup step
     assert len(kinds["dock"]) == 1
-    param = kinds["param"][0]
-    assert param["consumes"] == [] and param["produces"] == ["shp__egcg/ligand.xml"]
+    assert "param" not in kinds
     dock = kinds["dock"][0]
     assert dock["consumes"] == ["shp__apo/core.pdb"]   # docks onto the shared receptor core
     assert dock["params"]["n_poses"] == 3
@@ -75,11 +73,11 @@ def test_complex_fans_dynamics_over_pose_times_seed():
         assert "seed" in c["meta"] and "index" in c["meta"]
 
 
-def test_build_consumes_its_pose_core_and_the_shared_template():
+def test_build_consumes_its_pose_core():
     chunks = rc.enumerate_chunks(_spec(ligands=["egcg"], n_poses=2))
     builds = [c for c in chunks if c["kind"] == "build"]
     for j, b in enumerate(sorted(builds, key=lambda c: c["params"]["pose"])):
-        assert b["consumes"] == [f"shp__egcg/p{j}/core.pdb", "shp__egcg/ligand.xml"]
+        assert b["consumes"] == [f"shp__egcg/p{j}/core.pdb"]
         assert b["params"]["is_complex"] is True
 
 
@@ -105,9 +103,9 @@ def test_pose_count_scales_chunks():
     one = rc.enumerate_chunks(_spec(ligands=["egcg"], n_poses=1))
     assert len([c for c in five if c["kind"] == "build"]) == 5
     assert len([c for c in one if c["kind"] == "build"]) == 1
-    # param/dock do not multiply with poses
-    assert len([c for c in five if c["kind"] == "param"]) == 1
+    # one dock chunk regardless of pose count (it produces all poses)
     assert len([c for c in five if c["kind"] == "dock"]) == 1
+    assert len([c for c in one if c["kind"] == "dock"]) == 1
 
 
 if __name__ == "__main__":

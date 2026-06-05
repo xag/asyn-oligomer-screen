@@ -113,15 +113,11 @@ def enumerate_chunks(spec: dict) -> list[dict]:
     * **complex** — the bound pose is a *sampled dimension*, not a fixed input, so
       the dwell estimate marginalises pose uncertainty instead of betting on one
       stochastic Vina draw (see #14). Per ligand:
-        ``param``  smiles → a reusable ligand force-field template. Pose-INDEPENDENT
-                   (charges depend on topology, not placement), so it is computed
-                   ONCE and shared across poses — the expensive OpenFF/conda step
-                   does not multiply with pose count.
-        ``dock``   apo core (receptor) + smiles → ``n_poses`` pose cores. CPU; the
-                   pose ensemble Vina already produces, instead of discarding all
-                   but the top.
-        then per pose: ``build`` (place template into the pose + solvate, pip-only)
-                   → its own equilibrate→segment chains.
+        ``dock``   apo core (receptor) + smiles → ``n_poses`` pose cores. CPU
+                   (rdkit/meeko/Vina); the pose ensemble Vina already produces,
+                   instead of discarding all but the top.
+        then per pose: ``build`` (the proven complex prepare: parametrise + solvate
+                   from the pose core) → its own equilibrate→segment chains.
       Because each chunk is pose-specific, the existing per-chunk consensus IS a
       per-pose consensus; aggregation ACROSS poses happens at scoring time.
     """
@@ -149,16 +145,8 @@ def enumerate_chunks(spec: dict) -> list[dict]:
             continue
 
         smiles = spec["ligand_smiles"].get(ligand)
-        template = f"{pair}/ligand.xml"
         pose_cores = [f"{pair}/p{j}/core.pdb" for j in range(n_poses)]
 
-        # Parametrise once (pose-independent), then dock the ensemble.
-        chunks.append({
-            "id": f"param__{pair}", "kind": "param",
-            "consumes": [], "produces": [template],
-            "params": {"ligand": ligand, "smiles": smiles},
-            "meta": {"shape": shape, "ligand": ligand},
-        })
         chunks.append({
             "id": f"dock__{pair}", "kind": "dock",
             "consumes": [apo_core], "produces": pose_cores,
@@ -172,7 +160,7 @@ def enumerate_chunks(spec: dict) -> list[dict]:
             sys_xml, solv = f"{prefix}/system.xml", f"{prefix}/solvated.pdb"
             chunks.append({
                 "id": f"build__{pair}__p{j}", "kind": "build",
-                "consumes": [pose_cores[j], template], "produces": [sys_xml, solv],
+                "consumes": [pose_cores[j]], "produces": [sys_xml, solv],
                 "params": {"ligand": ligand, "smiles": smiles, "pose": j,
                            "rect_box": spec["rect_box"], "is_complex": True},
                 "meta": {"shape": shape, "ligand": ligand, "pose": j},
@@ -195,37 +183,39 @@ def cmd_create(args) -> None:
         raise FileNotFoundError(f"shape PDB not found: {shape_pdb}")
 
     ligands = list(args.ligands)
-    if args.apo and APO not in ligands:
+    # The apo arm is mandatory: its NAC core is both the baseline system input and
+    # the shared receptor every dock chunk docks onto.
+    if APO not in ligands:
         ligands = [APO] + ligands
-    if not ligands:
-        ligands = [APO]
 
     seeds = [args.base_seed + i for i in range(args.replicas)]
     lo, hi = dwell_time.CHUNK_RANGE
 
     spec = {
         "shape": shape, "arm": "mixed", "ligands": ligands,
-        "ligand_smiles": {}, "seeds": seeds,
+        "ligand_smiles": {}, "seeds": seeds, "n_poses": args.n_poses,
         "equil_ps": args.equil_ps, "prod_ps": args.prod_ps, "segment_ps": args.segment_ps,
         "traj_interval_ps": args.traj_interval_ps, "temperature_k": args.temperature_k,
         "rect_box": True, "core_range": [lo, hi],
     }
 
-    # Central, CPU prep: produce each pair's NAC-core PDB (the build chunk's input
-    # and the toxic reference for scoring). Apo truncates the shape; a real ligand
-    # docks first, then truncates the complex.
+    # Central CPU prep is now ONLY the apo NAC core — the apo build input and the
+    # shared docking receptor. Docking is a distributed `dock` chunk (the pose
+    # ensemble, #14), so the coordinator no longer docks here; it just reads each
+    # ligand's SMILES from the registry so the dock chunks carry them.
+    import stage3  # local: registry lookup (load_vicinity_molecule)
     scratch = store.experiment_dir(args.exp_id) / "_prep"
     scratch.mkdir(parents=True, exist_ok=True)
-    initial: dict[str, Path] = {}
+    apo_pair = _pair_tag(shape, APO)
+    apo_core = dwell_time._truncate_chunk(shape_pdb, scratch / f"{apo_pair}_core.pdb", lo, hi)
+    initial: dict[str, Path] = {f"{apo_pair}/core.pdb": apo_core}
     for ligand in ligands:
-        pair = _pair_tag(shape, ligand)
         if ligand == APO:
-            core = dwell_time._truncate_chunk(shape_pdb, scratch / f"{pair}_core.pdb", lo, hi)
-        else:
-            complex_pdb, smiles = dwell_time._ensure_complex(ligand, shape)
-            spec["ligand_smiles"][ligand] = smiles
-            core = dwell_time._truncate_chunk(complex_pdb, scratch / f"{pair}_core.pdb", lo, hi)
-        initial[f"{pair}/core.pdb"] = core
+            continue
+        smiles = stage3.load_vicinity_molecule(ligand).get("smiles")
+        if not smiles:
+            raise ValueError(f"vicinity molecule {ligand!r} has no SMILES; cannot dock")
+        spec["ligand_smiles"][ligand] = smiles
 
     chunks = enumerate_chunks(spec)
     store.create_experiment(args.exp_id, spec, chunks, initial)
@@ -326,6 +316,24 @@ def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
                "--report-interval-ps", "2"]
         _run(cmd, ch["id"])
         return {state_out: out_state, seg_out: out_seg}
+
+    if kind == "dock":
+        # Dock the ligand onto the apo NAC core and emit one complex core per
+        # pose. CPU only (rdkit/meeko/Vina), so it runs in the pip venv like the
+        # apo path — no conda. The pose ensemble is the #14 sampling: downstream
+        # build/equilibrate/segment fan out per pose.
+        import dwell_time
+        core = infile(ch["consumes"][0])          # apo NAC core = docking receptor
+        out_dir = scratch / ch["id"]
+        written = dwell_time.dock_pose_cores(
+            core, p["smiles"], out_dir,
+            n_poses=int(p["n_poses"]), seed=int(p.get("seed", 42)), emit=_emit)
+        produces = ch["produces"]
+        if len(written) != len(produces):
+            raise RuntimeError(
+                f"docking produced {len(written)} pose(s) but the DAG expects "
+                f"{len(produces)} — raise Vina exhaustiveness or lower n_poses")
+        return {aid: written[j] for j, aid in enumerate(produces)}
 
     raise ValueError(f"unknown chunk kind {kind!r}")
 
@@ -479,7 +487,10 @@ def main() -> None:
     pc.add_argument("exp_id")
     pc.add_argument("--shape", required=True, help="oligomer stem under results/oligomers/")
     pc.add_argument("--ligands", nargs="*", default=[], help="vicinity-molecule ids (docked)")
-    pc.add_argument("--apo", action="store_true", help="include the apo baseline arm")
+    pc.add_argument("--apo", action="store_true",
+                    help="(kept for compatibility; the apo arm is always included as the docking receptor)")
+    pc.add_argument("--n-poses", type=int, default=DEFAULT_N_POSES,
+                    help="docked poses per complex ligand the dwell estimate is sampled over (#14)")
     pc.add_argument("--replicas", type=int, default=2)
     pc.add_argument("--base-seed", type=int, default=1000)
     pc.add_argument("--equil-ps", type=float, default=DEFAULT_EQUIL_PS)
