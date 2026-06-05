@@ -169,6 +169,39 @@ def cmd_publish(args) -> None:
 
 
 # ---------------------------------------------------------------------------
+# publish-molecules — the registry health's GET /molecules reads
+# ---------------------------------------------------------------------------
+# molecules.json is the candidate-molecule registry: the primary seed list
+# (data/vicinity_molecules.js, emitted as JSON by scripts/build_molecules_json.mjs)
+# plus contributed proposals the broker appends at runtime. Republishing the
+# primary set MERGES — it preserves every source!="primary" entry already in the
+# file — so refreshing the seed never clobbers contributors' proposals.
+
+def cmd_publish_molecules(args) -> None:
+    from huggingface_hub import HfApi, CommitOperationAdd, hf_hub_download
+    api = HfApi(token=args.token)
+    primary = json.loads(Path(args.file).read_text(encoding="utf-8"))
+    if not isinstance(primary, list):
+        raise SystemExit(f"{args.file} must be a JSON array of molecule records")
+    contributed = []
+    try:
+        p = hf_hub_download(args.repo, "molecules.json", repo_type=DATASET, token=args.token)
+        existing = json.loads(Path(p).read_text(encoding="utf-8"))
+        contributed = [m for m in existing if isinstance(m, dict) and m.get("source") != "primary"]
+    except Exception:  # noqa: BLE001 — no registry yet = first publish
+        pass
+    merged = list(primary) + contributed
+    api.create_commit(
+        args.repo,
+        [CommitOperationAdd("molecules.json", json.dumps(merged, indent=2).encode("utf-8"))],
+        repo_type=DATASET, token=args.token,
+        commit_message="publish molecules registry",
+    )
+    print(f"published molecules.json -> {args.repo}: {len(primary)} primary "
+          f"+ {len(contributed)} contributed", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # work — contributor: pull a runnable chunk, run it, submit outputs
 # ---------------------------------------------------------------------------
 
@@ -427,6 +460,14 @@ def main() -> None:
     pst = sub.add_parser("status", help="progress from the repo manifest")
     common(pst)
     pst.set_defaults(func=cmd_status)
+
+    pm = sub.add_parser("publish-molecules",
+                        help="publish/refresh molecules.json (primary registry; preserves contributed)")
+    pm.add_argument("--repo", required=True, help="HF dataset repo, e.g. user/asyn-dwell-results")
+    pm.add_argument("--token", default=None, help="HF token (default: cached `hf auth login` / $HF_TOKEN)")
+    pm.add_argument("--file", default="molecules.json",
+                    help="primary molecules JSON, e.g. from `node scripts/build_molecules_json.mjs`")
+    pm.set_defaults(func=cmd_publish_molecules)
 
     args = p.parse_args()
     args.func(args)

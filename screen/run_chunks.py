@@ -39,6 +39,12 @@ DEFAULT_SEGMENT_PS = 100.0
 DEFAULT_TRAJ_INTERVAL_PS = 20.0
 DEFAULT_TEMPERATURE_K = 300.0
 APO = "apo"   # the ligand label for the apo baseline arm
+# How many docked poses a complex's dwell estimate is sampled over. The bound
+# pose is a stochastic Vina draw, so committing all replicas to one (the old top-
+# pose-only path) conditions the result on a single sample; spanning the ensemble
+# marginalises that uncertainty. Per-pose × per-seed replicas, aggregated across
+# poses at scoring time (#14).
+DEFAULT_N_POSES = 5
 
 
 # ---------------------------------------------------------------------------
@@ -59,56 +65,121 @@ def _pair_tag(shape: str, ligand: str) -> str:
     return f"{shape}__{ligand}"
 
 
-def enumerate_chunks(spec: dict) -> list[dict]:
-    """Build the chunk DAG (ids, consumes/produces, params) from a spec. Pure —
-    no IO. ``initial_artifacts`` (the core PDBs) are registered separately by
-    :func:`cmd_create`."""
-    shape = spec["shape"]
+def _dynamics_chunks(spec, chunks, *, pair, prefix, sys_xml, solv, meta_base):
+    """Append the equilibrate→segment dynamics DAG for one (pair, pose) onto
+    ``chunks``. ``prefix`` namespaces the per-replica state artifacts; ``meta_base``
+    carries shape/ligand (+ pose for a complex). The dynamics are identical for the
+    apo arm and every docked pose — only the upstream system differs."""
     seeds = spec["seeds"]
     prod_ps = spec["prod_ps"]
     segment_ps = spec["segment_ps"]
     n_seg = max(1, math.ceil(prod_ps / segment_ps))
+    for seed in seeds:
+        sd = f"{prefix}/s{seed}"
+        state0 = f"{sd}/state_0.xml"
+        eq_id = f"equil__{prefix.replace('/', '__')}__s{seed}"
+        chunks.append({
+            "id": eq_id, "kind": "equilibrate",
+            "consumes": [sys_xml, solv], "produces": [state0],
+            "params": {"equil_ps": spec["equil_ps"], "seed": seed,
+                       "temperature_k": spec["temperature_k"]},
+            "meta": {**meta_base, "seed": seed},
+        })
+        for i in range(n_seg):
+            this_ps = segment_ps if (i + 1) * segment_ps <= prod_ps else (prod_ps - i * segment_ps)
+            state_in = f"{sd}/state_{i}.xml"
+            state_out = f"{sd}/state_{i+1}.xml"
+            seg_out = f"{sd}/seg_{i}.pdb"
+            chunks.append({
+                "id": f"seg__{prefix.replace('/', '__')}__s{seed}__{i}", "kind": "segment",
+                "consumes": [sys_xml, solv, state_in], "produces": [state_out, seg_out],
+                "params": {"segment_ps": round(this_ps, 4), "index": i,
+                           "traj_interval_ps": spec["traj_interval_ps"],
+                           "seed": _segment_seed(seed, i),
+                           "temperature_k": spec["temperature_k"]},
+                "meta": {**meta_base, "seed": seed, "index": i},
+            })
+
+
+def enumerate_chunks(spec: dict) -> list[dict]:
+    """Build the chunk DAG (ids, consumes/produces, params) from a spec. Pure —
+    no IO. The only registered ``initial_artifact`` is the apo NAC-core PDB per
+    shape (see :func:`cmd_create`); everything else is produced by a chunk.
+
+    Two arms:
+
+    * **apo baseline** — no docking. ``build`` consumes the apo core and feeds one
+      equilibrate→segment chain per seed.
+    * **complex** — the bound pose is a *sampled dimension*, not a fixed input, so
+      the dwell estimate marginalises pose uncertainty instead of betting on one
+      stochastic Vina draw (see #14). Per ligand:
+        ``param``  smiles → a reusable ligand force-field template. Pose-INDEPENDENT
+                   (charges depend on topology, not placement), so it is computed
+                   ONCE and shared across poses — the expensive OpenFF/conda step
+                   does not multiply with pose count.
+        ``dock``   apo core (receptor) + smiles → ``n_poses`` pose cores. CPU; the
+                   pose ensemble Vina already produces, instead of discarding all
+                   but the top.
+        then per pose: ``build`` (place template into the pose + solvate, pip-only)
+                   → its own equilibrate→segment chains.
+      Because each chunk is pose-specific, the existing per-chunk consensus IS a
+      per-pose consensus; aggregation ACROSS poses happens at scoring time.
+    """
+    shape = spec["shape"]
+    n_poses = int(spec.get("n_poses", DEFAULT_N_POSES))
     chunks: list[dict] = []
+    apo_pair = _pair_tag(shape, APO)
+    apo_core = f"{apo_pair}/core.pdb"   # the shared receptor + apo system input
 
     for ligand in spec["ligands"]:
         pair = _pair_tag(shape, ligand)
-        core = f"{pair}/core.pdb"
-        sys_xml = f"{pair}/system.xml"
-        solv = f"{pair}/solvated.pdb"
-        smiles = spec["ligand_smiles"].get(ligand)  # None for apo
 
+        if ligand == APO:
+            sys_xml, solv = f"{pair}/system.xml", f"{pair}/solvated.pdb"
+            chunks.append({
+                "id": f"build__{pair}", "kind": "build",
+                "consumes": [apo_core], "produces": [sys_xml, solv],
+                "params": {"ligand": APO, "smiles": None, "rect_box": spec["rect_box"],
+                           "is_complex": False},
+                "meta": {"shape": shape, "ligand": APO},
+            })
+            _dynamics_chunks(spec, chunks, pair=pair, prefix=pair,
+                             sys_xml=sys_xml, solv=solv,
+                             meta_base={"shape": shape, "ligand": APO})
+            continue
+
+        smiles = spec["ligand_smiles"].get(ligand)
+        template = f"{pair}/ligand.xml"
+        pose_cores = [f"{pair}/p{j}/core.pdb" for j in range(n_poses)]
+
+        # Parametrise once (pose-independent), then dock the ensemble.
         chunks.append({
-            "id": f"build__{pair}", "kind": "build",
-            "consumes": [core], "produces": [sys_xml, solv],
-            "params": {"ligand": ligand, "smiles": smiles, "rect_box": spec["rect_box"],
-                       "is_complex": ligand != APO},
+            "id": f"param__{pair}", "kind": "param",
+            "consumes": [], "produces": [template],
+            "params": {"ligand": ligand, "smiles": smiles},
+            "meta": {"shape": shape, "ligand": ligand},
+        })
+        chunks.append({
+            "id": f"dock__{pair}", "kind": "dock",
+            "consumes": [apo_core], "produces": pose_cores,
+            "params": {"ligand": ligand, "smiles": smiles, "n_poses": n_poses,
+                       "rect_box": spec["rect_box"]},
             "meta": {"shape": shape, "ligand": ligand},
         })
 
-        for seed in seeds:
-            sd = f"{pair}/s{seed}"
-            state0 = f"{sd}/state_0.xml"
+        for j in range(n_poses):
+            prefix = f"{pair}/p{j}"
+            sys_xml, solv = f"{prefix}/system.xml", f"{prefix}/solvated.pdb"
             chunks.append({
-                "id": f"equil__{pair}__s{seed}", "kind": "equilibrate",
-                "consumes": [sys_xml, solv], "produces": [state0],
-                "params": {"equil_ps": spec["equil_ps"], "seed": seed,
-                           "temperature_k": spec["temperature_k"]},
-                "meta": {"shape": shape, "ligand": ligand, "seed": seed},
+                "id": f"build__{pair}__p{j}", "kind": "build",
+                "consumes": [pose_cores[j], template], "produces": [sys_xml, solv],
+                "params": {"ligand": ligand, "smiles": smiles, "pose": j,
+                           "rect_box": spec["rect_box"], "is_complex": True},
+                "meta": {"shape": shape, "ligand": ligand, "pose": j},
             })
-            for i in range(n_seg):
-                this_ps = segment_ps if (i + 1) * segment_ps <= prod_ps else (prod_ps - i * segment_ps)
-                state_in = f"{sd}/state_{i}.xml"
-                state_out = f"{sd}/state_{i+1}.xml"
-                seg_out = f"{sd}/seg_{i}.pdb"
-                chunks.append({
-                    "id": f"seg__{pair}__s{seed}__{i}", "kind": "segment",
-                    "consumes": [sys_xml, solv, state_in], "produces": [state_out, seg_out],
-                    "params": {"segment_ps": round(this_ps, 4), "index": i,
-                               "traj_interval_ps": spec["traj_interval_ps"],
-                               "seed": _segment_seed(seed, i),
-                               "temperature_k": spec["temperature_k"]},
-                    "meta": {"shape": shape, "ligand": ligand, "seed": seed, "index": i},
-                })
+            _dynamics_chunks(spec, chunks, pair=pair, prefix=prefix,
+                             sys_xml=sys_xml, solv=solv,
+                             meta_base={"shape": shape, "ligand": ligand, "pose": j})
     return chunks
 
 
