@@ -36,7 +36,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -60,8 +62,33 @@ from classifier import WEIGHTS
 from features import FEATURES, ordered_core_full_ids
 
 RESULTS = ROOT / "results" / "stage3"
-VINA_BIN = ROOT / "bin" / "vina.exe"
-MK_PREP_RECEPTOR = ROOT / ".venv" / "Scripts" / "mk_prepare_receptor.exe"
+
+
+def _tool_path(name: str, bundled: Path) -> str:
+    """Resolve an external docking tool across platforms so the `dock` chunk runs
+    on a volunteer's Linux/Mac box, not only the Windows dev machine. Order:
+    1. explicit override env var (e.g. ``VINA_BIN`` / ``MK_PREPARE_RECEPTOR_BIN``);
+    2. a console script next to the running Python (meeko installs
+       ``mk_prepare_receptor`` into the venv's bin/Scripts dir);
+    3. anything on ``PATH`` (``conda install vina`` / a downloaded binary);
+    4. the bundled Windows binary as a last-resort fallback.
+    """
+    env = os.environ.get(name.upper().replace("-", "_") + "_BIN")
+    if env:
+        return env
+    exe = name + (".exe" if os.name == "nt" else "")
+    beside = Path(sys.executable).parent / exe
+    if beside.exists():
+        return str(beside)
+    return shutil.which(name) or shutil.which(exe) or str(bundled)
+
+
+def _vina_bin() -> str:
+    return _tool_path("vina", ROOT / "bin" / "vina.exe")
+
+
+def _mk_prepare_receptor() -> str:
+    return _tool_path("mk_prepare_receptor", ROOT / ".venv" / "Scripts" / "mk_prepare_receptor.exe")
 VICINITY_JS = ROOT / "data" / "vicinity_molecules.js"
 
 # -----------------------------------------------------------------------------
@@ -158,7 +185,7 @@ def write_apo_pdb(structure: Structure, out_pdb: Path) -> Path:
 
 
 def prepare_receptor(apo_pdb: Path, out_pdbqt: Path) -> Path:
-    cmd = [str(MK_PREP_RECEPTOR), "--read_pdb", str(apo_pdb), "-p", str(out_pdbqt)]
+    cmd = [_mk_prepare_receptor(), "--read_pdb", str(apo_pdb), "-p", str(out_pdbqt)]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0 or not out_pdbqt.exists():
         raise RuntimeError(
@@ -292,7 +319,7 @@ def run_vina(
     seed: int = 42,
 ) -> tuple[Path, list[float], str]:
     cmd = [
-        str(VINA_BIN),
+        _vina_bin(),
         "--receptor", str(receptor),
         "--ligand", str(ligand),
         "--center_x", f"{center[0]:.3f}",
