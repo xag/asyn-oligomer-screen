@@ -393,6 +393,54 @@ def _truncate_chunk(src_pdb: Path, out_pdb: Path, lo: int, hi: int) -> Path:
     return out_pdb
 
 
+def dock_pose_cores(apo_core_pdb, smiles: str, out_dir, n_poses: int = 5,
+                    seed: int = 42, emit=print) -> list[Path]:
+    """Dock ``smiles`` onto the apo NAC core and write the top ``n_poses`` complex
+    cores to ``out_dir/p{j}/core.pdb`` (pose-rank order). The receptor is already
+    the truncated NAC core, so each output is a ready-to-build complex core — no
+    further truncation. CPU only (rdkit/meeko/Vina), so it runs in the pip venv.
+
+    This is the distributed ``dock`` chunk's body and the pose-sampling
+    replacement for a single central dock (#14): the bound pose is a stochastic
+    Vina draw, so the screen samples the ensemble instead of betting on the top
+    pose. Returns the written paths."""
+    import stage3
+    from Bio.PDB import PDBParser, PDBIO
+
+    apo_core_pdb = Path(apo_core_pdb)
+    out_dir = Path(out_dir)
+    work = out_dir / "_dock"
+    work.mkdir(parents=True, exist_ok=True)
+
+    parser = PDBParser(QUIET=True)
+    box = stage3.docking_box_for_nac_core(parser.get_structure("rec", str(apo_core_pdb)))
+    if box is None:
+        raise RuntimeError(f"no NAC-core docking box for {apo_core_pdb.name} "
+                           "(too few core residues 60-100)")
+    center, size = box
+
+    receptor = stage3.prepare_receptor(apo_core_pdb, work / "receptor.pdbqt")
+    ligand = stage3.prepare_ligand(smiles, work / "ligand.pdbqt", random_seed=seed)
+    docked, affinities, _log = stage3.run_vina(
+        receptor, ligand, center, size, work / "docked.pdbqt",
+        n_poses=n_poses, seed=seed)
+    poses = stage3.parse_pdbqt_all_poses(docked)[:n_poses]
+    emit(f"  docked {smiles}: {len(poses)} pose(s), "
+         f"affinities {[round(a, 2) for a in affinities[:n_poses]]} kcal/mol")
+
+    written: list[Path] = []
+    for j, pose in enumerate(poses):
+        s = parser.get_structure("cpx", str(apo_core_pdb))
+        stage3.add_ligand_to_structure(s, pose)
+        dest = out_dir / f"p{j}" / "core.pdb"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        io = PDBIO()
+        io.set_structure(s)
+        io.save(str(dest))
+        written.append(dest)
+    return written
+
+
 def run_pilot(
     shapes: list[str] = PILOT_SHAPES, ligands: list[str] = PILOT_LIGANDS,
     n_replicas: int = N_REPLICAS, prod_ns: float = PROD_NS,
