@@ -129,7 +129,10 @@ async def _ingest_results(lease: str, wall_s: float, manifest: str,
 
     _api().create_commit(_repo(), ops, repo_type=DATASET,
                          commit_message=f"results {chunk_id} by {pseudonym}")
-    return {"status": "accepted", "chunk_id": chunk_id, "outputs": list(meta_outputs)}
+    # Return the stored dataset paths so a work-store client can point the replica
+    # cursor at the state it just uploaded (resolvable via the dataset resolve base).
+    paths = {aid: f"{base}/{rec['file']}" for aid, rec in meta_outputs.items()}
+    return {"status": "accepted", "chunk_id": chunk_id, "outputs": list(meta_outputs), "paths": paths}
 
 
 @app.post("/api/screen/v1/results")

@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -127,6 +128,99 @@ def submit_results(results_url: str, lease: str, token: str | None,
     return r.json()
 
 
+# --- work-store unit: checkpointed run → upload → advance the cursor --------
+# A work-store unit (no `consumes` list; carries from_ps/step_ps params) runs a
+# short equilibrate or segment that checkpoints every `checkpoint_s` seconds. On
+# completion OR interrupt we upload the latest state and report how far it actually
+# got to /checkpoint, so the cursor advances by the work truly done — nothing
+# beyond the last few seconds is wasted.
+
+_CKPT_RE = re.compile(r"^CHECKPOINT\s+([0-9.]+)\s*$")
+
+
+def _run_md_streaming(cmd: list[str]) -> float | None:
+    """Run md_relax, ticking for liveness and tracking the last `CHECKPOINT <ps>`
+    it prints. On KeyboardInterrupt, stop the child (its latest checkpoint is
+    already on disk) and re-raise. Returns the last checkpoint ps, or None."""
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
+    last_ps = None
+    try:
+        for line in proc.stdout:
+            m = _CKPT_RE.match(line.strip())
+            if m:
+                last_ps = float(m.group(1))
+            else:
+                _tick()
+        if proc.wait() != 0:
+            raise RuntimeError(f"md step exited {proc.returncode}")
+        return last_ps
+    except KeyboardInterrupt:
+        proc.terminate()
+        try:
+            proc.wait(timeout=20)
+        except Exception:  # noqa: BLE001
+            proc.kill()
+        raise
+
+
+def run_unit(base: str, w: dict, token: str | None, scratch: Path) -> dict:
+    chunk = w["chunk"]
+    p = chunk.get("params", {})
+    kind = chunk.get("kind")
+    local = download_inputs(w["resolve_base"], w.get("inputs", {}), scratch)
+    state_out = scratch / "state.xml"
+    seg_out = scratch / "seg.pdb"
+    py, mdr = sys.executable, str(run_chunks.MD_RELAX)
+
+    if kind == "equilibrate":
+        cmd = [py, mdr, "--equilibrate", str(state_out),
+               "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
+               "--equil-ps", str(p["equil_ps"]), "--temperature-k", str(p["temperature_k"]),
+               "--seed", str(p["seed"]), "--report-interval-ps", "2"]
+    else:
+        cmd = [py, mdr, "--segment",
+               "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
+               "--state-in", str(local["state_in.xml"]), "--state-out", str(state_out),
+               "--seg-out", str(seg_out), "--segment-ps", str(p["step_ps"]),
+               "--traj-interval-ps", str(p["traj_interval_ps"]), "--temperature-k", str(p["temperature_k"]),
+               "--seed", str(p["seed"]), "--report-interval-ps", "2",
+               "--checkpoint-s", str(p.get("checkpoint_s", 10))]
+
+    t0 = time.time()
+    interrupted, last_ps = False, None
+    try:
+        last_ps = _run_md_streaming(cmd)
+    except KeyboardInterrupt:
+        interrupted = True
+
+    if not state_out.exists():
+        # nothing reached even one checkpoint — let it be reassigned from the cursor.
+        if interrupted:
+            raise KeyboardInterrupt
+        return {"stop": True, "msg": "the simulation produced no checkpoint"}
+
+    outputs = {"state.xml": state_out}
+    if kind != "equilibrate" and seg_out.exists():
+        outputs["seg.pdb"] = seg_out
+    resp = submit_results(w["results_url"], w["lease"], token, outputs, time.time() - t0)
+    state_path = (resp.get("paths") or {}).get("state.xml")
+
+    body = {"lease": w["lease"], "state": state_path}
+    if kind != "equilibrate":
+        from_ps = float(p["from_ps"])
+        body["ps_reached"] = from_ps + (last_ps if last_ps is not None else float(p["step_ps"]))
+    requests.post(base.rstrip("/") + "/api/screen/v1/checkpoint", json=body, timeout=60)
+
+    secs = time.time() - t0
+    _say(f"    {'stopped early — ' if interrupted else ''}advanced {chunk.get('molecule')} "
+         f"· sent back ✓ ({_fmt(secs)})")
+    if interrupted:
+        raise KeyboardInterrupt
+    return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": None}
+
+
 # --- one work → run → submit cycle ------------------------------------------
 
 def run_once(base: str, token: str | None, molecules: str | None,
@@ -145,7 +239,10 @@ def run_once(base: str, token: str | None, molecules: str | None,
 
     chunk = w["chunk"]
     _say(f"  ▶ {chunk.get('label') or chunk.get('kind')}")
-    scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{chunk['id']}_"))
+    safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", str(chunk["id"]))
+    scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{safe_id}_"))
+    if "consumes" not in chunk:        # work-store unit (checkpointed, cursor-advancing)
+        return run_unit(base, w, token, scratch)
     local = download_inputs(w["resolve_base"], w.get("inputs", {}), scratch)
     t0 = time.time()
     outputs = run_chunks.execute_chunk(chunk, lambda aid: local[aid], scratch)
