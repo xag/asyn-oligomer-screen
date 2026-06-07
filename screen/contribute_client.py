@@ -135,7 +135,8 @@ def run_once(base: str, token: str | None, molecules: str | None,
     and prints what's happening as it goes."""
     w = get_work(base, token, molecules, done)
     if w.get("status") in ("idle", "busy"):
-        return {"stop": True, "msg": w.get("message") or w.get("status")}
+        return {"stop": True, "msg": w.get("message") or w.get("status"),
+                "scope": w.get("scope")}
     if "chunk" not in w:
         return {"stop": True, "msg": w.get("error") or "no work available"}
     results_url = w.get("results_url")
@@ -217,6 +218,13 @@ def contribute(base: str = DEFAULT_BASE_URL, minutes: float | None = None,
             return
         except Exception as e:  # noqa: BLE001
             _say(f"    task failed ({e}) — it will be reassigned to someone else\n")
+            last_lease = None
+            continue
+        if r.get("stop") and molecules and r.get("scope") == "molecule":
+            _say("\nNothing queued for your molecule pick right now — running "
+                 "whatever the screen needs next so your GPU isn't idle. Your "
+                 "picks run as the screen reaches them.\n")
+            molecules = None
             last_lease = None
             continue
         if r.get("stop"):
