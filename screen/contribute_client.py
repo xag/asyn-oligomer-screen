@@ -155,6 +155,55 @@ def run_once(base: str, token: str | None, molecules: str | None,
     return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": w["lease"]}
 
 
+# --- propose a molecule to test ---------------------------------------------
+
+def submit_molecule(name: str, smiles: str, *, base: str = DEFAULT_BASE_URL,
+                    group: str | None = None, evidence: str | None = None,
+                    route: str | None = None, feasibility: str | None = None,
+                    refs: str | list[str] | None = None) -> dict:
+    """Propose a molecule for the screen to dock and test. `name` and `smiles` are
+    required (the structure is what gets docked); the rest help it score and show
+    up well. The server validates the SMILES and stores it for the next prep pass.
+    Returns the stored record, or {} on a rejected/failed submission."""
+    name, smiles = (name or "").strip(), (smiles or "").strip()
+    if not name or not smiles:
+        _say("A name and a SMILES string are both required to submit a molecule.")
+        return {}
+
+    payload: dict = {"name": name, "smiles": smiles}
+    if group:
+        payload["group"] = group
+    if evidence:
+        payload["evidence"] = evidence
+    delivery = {k: v for k, v in (("route", route), ("feasibility", feasibility)) if v}
+    if delivery:
+        payload["delivery"] = delivery
+    if refs:
+        items = refs if isinstance(refs, list) else str(refs).split(";")
+        cleaned = [s.strip() for s in items if s and s.strip()]
+        if cleaned:
+            payload["refs"] = cleaned
+
+    try:
+        r = requests.post(base.rstrip("/") + "/api/screen/v1/molecules",
+                          json=payload, timeout=60)
+    except requests.RequestException as e:  # noqa: BLE001
+        _say(f"Couldn't reach the screen to submit ({e}).")
+        return {}
+
+    if r.status_code == 200:
+        rec = r.json()
+        _say(f"Submitted “{rec.get('name')}” (id {rec.get('id')}). It's queued for "
+             "docking and testing — its results will appear on the results page.")
+        return rec
+    try:
+        msg = r.json().get("error") or r.text
+    except Exception:  # noqa: BLE001
+        msg = r.text
+    _say(f"Not accepted ({r.status_code}): {msg}")
+    return {}
+
+
 # --- the contributor's whole session ----------------------------------------
 
 def contribute(base: str = DEFAULT_BASE_URL, minutes: float | None = None,
