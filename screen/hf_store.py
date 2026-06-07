@@ -313,6 +313,76 @@ def cmd_enqueue_awaiting(args) -> None:
 
 
 # ---------------------------------------------------------------------------
+# seed-replicas — register build-ready replica cursors in the work store
+# ---------------------------------------------------------------------------
+
+def cmd_seed_replicas(args) -> None:
+    """Bridge the discrete dock+build chunks (which produce each pose's prepared MD
+    system) into the Redis work store: for every completed build, register a replica
+    cursor per seed pointing at that system, so the segment-heavy work flows through
+    the scalable cursor store instead of a materialised manifest. Idempotent —
+    health's ensureReplica leaves committed progress untouched. POSTs to health
+    /seed (cron-authenticated)."""
+    import urllib.request
+    from huggingface_hub import HfApi, hf_hub_download
+
+    api = HfApi(token=args.token)
+    manifest = _download_manifest(api, args.repo, args.token)
+    spec = manifest.get("spec", {})
+    arts = manifest.get("artifacts", {})
+    seeds = spec.get("seeds", []) or []
+    prod_ps = spec.get("prod_ps")
+
+    try:
+        p = hf_hub_download(args.repo, "molecules.json", repo_type=DATASET,
+                            token=args.token, force_download=True)
+        registry = json.loads(Path(p).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        registry = []
+    prio = {}
+    for m in registry:
+        if isinstance(m, dict) and m.get("id"):
+            pr = 10 ** 9 if m.get("source") == "contributed" else (m.get("priority") or 100)
+            prio[m["id"]] = pr
+    priority_of = lambda lig: 0 if lig == "apo" else prio.get(lig, 100)  # noqa: E731
+
+    replicas = []
+    for ch in manifest.get("chunks", []):
+        if ch.get("kind") != "build" or ch.get("status") != "done":
+            continue
+        produces = ch.get("produces", [])
+        sys_xml = next((a for a in produces if a.endswith("system.xml")), None)
+        solv = next((a for a in produces if a.endswith("solvated.pdb")), None)
+        sx = (arts.get(sys_xml) or {}).get("path") if sys_xml else None
+        sp = (arts.get(solv) or {}).get("path") if solv else None
+        if not sx or not sp:
+            continue
+        meta = ch.get("meta", {})
+        ligand, pose = meta.get("ligand", "apo"), meta.get("pose")
+        for sd in seeds:
+            rid = f"{ligand}__p{pose}__s{sd}" if pose is not None else f"{ligand}__s{sd}"
+            replicas.append({
+                "rid": rid, "ligand": ligand, "pose": pose, "seed": sd,
+                "target_ps": prod_ps, "sys_xml": sx, "solv_pdb": sp,
+                "priority": priority_of(ligand),
+            })
+
+    body = json.dumps({
+        "spec": {
+            "equil_ps": spec.get("equil_ps"), "segment_ps": spec.get("segment_ps"),
+            "temperature_k": spec.get("temperature_k"), "traj_interval_ps": spec.get("traj_interval_ps"),
+            "checkpoint_s": args.checkpoint_s,
+        },
+        "replicas": replicas,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        args.site.rstrip("/") + "/api/screen/v1/seed", data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {args.secret}"})
+    with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310
+        print(f"seeded {len(replicas)} replica cursor(s): {r.read().decode('utf-8')}", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # work — contributor: pull a runnable chunk, run it, submit outputs
 # ---------------------------------------------------------------------------
 
@@ -584,6 +654,15 @@ def main() -> None:
                         help="generate chunks for contributed molecules awaiting prep and append to the live manifest")
     common(pe)
     pe.set_defaults(func=cmd_enqueue_awaiting)
+
+    psr = sub.add_parser("seed-replicas",
+                         help="register build-ready replica cursors in the work store (POST health /seed)")
+    common(psr)
+    psr.add_argument("--site", required=True, help="health site root, e.g. https://<site>")
+    psr.add_argument("--secret", required=True, help="CRON_SECRET shared with health (Bearer auth)")
+    psr.add_argument("--checkpoint-s", type=float, default=10.0,
+                     help="wall-seconds between contributor checkpoints stamped onto units")
+    psr.set_defaults(func=cmd_seed_replicas)
 
     args = p.parse_args()
     args.func(args)

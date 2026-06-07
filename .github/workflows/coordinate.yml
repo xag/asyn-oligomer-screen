@@ -44,3 +44,13 @@ jobs:
           REPO: ${{ vars.SCREEN_DATASET_REPO }}
           EXP: ${{ vars.SCREEN_EXP_ID }}
         run: python screen/hf_store.py enqueue-awaiting "$EXP" --repo "$REPO"
+      # Bridge completed dock+build into the Redis work store: one replica cursor
+      # per seed, so segment work flows through the scalable store. Idempotent.
+      - name: seed work-store replica cursors
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REPO: ${{ vars.SCREEN_DATASET_REPO }}
+          EXP: ${{ vars.SCREEN_EXP_ID }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: python screen/hf_store.py seed-replicas "$EXP" --repo "$REPO" --site "$SITE_URL" --secret "$CRON_SECRET"
