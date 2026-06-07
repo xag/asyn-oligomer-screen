@@ -35,3 +35,12 @@ jobs:
           python screen/hf_store.py ingest "$EXP" --repo "$REPO" --quorum-weight 0.5
           python screen/reputation.py fold --repo "$REPO" \
             --bonus-url "$SITE_URL/screen?action=bonus&secret=$CRON_SECRET"
+      # Turn contributed submissions into runnable work (docking is itself a
+      # contributed `dock` chunk). Separate step so a bad submission can't block
+      # the accept/fold core above.
+      - name: enqueue contributed molecules awaiting prep
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REPO: ${{ vars.SCREEN_DATASET_REPO }}
+          EXP: ${{ vars.SCREEN_EXP_ID }}
+        run: python screen/hf_store.py enqueue-awaiting "$EXP" --repo "$REPO"

@@ -202,6 +202,92 @@ def cmd_publish_molecules(args) -> None:
 
 
 # ---------------------------------------------------------------------------
+# enqueue-awaiting — turn contributed submissions into runnable work (coordinator)
+# ---------------------------------------------------------------------------
+
+def _norm_chunk(ch: dict) -> dict:
+    """The pending-chunk shape chunk_store.create_experiment writes — mirrored here
+    so appended chunks match the rest of the manifest exactly."""
+    return {
+        "id": ch["id"], "kind": ch["kind"],
+        "consumes": list(ch.get("consumes", [])),
+        "produces": list(ch.get("produces", [])),
+        "params": dict(ch.get("params", {})),
+        "meta": dict(ch.get("meta", {})),
+        "status": "pending", "lease": None, "wall_s": None,
+        "error": None, "updated_at": None,
+    }
+
+
+def cmd_enqueue_awaiting(args) -> None:
+    """Enqueue contributed molecules still `prep:awaiting` into the live experiment:
+    generate each one's dock->build->equilibrate->segment chunks (docking stays a
+    contributor `dock` chunk) against the manifest's own spec + shared apo core, and
+    append them. Marks the molecule `prep:ready`. Idempotent — molecules already in
+    the spec, or chunk ids already present, are skipped. Adds nothing to our
+    prioritisation: the new chunks are contributed-tier, run only via the opt-out."""
+    from huggingface_hub import HfApi, CommitOperationAdd, hf_hub_download
+    from run_chunks import enumerate_chunks, APO
+
+    api = HfApi(token=args.token)
+    manifest = _download_manifest(api, args.repo, args.token)
+    if manifest.get("exp_id") not in (None, args.exp_id):
+        raise SystemExit(f"repo holds experiment {manifest.get('exp_id')!r}, not {args.exp_id!r}")
+
+    try:
+        p = hf_hub_download(args.repo, "molecules.json", repo_type=DATASET,
+                            token=args.token, force_download=True)
+        registry = json.loads(Path(p).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — no registry yet = nothing to enqueue
+        registry = []
+
+    spec = manifest["spec"]
+    have = set(spec.get("ligands", []))
+    artifacts = manifest["artifacts"]
+    seen_ids = {c["id"] for c in manifest["chunks"]}
+
+    added_mols, added_chunks = [], 0
+    for m in registry:
+        if not isinstance(m, dict) or m.get("source") != "contributed" or m.get("prep") != "awaiting":
+            continue
+        mid, smiles = m.get("id"), m.get("smiles")
+        if not mid or not smiles or mid == APO or mid in have:
+            continue
+        lig_spec = {**spec, "ligands": [mid], "ligand_smiles": {mid: smiles}}
+        try:
+            chunks = enumerate_chunks(lig_spec)
+        except Exception as e:  # noqa: BLE001 — one bad submission shouldn't block the rest
+            print(f"  skip {mid}: {e}", flush=True)
+            continue
+        for ch in chunks:
+            if ch["id"] in seen_ids:
+                continue
+            manifest["chunks"].append(_norm_chunk(ch))
+            seen_ids.add(ch["id"])
+            for aid in ch.get("produces", []):
+                artifacts.setdefault(aid, {"present": False, "path": None, "sha256": None, "bytes": None})
+            added_chunks += 1
+        spec.setdefault("ligands", []).append(mid)
+        spec.setdefault("ligand_smiles", {})[mid] = smiles
+        m["prep"] = "ready"
+        added_mols.append(mid)
+
+    if not added_mols:
+        print("nothing to enqueue (no contributed molecules awaiting prep)", flush=True)
+        return
+
+    api.create_commit(
+        args.repo,
+        [CommitOperationAdd("manifest.json", json.dumps(manifest, indent=2).encode("utf-8")),
+         CommitOperationAdd("molecules.json", json.dumps(registry, indent=2).encode("utf-8"))],
+        repo_type=DATASET, token=args.token,
+        commit_message=f"enqueue {len(added_mols)} contributed molecule(s): {', '.join(added_mols)}",
+    )
+    print(f"enqueued {len(added_mols)} molecule(s), +{added_chunks} chunks: "
+          f"{', '.join(added_mols)}", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # work — contributor: pull a runnable chunk, run it, submit outputs
 # ---------------------------------------------------------------------------
 
@@ -468,6 +554,11 @@ def main() -> None:
     pm.add_argument("--file", default="molecules.json",
                     help="primary molecules JSON, e.g. from `node scripts/build_molecules_json.mjs`")
     pm.set_defaults(func=cmd_publish_molecules)
+
+    pe = sub.add_parser("enqueue-awaiting",
+                        help="generate chunks for contributed molecules awaiting prep and append to the live manifest")
+    common(pe)
+    pe.set_defaults(func=cmd_enqueue_awaiting)
 
     args = p.parse_args()
     args.func(args)
