@@ -219,13 +219,24 @@ def _norm_chunk(ch: dict) -> dict:
     }
 
 
+# A contributed submission earns a cheap SCREENING pass, not the full curated
+# treatment: one pose, a couple of seeds, short trajectories — a few dozen chunks
+# instead of thousands, so an unvetted molecule can't blow up the work list. It's
+# also the right science: screen cheaply, and promote a promising hit to the full
+# budget as a moderation step (re-create it as a primary molecule).
+SCREEN_N_POSES = 1
+SCREEN_N_SEEDS = 2
+SCREEN_PROD_PS = 1000.0
+
+
 def cmd_enqueue_awaiting(args) -> None:
     """Enqueue contributed molecules still `prep:awaiting` into the live experiment:
     generate each one's dock->build->equilibrate->segment chunks (docking stays a
-    contributor `dock` chunk) against the manifest's own spec + shared apo core, and
-    append them. Marks the molecule `prep:ready`. Idempotent — molecules already in
-    the spec, or chunk ids already present, are skipped. Adds nothing to our
-    prioritisation: the new chunks are contributed-tier, run only via the opt-out."""
+    contributor `dock` chunk) against the manifest's spec + shared apo core, on a
+    reduced screening budget, and append them. Marks the molecule `prep:ready`.
+    Idempotent — molecules already in the spec, or chunk ids already present, are
+    skipped. Adds nothing to our prioritisation: the new chunks are contributed-tier,
+    run only via the opt-out."""
     from huggingface_hub import HfApi, CommitOperationAdd, hf_hub_download
     from run_chunks import enumerate_chunks, APO
 
@@ -253,7 +264,12 @@ def cmd_enqueue_awaiting(args) -> None:
         mid, smiles = m.get("id"), m.get("smiles")
         if not mid or not smiles or mid == APO or mid in have:
             continue
-        lig_spec = {**spec, "ligands": [mid], "ligand_smiles": {mid: smiles}}
+        lig_spec = {
+            **spec, "ligands": [mid], "ligand_smiles": {mid: smiles},
+            "n_poses": SCREEN_N_POSES,
+            "seeds": list(spec.get("seeds", []))[:SCREEN_N_SEEDS] or [1],
+            "prod_ps": min(float(spec.get("prod_ps", SCREEN_PROD_PS)), SCREEN_PROD_PS),
+        }
         try:
             chunks = enumerate_chunks(lig_spec)
         except Exception as e:  # noqa: BLE001 — one bad submission shouldn't block the rest
