@@ -19,6 +19,7 @@ const MOL_PATH = join(root, 'data', 'vicinity_molecules.js');
 const BRAIN_PATH = join(root, 'data', 'brain_access.js');
 const OUT_PATH = join(here, 'index.html');
 const REPO = 'https://github.com/xag/asyn-oligomer-screen';
+const COLAB_URL = 'https://colab.research.google.com/github/xag/asyn-oligomer-screen/blob/main/notebooks/contribute.ipynb';
 
 // --- load an ES-module data file by stripping `export` and returning a const ---
 function loadConst(path, name) {
@@ -90,7 +91,33 @@ const protective = records
   .filter((r) => r.dActGated < 0 && !harmfulIds.has(r.id))
   .sort((a, b) => a.dActGated - b.dActGated);
 
-const payload = JSON.stringify({ protective, harmful });
+// The full candidate pool — every registry entry, not just the scored leaders
+// above. This is the surface a contributor browses to steer their compute at a
+// molecule they believe matters; the ones still "awaiting compute" are exactly
+// the ones the ranked views can't show.
+const scoredIds = new Set(records.map((r) => r.id));
+const GROUP_LABELS = {
+  'endogenous-metabolites': 'Made in the body',
+  dietary: 'Food & drink',
+  neurotransmitter: 'Neurotransmitters',
+  metal: 'Metals & ions',
+  lipid: 'Lipids',
+  'gut-derived': 'Gut-derived',
+  environmental: 'Environmental exposure',
+};
+const candidates = [...metaById.values()]
+  .map((m) => ({
+    id: m.id,
+    name: m.name ?? m.id,
+    group: m.group ?? 'environmental',
+    route: m?.delivery?.route ?? '',
+    feasibility: m?.delivery?.feasibility ?? '',
+    why: m.evidence ?? '',
+    scored: scoredIds.has(m.id),
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+const payload = JSON.stringify({ protective, harmful, candidates, groupLabels: GROUP_LABELS });
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -123,7 +150,20 @@ const html = `<!DOCTYPE html>
     color:var(--dim); border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
   .seg button.on.prot { color:#0e1117; background:var(--prot); border-color:var(--prot); }
   .seg button.on.harm { color:#0e1117; background:var(--harm); border-color:var(--harm); }
+  .seg button.on.cand { color:#0e1117; background:var(--novel); border-color:var(--novel); }
   .intro { color:var(--dim); font-size:13px; margin:2px 0 12px; }
+  .intro a { color:var(--novel); }
+
+  #csearch { width:100%; padding:11px 13px; margin:0 0 10px; border:1px solid var(--line);
+    border-radius:10px; background:var(--card); color:var(--txt); font-size:15px; }
+  #csearch::placeholder { color:var(--dim); }
+  .cwhere { flex:1 1 auto; color:var(--dim); font-size:12.5px; }
+  .cstatus { font-size:11px; padding:2px 9px; border-radius:999px; white-space:nowrap; flex:0 0 auto; }
+  .cstatus.await { color:var(--novel); border:1px solid var(--novel); }
+  .cstatus.scored { color:var(--marker); border:1px solid var(--marker); }
+  .copyid { margin:8px 0 2px; padding:8px 12px; border:1px solid var(--novel); background:transparent;
+    color:var(--novel); border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+  .copyid.done { color:var(--prot); border-color:var(--prot); cursor:default; }
 
   details.mol { background:var(--card); border:1px solid var(--line); border-radius:10px;
     margin:0 0 7px; overflow:hidden; }
@@ -183,8 +223,10 @@ const html = `<!DOCTYPE html>
   <div class="seg">
     <button id="bProt" class="prot on" data-panel="protective">Worth testing</button>
     <button id="bHarm" class="harm" data-panel="harmful">Reduce exposure</button>
+    <button id="bCand" class="cand" data-panel="candidates">Pick a molecule</button>
   </div>
   <p class="intro" id="intro"></p>
+  <input id="csearch" type="search" placeholder="Search candidates by name…" hidden autocomplete="off">
 
   <div id="list"></div>
   <div class="foot" id="foot"></div>
@@ -192,6 +234,7 @@ const html = `<!DOCTYPE html>
 
 <script>
 const DATA = ${payload};
+const COLAB = '${COLAB_URL}';
 let panel = 'protective';
 
 const VERDICT = {
@@ -229,6 +272,52 @@ function harmLever(r) {
 function shortName(n){ return n.replace(/\\s*\\(.*\\)/, ''); }
 function field(lbl, val, cls){ return val ? '<div class="field"><span class="lbl">' + lbl + '</span><span class="val ' + (cls||'') + '">' + val + '</span></div>' : ''; }
 function pct(v, max){ return Math.max(3, Math.round((v / max) * 100)); }
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c])); }
+
+function molCandidate(c) {
+  const where = [c.route, c.feasibility].filter(Boolean).join(' · ');
+  const status = c.scored
+    ? '<span class="cstatus scored">already scored</span>'
+    : '<span class="cstatus await">awaiting compute</span>';
+  return \`<details class="mol">
+    <summary>
+      <span class="nm">\${shortName(c.name)}</span>
+      <div class="meta">
+        <span class="cwhere">\${where}</span>
+        \${status}
+      </div>
+    </summary>
+    <div class="body">
+      \${field('Why it’s a candidate', c.why ? esc(c.why) : '')}
+      <button class="copyid" data-id="\${c.id}">Target this — copy id</button>
+    </div>
+  </details>\`;
+}
+
+function renderCandidates() {
+  const search = document.getElementById('csearch');
+  document.getElementById('intro').innerHTML =
+    'Every molecule in the screen, including the ones not yet computed. Search or browse, '
+    + 'copy an id, and paste it into the <b>Molecules</b> field of the '
+    + '<a href="' + COLAB + '" target="_blank" rel="noopener">contributor notebook</a> to point your GPU at it.';
+  const q = (search.value || '').trim().toLowerCase();
+  const list = document.getElementById('list');
+  if (q) {
+    const hits = DATA.candidates.filter(c => (c.name + ' ' + c.group + ' ' + c.why).toLowerCase().includes(q));
+    list.innerHTML = hits.length
+      ? hits.map(molCandidate).join('')
+      : '<p class="intro">No candidate matches “' + esc(q) + '”.</p>';
+    return;
+  }
+  list.innerHTML = Object.keys(DATA.groupLabels).map(g => {
+    const arr = DATA.candidates.filter(c => c.group === g);
+    if (!arr.length) return '';
+    const awaiting = arr.filter(c => !c.scored).length;
+    return '<details class="group" open><summary><span class="gcount">' + arr.length + '</span> '
+      + DATA.groupLabels[g] + ' — ' + awaiting + ' awaiting compute</summary>'
+      + arr.map(molCandidate).join('') + '</details>';
+  }).join('');
+}
 
 function molProtective(r, max) {
   const v = VERDICT[r.verdict];
@@ -269,6 +358,8 @@ function molHarmful(r, max) {
 }
 
 function render() {
+  document.getElementById('csearch').hidden = panel !== 'candidates';
+  if (panel === 'candidates') return renderCandidates();
   const prot = panel === 'protective';
   const all = DATA[panel];
   const max = prot ? Math.max(...all.map(r => -r.dActGated)) : Math.max(...all.map(r => r.aspr));
@@ -294,10 +385,22 @@ function render() {
 
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
   panel = b.dataset.panel;
-  document.getElementById('bProt').classList.toggle('on', panel === 'protective');
-  document.getElementById('bHarm').classList.toggle('on', panel === 'harmful');
+  document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x.dataset.panel === panel));
   window.scrollTo(0, 0);
   render();
+});
+
+document.getElementById('csearch').addEventListener('input', render);
+
+// Copy a molecule id to paste into the notebook's Molecules field. Falls back to
+// leaving the id on screen if the clipboard API is unavailable.
+document.getElementById('list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.copyid');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const done = () => { btn.textContent = 'copied “' + id + '” — paste into Molecules'; btn.classList.add('done'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(id).then(done, done);
+  else done();
 });
 
 document.getElementById('foot').innerHTML =
@@ -318,6 +421,6 @@ render();
 
 writeFileSync(OUT_PATH, html);
 console.log(`wrote ${OUT_PATH}`);
-console.log(`  protective: ${protective.length}  harmful: ${harmful.length}`);
+console.log(`  protective: ${protective.length}  harmful: ${harmful.length}  candidates: ${candidates.length}`);
 if (missingBrain.length) console.log(`  ⚠ missing brain_access for: ${missingBrain.join(', ')}`);
 else console.log('  ✓ every candidate has a brain-access justification');
