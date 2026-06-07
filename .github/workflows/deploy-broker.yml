@@ -1,0 +1,37 @@
+name: deploy dwell-time broker
+
+# Manual redeploy of the write broker (broker/app.py) to its HF Space, and (re)set
+# its secrets. The HF write token never leaves a managed store: it's the same
+# secrets.HF_TOKEN the hourly coordinator uses, and provision.py copies it into the
+# Space's own secret. Nothing is kept locally.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-broker
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # provision.py needs only the hub client.
+      - run: pip install --quiet huggingface_hub
+      - name: provision broker Space + secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          # Must equal health's SCREEN_LEASE_KEY so the broker can verify the
+          # leases health signs. Read from a file so it never lands in a process arg.
+          SCREEN_LEASE_KEY: ${{ secrets.SCREEN_LEASE_KEY }}
+        run: |
+          if [ -z "$SCREEN_LEASE_KEY" ]; then
+            echo "::error::SCREEN_LEASE_KEY repo secret is not set — add it (same value as health's SCREEN_LEASE_KEY) and re-run."
+            exit 1
+          fi
+          printf '%s' "$SCREEN_LEASE_KEY" > "$RUNNER_TEMP/lease.key"
+          python broker/provision.py "$RUNNER_TEMP/lease.key"
+          rm -f "$RUNNER_TEMP/lease.key"
