@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/users/xg2/Perso/health/**)"
+    ]
+  }
+}
