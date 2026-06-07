@@ -753,12 +753,19 @@ def segment_chunk(
     pressure_atm: float,
     timestep_fs: float,
     report_interval_ps: float,
+    checkpoint_s: float = 0.0,
     seed: int | None,
     t0: float | None = None,
 ) -> None:
     """Chunk step 'segment': continue a replica from state_in for segment_ps,
     dumping heavy-atom frames to seg_out, then serialise state_out. No minimise/
-    warm-up/equilibrate — velocities come from state_in. Pip-only OpenMM."""
+    warm-up/equilibrate — velocities come from state_in. Pip-only OpenMM.
+
+    With ``checkpoint_s > 0`` the work-loop overwrites ``state_out`` every
+    ``checkpoint_s`` seconds of wall time and prints ``CHECKPOINT <ps_done>`` —
+    so if the process is killed (a contributor closes the tab) the latest
+    checkpoint is already on disk and at most ``checkpoint_s`` seconds are lost.
+    Left at 0 (the manifest path) the loop is byte-identical to before."""
     if t0 is None:
         t0 = time.time()
     print(f"=== md_relax (segment chunk): {Path(state_in).name} → {Path(state_out).name} ===", flush=True)
@@ -787,13 +794,34 @@ def segment_chunk(
     writer = HeavyTrajectoryWriter(Path(seg_out), topology)
     print(f"  segment NPT ({segment_ps:.0f} ps, {seg_steps} steps) → "
           f"{n_frames} frames every {traj_interval_ps:.0f} ps to {Path(seg_out).name}", flush=True)
-    for _ in range(n_frames):
-        sim.step(frame_steps)
-        fr = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
-        writer.write_frame(fr.getPositions(asNumpy=True))
+    if checkpoint_s and checkpoint_s > 0:
+        # Step in ~1 ps blocks so wall-clock checkpoints land near checkpoint_s;
+        # write a trajectory frame on each traj_interval boundary; overwrite
+        # state_out whenever checkpoint_s has elapsed (resumable on a kill).
+        block = max(1, min(frame_steps, steps_per_ps))
+        done_steps = last_frame = 0
+        last_ckpt = time.time()
+        while done_steps < seg_steps:
+            sim.step(min(block, seg_steps - done_steps))
+            done_steps = min(done_steps + block, seg_steps)
+            if done_steps - last_frame >= frame_steps or done_steps >= seg_steps:
+                fr = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+                writer.write_frame(fr.getPositions(asNumpy=True))
+                last_frame = done_steps
+            if time.time() - last_ckpt >= checkpoint_s:
+                serialize_state(sim, Path(state_out))
+                print(f"CHECKPOINT {done_steps / steps_per_ps:.4f}", flush=True)
+                last_ckpt = time.time()
+    else:
+        for _ in range(n_frames):
+            sim.step(frame_steps)
+            fr = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+            writer.write_frame(fr.getPositions(asNumpy=True))
     writer.close()
 
     serialize_state(sim, Path(state_out))
+    if checkpoint_s and checkpoint_s > 0:
+        print(f"CHECKPOINT {seg_steps / steps_per_ps:.4f}", flush=True)
     print(f"  wrote {Path(seg_out).name} + {Path(state_out).name} "
           f"({(time.time() - t0)/60:.1f} min total)", flush=True)
 
@@ -1132,6 +1160,9 @@ def main() -> None:
                    help="output multi-MODEL frame PDB for --segment")
     p.add_argument("--segment-ps", type=float, default=100.0,
                    help="ps of production per --segment step")
+    p.add_argument("--checkpoint-s", type=float, default=0.0,
+                   help="with --segment, overwrite --state-out every N wall-seconds and print "
+                        "CHECKPOINT <ps_done>, so a killed run loses at most N seconds (0 = off)")
     args = p.parse_args()
 
     # --- Resumable chunk dispatch (pip-only; needs a built --system-xml). ---
@@ -1155,7 +1186,7 @@ def main() -> None:
             segment_ps=args.segment_ps, traj_interval_ps=args.traj_interval_ps,
             temperature_k=args.temperature_k, pressure_atm=args.pressure_atm,
             timestep_fs=args.timestep_fs, report_interval_ps=args.report_interval_ps,
-            seed=args.seed,
+            checkpoint_s=args.checkpoint_s, seed=args.seed,
         )
         return
 
