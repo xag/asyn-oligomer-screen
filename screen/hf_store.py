@@ -224,6 +224,11 @@ def _norm_chunk(ch: dict) -> dict:
 # instead of thousands, so an unvetted molecule can't blow up the work list. It's
 # also the right science: screen cheaply, and promote a promising hit to the full
 # budget as a moderation step (re-create it as a primary molecule).
+#
+# INVARIANT: these reduce only the *count* of chunks (poses, seeds, total prod_ps).
+# They never touch equil_ps / segment_ps — those are inherited from the curated
+# spec — so a contributed chunk's wall time always equals (or is less than) one of
+# ours, never more. Do not add a SCREEN_SEGMENT_PS/SCREEN_EQUIL_PS here.
 SCREEN_N_POSES = 1
 SCREEN_N_SEEDS = 2
 SCREEN_PROD_PS = 1000.0
@@ -270,6 +275,10 @@ def cmd_enqueue_awaiting(args) -> None:
             "seeds": list(spec.get("seeds", []))[:SCREEN_N_SEEDS] or [1],
             "prod_ps": min(float(spec.get("prod_ps", SCREEN_PROD_PS)), SCREEN_PROD_PS),
         }
+        # Enforce the invariant: a contributed chunk must never run longer than ours.
+        assert lig_spec.get("segment_ps") == spec.get("segment_ps") \
+            and lig_spec.get("equil_ps") == spec.get("equil_ps"), \
+            "screening budget must not change per-chunk MD length (equil_ps/segment_ps)"
         try:
             chunks = enumerate_chunks(lig_spec)
         except Exception as e:  # noqa: BLE001 — one bad submission shouldn't block the rest
