@@ -99,7 +99,11 @@ async def _ingest_results(lease: str, wall_s: float, manifest: str,
 
     by_name = {f.filename: f for f in (files or [])}
     ops, meta_outputs, total = [], {}, 0
-    base = f"submissions/{chunk_id}/{pseudonym}"
+    # Unit ids carry '#'/'@' (e.g. rid#segment@5). They land in dataset paths that
+    # are later fetched as resolve_base + path, where '#' would be read as a URL
+    # fragment — so make the storage path URL-safe. The real id stays in meta.json.
+    safe_chunk = re.sub(r"[^A-Za-z0-9_.-]", "_", chunk_id)
+    base = f"submissions/{safe_chunk}/{pseudonym}"
     for aid, fname in out_map.items():
         up = by_name.get(fname)
         if up is None:

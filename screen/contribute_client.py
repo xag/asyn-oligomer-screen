@@ -128,12 +128,13 @@ def submit_results(results_url: str, lease: str, token: str | None,
     return r.json()
 
 
-# --- work-store unit: checkpointed run → upload → advance the cursor --------
-# A work-store unit (no `consumes` list; carries from_ps/step_ps params) runs a
-# short equilibrate or segment that checkpoints every `checkpoint_s` seconds. On
-# completion OR interrupt we upload the latest state and report how far it actually
-# got to /checkpoint, so the cursor advances by the work truly done — nothing
-# beyond the last few seconds is wasted.
+# --- run one unit: download inputs → run by kind → upload → report ----------
+# Every unit (dock, build, equilibrate, segment) arrives in one shape: inputs to
+# download, params, and an `outputs` map (local filename → artifact id). We run the
+# kind-appropriate step, upload the produced files to the broker, and report the
+# resulting dataset paths to /checkpoint, which registers the produced artifacts and
+# advances the job. The MD steps checkpoint every `checkpoint_s` seconds, so on an
+# interrupt the latest state is already saved and only the last few seconds are lost.
 
 _CKPT_RE = re.compile(r"^CHECKPOINT\s+([0-9.]+)\s*$")
 
@@ -170,51 +171,63 @@ def run_unit(base: str, w: dict, token: str | None, scratch: Path) -> dict:
     p = chunk.get("params", {})
     kind = chunk.get("kind")
     local = download_inputs(w["resolve_base"], w.get("inputs", {}), scratch)
-    state_out = scratch / "state.xml"
-    seg_out = scratch / "seg.pdb"
-    py, mdr = sys.executable, str(run_chunks.MD_RELAX)
-
-    if kind == "equilibrate":
-        cmd = [py, mdr, "--equilibrate", str(state_out),
-               "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
-               "--equil-ps", str(p["equil_ps"]), "--temperature-k", str(p["temperature_k"]),
-               "--seed", str(p["seed"]), "--report-interval-ps", "2"]
-    else:
-        cmd = [py, mdr, "--segment",
-               "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
-               "--state-in", str(local["state_in.xml"]), "--state-out", str(state_out),
-               "--seg-out", str(seg_out), "--segment-ps", str(p["step_ps"]),
-               "--traj-interval-ps", str(p["traj_interval_ps"]), "--temperature-k", str(p["temperature_k"]),
-               "--seed", str(p["seed"]), "--report-interval-ps", "2",
-               "--checkpoint-s", str(p.get("checkpoint_s", 10))]
-
     t0 = time.time()
     interrupted, last_ps = False, None
-    try:
-        last_ps = _run_md_streaming(cmd)
-    except KeyboardInterrupt:
-        interrupted = True
+    produced: dict[str, Path] = {}   # local filename → produced file
 
-    if not state_out.exists():
-        # nothing reached even one checkpoint — let it be reassigned from the cursor.
-        if interrupted:
-            raise KeyboardInterrupt
-        return {"stop": True, "msg": "the simulation produced no checkpoint"}
+    if kind in ("equilibrate", "segment"):
+        state_out = scratch / "state.xml"
+        seg_out = scratch / "seg.pdb"
+        py, mdr = sys.executable, str(run_chunks.MD_RELAX)
+        if kind == "equilibrate":
+            cmd = [py, mdr, "--equilibrate", str(state_out),
+                   "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
+                   "--equil-ps", str(p["equil_ps"]), "--temperature-k", str(p["temperature_k"]),
+                   "--seed", str(p["seed"]), "--report-interval-ps", "2"]
+        else:
+            cmd = [py, mdr, "--segment",
+                   "--system-xml", str(local["system.xml"]), "--solvated-pdb", str(local["solvated.pdb"]),
+                   "--state-in", str(local["state_in.xml"]), "--state-out", str(state_out),
+                   "--seg-out", str(seg_out), "--segment-ps", str(p["step_ps"]),
+                   "--traj-interval-ps", str(p["traj_interval_ps"]), "--temperature-k", str(p["temperature_k"]),
+                   "--seed", str(p["seed"]), "--report-interval-ps", "2",
+                   "--checkpoint-s", str(p.get("checkpoint_s", 10))]
+        try:
+            last_ps = _run_md_streaming(cmd)
+        except KeyboardInterrupt:
+            interrupted = True
+        if not state_out.exists():
+            # nothing reached even one checkpoint — let it be reassigned from the cursor.
+            if interrupted:
+                raise KeyboardInterrupt
+            return {"stop": True, "msg": "the simulation produced no checkpoint"}
+        produced["state.xml"] = state_out
+        if kind == "segment" and seg_out.exists():
+            produced["seg.pdb"] = seg_out
+    elif kind in ("dock", "build"):
+        produced = run_chunks.execute_unit(kind, p, local, scratch)
+    else:
+        return {"stop": True, "msg": f"unknown work kind {kind!r}"}
 
-    outputs = {"state.xml": state_out}
-    if kind != "equilibrate" and seg_out.exists():
-        outputs["seg.pdb"] = seg_out
-    resp = submit_results(w["results_url"], w["lease"], token, outputs, time.time() - t0)
-    state_path = (resp.get("paths") or {}).get("state.xml")
+    resp = submit_results(w["results_url"], w["lease"], token, produced, time.time() - t0)
+    paths = resp.get("paths") or {}
 
-    body = {"lease": w["lease"], "state": state_path}
-    if kind != "equilibrate":
+    # Report to /checkpoint: produced artifacts (by id) for the DAG, plus the cursor
+    # state + how far an MD segment actually got. The store registers the artifacts
+    # and advances the job; a partial segment advances partially (nothing wasted).
+    body: dict = {"lease": w["lease"]}
+    out_aids = {aid: paths[name] for name, aid in (w.get("outputs") or {}).items() if name in paths}
+    if out_aids:
+        body["outputs"] = out_aids
+    if kind in ("equilibrate", "segment"):
+        body["state"] = paths.get("state.xml")
+    if kind == "segment":
         from_ps = float(p["from_ps"])
         body["ps_reached"] = from_ps + (last_ps if last_ps is not None else float(p["step_ps"]))
     requests.post(base.rstrip("/") + "/api/screen/v1/checkpoint", json=body, timeout=60)
 
     secs = time.time() - t0
-    _say(f"    {'stopped early — ' if interrupted else ''}advanced {chunk.get('molecule')} "
+    _say(f"    {'stopped early — ' if interrupted else ''}advanced {chunk.get('molecule') or kind} "
          f"· sent back ✓ ({_fmt(secs)})")
     if interrupted:
         raise KeyboardInterrupt
@@ -233,23 +246,14 @@ def run_once(base: str, token: str | None, molecules: str | None,
                 "scope": w.get("scope")}
     if "chunk" not in w:
         return {"stop": True, "msg": w.get("error") or "no work available"}
-    results_url = w.get("results_url")
-    if not results_url:
+    if not w.get("results_url"):
         return {"stop": True, "msg": "this site has no result broker configured yet"}
 
     chunk = w["chunk"]
     _say(f"  ▶ {chunk.get('label') or chunk.get('kind')}")
     safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", str(chunk["id"]))
     scratch = Path(tempfile.mkdtemp(prefix=f"contrib_{safe_id}_"))
-    if "consumes" not in chunk:        # work-store unit (checkpointed, cursor-advancing)
-        return run_unit(base, w, token, scratch)
-    local = download_inputs(w["resolve_base"], w.get("inputs", {}), scratch)
-    t0 = time.time()
-    outputs = run_chunks.execute_chunk(chunk, lambda aid: local[aid], scratch)
-    secs = time.time() - t0
-    submit_results(results_url, w["lease"], token, outputs, secs)
-    _say(f"    done in {_fmt(secs)} · sent back ✓")
-    return {"stop": False, "chunk_id": chunk["id"], "seconds": secs, "lease": w["lease"]}
+    return run_unit(base, w, token, scratch)
 
 
 # --- propose a molecule to test ---------------------------------------------

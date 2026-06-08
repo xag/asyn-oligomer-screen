@@ -338,6 +338,44 @@ def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
     raise ValueError(f"unknown chunk kind {kind!r}")
 
 
+def execute_unit(kind: str, params: dict, local: dict[str, "Path"], scratch: Path) -> dict[str, Path]:
+    """Run a discrete prep unit (dock/build) from the unified work-store shape and
+    return {local filename: produced file}. Inputs arrive resolved by local name
+    ('core.pdb'); the caller maps the returned files to artifact ids via the unit's
+    ``outputs`` map. The MD steps (equilibrate/segment) run in the contributor
+    client directly; this covers the CPU prep that feeds them."""
+    scratch = Path(scratch)
+    scratch.mkdir(parents=True, exist_ok=True)
+    p = params
+
+    if kind == "build":
+        core = local["core.pdb"]
+        prefix = scratch / "build"
+        if p.get("is_complex"):
+            cmd = [_conda_python(), str(MD_RELAX), "--complex-pdb", str(core),
+                   "--ligand-smiles", p["smiles"], "--rect-box", "--prepare-only", str(prefix)]
+        else:
+            cmd = [_venv_python(), str(MD_RELAX), "--apo-pdb", str(core),
+                   "--rect-box", "--prepare-only", str(prefix)]
+        _run(cmd, "build")
+        return {"system.xml": Path(f"{prefix}_system.xml"), "solvated.pdb": Path(f"{prefix}_solvated.pdb")}
+
+    if kind == "dock":
+        import dwell_time
+        core = local["core.pdb"]
+        out_dir = scratch / "dock"
+        n_poses = int(p["n_poses"])
+        written = dwell_time.dock_pose_cores(
+            core, p["smiles"], out_dir, n_poses=n_poses, seed=int(p.get("seed", 42)), emit=_emit)
+        if len(written) != n_poses:
+            raise RuntimeError(
+                f"docking produced {len(written)} pose(s) but {n_poses} were requested — "
+                f"raise Vina exhaustiveness or lower n_poses")
+        return {f"pose_{j}.pdb": w for j, w in enumerate(written)}
+
+    raise ValueError(f"execute_unit: unknown kind {kind!r}")
+
+
 def cmd_work(args) -> None:
     worker = args.worker or f"local-{int(time.time())}"
     done = 0
@@ -420,16 +458,17 @@ def cmd_score(args) -> None:
     merged_dir = store.experiment_dir(args.exp_id) / "_scored"
     merged_dir.mkdir(parents=True, exist_ok=True)
 
-    # A replica's segments come straight from the manifest, ordered by index —
-    # never assumed uniform. Replicas may carry different segment counts (e.g.
-    # coarse legacy segments alongside a finer re-segmented continuation), so the
-    # per-seed list is derived from the chunks, not from prod_ps/segment_ps.
+    # A replica's trajectory is its cursor frames, ordered by simulated time. The
+    # work store advances a replica in fine steps and registers each step's frames
+    # as `<rid>/seg@<ps>.pdb`; physically this is the same trajectory the old
+    # per-segment chunks produced, just chunked finer. rid == "<pair>__s<seed>"
+    # (the apo arm and pose-less complexes; pose replicas carry an extra __p<j>).
     def replica_segments(pair: str, seed: int) -> list[str]:
-        segs = sorted(
-            (c for c in manifest["chunks"]
-             if c["id"].startswith(f"seg__{pair}__s{seed}__")),
-            key=lambda c: c["params"]["index"])
-        return [next(a for a in c["produces"] if a.endswith(".pdb")) for c in segs]
+        prefix = f"{pair}__s{seed}/seg@"
+        return sorted(
+            (a for a in manifest["artifacts"]
+             if a.startswith(prefix) and a.endswith(".pdb")),
+            key=lambda a: float(a[len(prefix):-len(".pdb")]))
 
     # Reference = the apo NAC-core (the toxic shape); fall back to first ligand.
     ref_ligand = APO if APO in spec["ligands"] else spec["ligands"][0]

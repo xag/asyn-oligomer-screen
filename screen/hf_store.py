@@ -313,16 +313,17 @@ def cmd_enqueue_awaiting(args) -> None:
 
 
 # ---------------------------------------------------------------------------
-# seed-replicas — register build-ready replica cursors in the work store
+# seed-dag — seed the whole experiment DAG (dock/build/replica) into the store
 # ---------------------------------------------------------------------------
 
-def cmd_seed_replicas(args) -> None:
-    """Bridge the discrete dock+build chunks (which produce each pose's prepared MD
-    system) into the Redis work store: for every completed build, register a replica
-    cursor per seed pointing at that system, so the segment-heavy work flows through
-    the scalable cursor store instead of a materialised manifest. Idempotent —
-    health's ensureReplica leaves committed progress untouched. POSTs to health
-    /seed (cron-authenticated)."""
+def cmd_seed_dag(args) -> None:
+    """Seed the whole experiment DAG into the work store: the MD spec, the initial
+    artifacts (the apo core that dock/build consume), and every job — dock, build and
+    replica cursor — each wired by needs/produces. The store gates dispatch on
+    dependencies and unblocks downstream work as artifacts register, so the entire
+    pipeline flows through one dispatch path (no manifest dispatch, no build→replica
+    bridge). Idempotent — re-seeding leaves committed progress untouched. POSTs to
+    health /seed (cron-authenticated)."""
     import urllib.request
     from huggingface_hub import HfApi, hf_hub_download
 
@@ -330,7 +331,7 @@ def cmd_seed_replicas(args) -> None:
     manifest = _download_manifest(api, args.repo, args.token)
     spec = manifest.get("spec", {})
     arts = manifest.get("artifacts", {})
-    seeds = spec.get("seeds", []) or []
+    chunks = manifest.get("chunks", [])
     prod_ps = spec.get("prod_ps")
 
     try:
@@ -342,29 +343,37 @@ def cmd_seed_replicas(args) -> None:
     prio = {}
     for m in registry:
         if isinstance(m, dict) and m.get("id"):
-            pr = 10 ** 9 if m.get("source") == "contributed" else (m.get("priority") or 100)
-            prio[m["id"]] = pr
+            prio[m["id"]] = 10 ** 9 if m.get("source") == "contributed" else (m.get("priority") or 100)
     priority_of = lambda lig: 0 if lig == "apo" else prio.get(lig, 100)  # noqa: E731
 
-    replicas = []
-    for ch in manifest.get("chunks", []):
-        if ch.get("kind") != "build" or ch.get("status") != "done":
-            continue
-        produces = ch.get("produces", [])
-        sys_xml = next((a for a in produces if a.endswith("system.xml")), None)
-        solv = next((a for a in produces if a.endswith("solvated.pdb")), None)
-        sx = (arts.get(sys_xml) or {}).get("path") if sys_xml else None
-        sp = (arts.get(solv) or {}).get("path") if solv else None
-        if not sx or not sp:
-            continue
-        meta = ch.get("meta", {})
-        ligand, pose = meta.get("ligand", "apo"), meta.get("pose")
-        for sd in seeds:
-            rid = f"{ligand}__p{pose}__s{sd}" if pose is not None else f"{ligand}__s{sd}"
+    # Initial artifacts = those no chunk produces (the apo core every dock/build
+    # consumes); register them with their dataset paths so dependents can unblock.
+    produced = {aid for c in chunks for aid in c.get("produces", [])}
+    artifacts = {aid: rec["path"] for aid, rec in arts.items()
+                 if aid not in produced and rec and rec.get("path")}
+
+    dock, build, replicas = [], [], []
+    for ch in chunks:
+        kind, meta = ch.get("kind"), ch.get("meta", {})
+        lig = meta.get("ligand", "apo")
+        if kind in ("dock", "build"):
+            job = {
+                "id": ch["id"], "ligand": lig,
+                "needs": {"core.pdb": ch["consumes"][0]},
+                "produces": ch["produces"], "params": ch.get("params", {}),
+                "priority": priority_of(lig),
+            }
+            (dock if kind == "dock" else build).append(job)
+        elif kind == "equilibrate":
+            # One replica cursor per equilibrate; its segments are subsumed by the
+            # cursor, so segment chunks are skipped. It needs the build's system.
+            sys_xml, solv = ch["consumes"][0], ch["consumes"][1]
             replicas.append({
-                "rid": rid, "ligand": ligand, "pose": pose, "seed": sd,
-                "target_ps": prod_ps, "sys_xml": sx, "solv_pdb": sp,
-                "priority": priority_of(ligand),
+                "rid": ch["id"][len("equil__"):],   # equil__<prefix>__s<seed> → <prefix>__s<seed>
+                "ligand": lig, "pose": meta.get("pose"), "seed": meta.get("seed"),
+                "target_ps": prod_ps,
+                "needs": {"system.xml": sys_xml, "solvated.pdb": solv},
+                "priority": priority_of(lig),
             })
 
     body = json.dumps({
@@ -373,13 +382,51 @@ def cmd_seed_replicas(args) -> None:
             "temperature_k": spec.get("temperature_k"), "traj_interval_ps": spec.get("traj_interval_ps"),
             "checkpoint_s": args.checkpoint_s,
         },
-        "replicas": replicas,
+        "artifacts": artifacts, "dock": dock, "build": build, "replicas": replicas,
     }).encode("utf-8")
     req = urllib.request.Request(
         args.site.rstrip("/") + "/api/screen/v1/seed", data=body,
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {args.secret}"})
     with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310
-        print(f"seeded {len(replicas)} replica cursor(s): {r.read().decode('utf-8')}", flush=True)
+        print(f"seeded DAG: {len(dock)} dock, {len(build)} build, {len(replicas)} replica(s) — "
+              f"{r.read().decode('utf-8')}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# project — mirror the work store's artifacts into manifest.json (scoring view)
+# ---------------------------------------------------------------------------
+
+def cmd_project(args) -> None:
+    """Project the work store back into manifest.json: pull the registered artifacts
+    from health /state and mark them present (with their dataset paths), and mark a
+    chunk done once all its produced artifacts exist. The store stays the source of
+    truth for dispatch + progress; the manifest is the generated view that scoring,
+    spot-check and archival read. Cron-authenticated."""
+    import urllib.request
+    from huggingface_hub import HfApi, CommitOperationAdd
+
+    api = HfApi(token=args.token)
+    manifest = _download_manifest(api, args.repo, args.token)
+
+    req = urllib.request.Request(
+        args.site.rstrip("/") + "/api/screen/v1/state",
+        headers={"Authorization": f"Bearer {args.secret}"})
+    with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310
+        state = json.loads(r.read().decode("utf-8"))
+    artifacts = state.get("artifacts", {}) or {}
+
+    arts = manifest.setdefault("artifacts", {})
+    for aid, path in artifacts.items():
+        arts[aid] = {"present": True, "path": path, "sha256": None, "bytes": None}
+    for ch in manifest.get("chunks", []):
+        prod = ch.get("produces", [])
+        if prod and all(arts.get(a, {}).get("present") for a in prod):
+            ch["status"] = "done"
+
+    api.create_commit(
+        args.repo, [CommitOperationAdd("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))],
+        repo_type=DATASET, token=args.token, commit_message="project work store -> manifest")
+    print(f"projected {len(artifacts)} artifact(s) into manifest.json", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -655,14 +702,21 @@ def main() -> None:
     common(pe)
     pe.set_defaults(func=cmd_enqueue_awaiting)
 
-    psr = sub.add_parser("seed-replicas",
-                         help="register build-ready replica cursors in the work store (POST health /seed)")
+    psr = sub.add_parser("seed-dag",
+                         help="seed the whole experiment DAG (dock/build/replica jobs) into the work store (POST health /seed)")
     common(psr)
     psr.add_argument("--site", required=True, help="health site root, e.g. https://<site>")
     psr.add_argument("--secret", required=True, help="CRON_SECRET shared with health (Bearer auth)")
     psr.add_argument("--checkpoint-s", type=float, default=10.0,
                      help="wall-seconds between contributor checkpoints stamped onto units")
-    psr.set_defaults(func=cmd_seed_replicas)
+    psr.set_defaults(func=cmd_seed_dag)
+
+    ppj = sub.add_parser("project",
+                         help="mirror work-store artifacts into manifest.json for scoring (GET health /state)")
+    common(ppj)
+    ppj.add_argument("--site", required=True, help="health site root, e.g. https://<site>")
+    ppj.add_argument("--secret", required=True, help="CRON_SECRET shared with health (Bearer auth)")
+    ppj.set_defaults(func=cmd_project)
 
     args = p.parse_args()
     args.func(args)
