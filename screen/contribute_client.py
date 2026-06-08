@@ -76,6 +76,25 @@ def _gpu_line() -> str:
     return "No GPU detected — set Runtime > Change runtime type > GPU (runs will be slow otherwise)."
 
 
+def runnable_kinds() -> list[str]:
+    """Which unit kinds this machine can actually run, so /work only hands us those.
+    Every box runs the MD itself (pip OpenMM); docking needs RDKit/Meeko/Vina and
+    force-field prep needs the OpenFF conda env — a pip-only GPU client (e.g. Colab)
+    has neither, so it sticks to the simulations."""
+    import importlib.util as iu
+    have = lambda m: iu.find_spec(m) is not None  # noqa: E731
+    kinds = ["equilibrate", "segment"]
+    if have("rdkit") and have("meeko") and have("vina"):
+        kinds.append("dock")
+    try:
+        import md_env
+        md_env.md_python()              # raises if the OpenFF conda env is absent
+        kinds.append("build")
+    except Exception:  # noqa: BLE001
+        pass
+    return kinds
+
+
 # --- API endpoints ----------------------------------------------------------
 
 def _work_url(base: str) -> str:
@@ -83,14 +102,17 @@ def _work_url(base: str) -> str:
 
 
 def get_work(base: str, token: str | None, molecules: str | None,
-             done: str | None) -> dict:
+             done: str | None, kinds: str | None = None) -> dict:
     """GET the next simulation. `molecules` is a comma-separated preference list
-    in decreasing interest; `done` releases the lease just finished."""
+    in decreasing interest; `done` releases the lease just finished; `kinds`
+    restricts dispatch to the unit kinds this machine can run."""
     params: dict[str, str] = {}
     if molecules:
         params["molecules"] = molecules
     if done:
         params["done"] = done
+    if kinds:
+        params["kinds"] = kinds
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     r = requests.get(_work_url(base), params=params, headers=headers, timeout=60)
     if not r.ok and r.status_code not in (429, 503):
@@ -237,10 +259,10 @@ def run_unit(base: str, w: dict, token: str | None, scratch: Path) -> dict:
 # --- one work → run → submit cycle ------------------------------------------
 
 def run_once(base: str, token: str | None, molecules: str | None,
-             done: str | None = None) -> dict:
+             done: str | None = None, kinds: str | None = None) -> dict:
     """Pull → run → submit one chunk. Returns {stop|chunk_id, seconds, lease, ...}
     and prints what's happening as it goes."""
-    w = get_work(base, token, molecules, done)
+    w = get_work(base, token, molecules, done, kinds)
     if w.get("status") in ("idle", "busy"):
         return {"stop": True, "msg": w.get("message") or w.get("status"),
                 "scope": w.get("scope")}
@@ -327,6 +349,11 @@ def contribute(base: str = DEFAULT_BASE_URL, minutes: float | None = None,
     # (see run_chunks._run), so nothing diagnostic is lost.
     run_chunks._emit = lambda *_: None
     _say(_gpu_line())
+    # Tell the server only the unit kinds this machine can run, so it never hands
+    # us docking/prep work a pip-only client can't do (which would just bounce).
+    kinds = ",".join(runnable_kinds())
+    if "dock" not in kinds and "build" not in kinds:
+        _say("This machine runs the simulations; docking and prep need extra tools, so they're left to others.")
     token = token or os.environ.get("ASYN_CONTRIB_TOKEN")
     if not token:
         _say("Running anonymously (no token) — your runs count but aren't "
@@ -361,7 +388,7 @@ def contribute(base: str = DEFAULT_BASE_URL, minutes: float | None = None,
         _say(f"[{_fmt(elapsed)} in · {_fmt(budget - elapsed)} left]"
              if budget is not None else f"[{_fmt(elapsed)} in]")
         try:
-            r = run_once(base, token, molecules, done=last_lease)
+            r = run_once(base, token, molecules, done=last_lease, kinds=kinds)
         except KeyboardInterrupt:
             stop_hb.set()
             _say("\nStopped. The current task will be reassigned.")
