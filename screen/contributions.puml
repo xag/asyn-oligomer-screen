@@ -1,0 +1,33 @@
+@startuml
+title alpha-synuclein dwell-time screen — how a contribution works
+
+actor "Contributor\n(GPU/CPU)" as C
+participant "health\ndispatch + work store\n(no token, no GPU)" as H
+database "Hugging Face\ndataset (files)" as DS
+participant "broker\ndataset writer\n(holds the token)" as B
+
+== get credit (optional, once) ==
+C -> H : POST /token  (email)
+H --> C : verification link by email -> token (90 days)
+note right of C : omit the token to run anonymously\n(runs still count, just uncredited)
+
+== run one unit (repeat) ==
+C -> H : GET /work  (token, molecule prefs)
+H --> C : lease + chunk{kind, params}\n+ inputs + outputs + resolve_base + results_url
+note right of H : one job DAG, derived on demand:\ndock -> build -> equilibrate -> segment
+
+C -> DS : download each input  (resolve_base + path)
+C -> C : run the unit on the GPU\n(segments checkpoint every checkpoint_s)
+
+C -> B : POST /results  (output files + lease)
+B -> DS : store files
+B --> C : dataset path of each file
+
+C -> H : POST /checkpoint  (lease, outputs, state, ps_reached)
+H -> H : register produced artifacts,\nadvance the job, free the lease
+note right of H : downstream work unblocks as artifacts land;\na partial/interrupted run still advances
+
+H --> C : committed
+C -> H : GET /work  (next unit) ...
+
+@enduml
