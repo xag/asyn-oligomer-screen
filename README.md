@@ -6,7 +6,7 @@
 
 **▶ [Interactive results page](https://xag.github.io/asyn-oligomer-screen/)** — protective candidates and suspected-harmful anti-targets, ranked and cross-referenced with how each molecule reaches the brain. Source in [docs/](docs/); regenerate with `node docs/build_display.mjs`.
 
-**▶ [Wet-lab handoff package](https://github.com/xag/asyn-oligomer-screen/blob/main/docs/HANDOFF.md)** — the 7 novel protective candidates + 4 reactive metabolites packaged for orthogonal-mechanism assays, with predicted mechanism, suggested readout, and actionable category per molecule ([#11](https://github.com/xag/asyn-oligomer-screen/issues/11)). Generated from the live sweep with `node docs/build_handoff.mjs`.
+**▶ [Wet-lab handoff package](https://github.com/xag/asyn-oligomer-screen/blob/main/docs/HANDOFF.md)** — the 7 novel protective candidates + 4 reactive metabolites packaged for orthogonal-mechanism assays, with predicted mechanism, suggested readout, and actionable category per molecule. Generated from the live sweep with `node docs/build_handoff.mjs`.
 
 ## Plain English Summary
 
@@ -24,8 +24,7 @@ Releasing the full pipeline — receptor model, candidate list, scoring code, ev
 
 Critiques and counter-evidence are as welcome as confirmations.
 
-- **[Issues](https://github.com/xag/asyn-oligomer-screen/issues)** — technical questions, framework critiques, suggested candidates, bug reports, wet-lab follow-up interest. Preferred channel because it is public and archived.
-- **[Discussions](https://github.com/xag/asyn-oligomer-screen/discussions)** — broader conversation about the approach or the open-research model.
+- **[Discussions](https://github.com/xag/asyn-oligomer-screen/discussions)** — technical questions, framework critiques, suggested candidates, bug reports, wet-lab follow-up interest, and broader conversation about the approach or the open-research model.
 
 ## Work in progress
 
@@ -200,7 +199,7 @@ Docking only finds molecules that bind reversibly — they sit on the protein an
 
 The risk that a framework calibrated on a feature set could self-reinforce in evaluation was controlled by a pre-registered blind hold-out conducted after the Stage 2 weights, ligand-aware `contact_density`, Boltzmann weighting parameters, and gate threshold were frozen.
 
-Five entries marked `validation_holdout: true` in `data/vicinity_molecules.js` constitute the cohort: silibinin, EGCG, rosmarinic acid, fisetin, and caffeic acid phenethyl ester (CAPE). All five have strong published in-vitro evidence for α-syn aggregation modulation (Ehrnhoefer et al. 2008; Bieschke et al. 2010; Pérez-Sánchez et al. 2016; Ono & Yamada 2006; Ardah et al. 2016; Morroni et al. 2018). Three (silibinin, EGCG, rosmarinic acid) were present in `data/vicinity_molecules.js` from inception with `smiles: null` and could never have been docked during framework development; fisetin and CAPE were added after the framework was locked. Predictions (rank range, affinity range, `delta_activity_gated` range) and pass criteria were recorded in [issue #6](https://github.com/xag/asyn-oligomer-screen/issues/6) before the docking run.
+Five entries marked `validation_holdout: true` in `data/vicinity_molecules.js` constitute the cohort: silibinin, EGCG, rosmarinic acid, fisetin, and caffeic acid phenethyl ester (CAPE). All five have strong published in-vitro evidence for α-syn aggregation modulation (Ehrnhoefer et al. 2008; Bieschke et al. 2010; Pérez-Sánchez et al. 2016; Ono & Yamada 2006; Ardah et al. 2016; Morroni et al. 2018). Three (silibinin, EGCG, rosmarinic acid) were present in `data/vicinity_molecules.js` from inception with `smiles: null` and could never have been docked during framework development; fisetin and CAPE were added after the framework was locked. Predictions (rank range, affinity range, `delta_activity_gated` range) and pass criteria were pre-registered before the docking run.
 
 Pass criteria (pre-registered):
 
@@ -223,7 +222,7 @@ Outcome: pass (4/5 in top 25; none below rank 60). No code, weight, or threshold
 <details>
 <summary><b>Plain English</b></summary>
 
-When you build a scoring framework and then test it on examples, there is a risk you have unconsciously tuned it to pass the test. To rule this out, before running the validation we wrote down exactly what we expected — which molecules should rank where, what would count as a success, what would count as a failure — and saved that prediction publicly in [issue #6](https://github.com/xag/asyn-oligomer-screen/issues/6). Then we ran the experiment without modifying anything. Four of five known α-syn-modulating molecules landed in the top 25 of 122; none below rank 60. That meets the pre-registered "pass" bar. The framework is not perfect (CAPE missed by quite a bit), but it correctly ranks the molecules the literature already validates, which is the minimum bar for trusting the rankings on molecules the literature has *not* yet validated.
+When you build a scoring framework and then test it on examples, there is a risk you have unconsciously tuned it to pass the test. To rule this out, before running the validation we wrote down exactly what we expected — which molecules should rank where, what would count as a success, what would count as a failure — and pre-registered that prediction. Then we ran the experiment without modifying anything. Four of five known α-syn-modulating molecules landed in the top 25 of 122; none below rank 60. That meets the pre-registered "pass" bar. The framework is not perfect (CAPE missed by quite a bit), but it correctly ranks the molecules the literature already validates, which is the minimum bar for trusting the rankings on molecules the literature has *not* yet validated.
 </details>
 
 ## 7. Results
@@ -381,7 +380,7 @@ Six honest caveats:
 <details>
 <summary><b>Plain English</b></summary>
 
-This section is for someone who wants to *re-run* the analysis on their own computer — re-derive every number and figure in this README from the inputs. It needs Python and a one-time download of the docking tool (AutoDock Vina). The full pipeline takes a few hours on a normal workstation. If you only want to *read* the results or *propose* changes, you don't need to run any of this. If you'd like to run it but get stuck on the setup, open an issue — an AI assistant can also walk you through the install step-by-step.
+This section is for someone who wants to *re-run* the analysis on their own computer — re-derive every number and figure in this README from the inputs. It needs Python and a one-time download of the docking tool (AutoDock Vina). The full pipeline takes a few hours on a normal workstation. If you only want to *read* the results or *propose* changes, you don't need to run any of this. If you'd like to run it but get stuck on the setup, an AI assistant can walk you through the install step-by-step.
 </details>
 
 Python 3.12, tested on Windows 11; Linux/macOS supported with adaptation of the Vina binary path.
@@ -434,7 +433,7 @@ conda env create -f environment-md.yml
 .venv/bin/python screen/md_stage3.py
 ```
 
-**Shape-stability (dwell-time) channel** ([#14](https://github.com/xag/asyn-oligomer-screen/issues/14)). The time-resolved channel that lifts the §8.3 sign-bound: across velocity-seeded short-MD replicas, does the ligand keep the oligomer in its toxic shape (destabiliser → less, stabiliser/anti-target → more)? Two surfaces. The bootstrap self-test and trajectory scoring are pure geometry (β-core Cα RMSD + inter-chain contact Jaccard) and run in the pip venv with **no GPU**:
+**Shape-stability (dwell-time) channel**. The time-resolved channel that lifts the §8.3 sign-bound: across velocity-seeded short-MD replicas, does the ligand keep the oligomer in its toxic shape (destabiliser → less, stabiliser/anti-target → more)? Two surfaces. The bootstrap self-test and trajectory scoring are pure geometry (β-core Cα RMSD + inter-chain contact Jaccard) and run in the pip venv with **no GPU**:
 
 ```bash
 .venv/bin/python screen/dwell_time.py selftest
@@ -445,7 +444,6 @@ conda env create -f environment-md.yml
 ```
 
 The MD replicas are designed to run as **independent per-replica chunks small enough for a basic GPU** (toward the volunteer-compute direction). The *apo* side needs only `openmm` + `pdbfixer` — the non-default `md` dependency group, no conda. Truncate to the NAC core and solvate in a tight box (`--rect-box`) so one chunk is ~55k atoms (~3.5 min for 80 ps on a 4 GB laptop GPU via OpenCL):
-
 ```bash
 uv sync --group md
 .venv/bin/python screen/md_relax.py --apo-pdb <core-truncated>.pdb \
@@ -454,7 +452,7 @@ uv sync --group md
     --traj-out apo_rep00.pdb --traj-interval-ps 20
 ```
 
-The docked-*complex* side uses OpenFF/SMIRNOFF to parameterise the ligand — a one-time, GPU-free step that runs in the conda MD env ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). It is split off (`--prepare-only`), serialising a ready-to-run OpenMM `System`; the per-replica GPU dynamics then run from it with **pip-only OpenMM** (`--system-xml`/`--solvated-pdb`), exactly like the apo chunk:
+The docked-*complex* side uses OpenFF/SMIRNOFF to parameterise the ligand — a one-time, GPU-free step that runs in the conda MD env. It is split off (`--prepare-only`), serialising a ready-to-run OpenMM `System`; the per-replica GPU dynamics then run from it with **pip-only OpenMM** (`--system-xml`/`--solvated-pdb`), exactly like the apo chunk:
 
 ```bash
 # central, GPU-free, conda (OpenFF): parametrise once → system.xml + solvated.pdb
@@ -469,7 +467,7 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
     --equil-ps 20 --prod-ps 60 --traj-out <pair>_rep00.pdb --traj-interval-ps 20
 ```
 
-**Crowdsourced result store** ([#34](https://github.com/xag/asyn-oligomer-screen/issues/34)). Distribute the chunked sweep through a public Hugging Face Dataset repo:
+**Crowdsourced result store**. Distribute the chunked sweep through a public Hugging Face Dataset repo:
 
 ```bash
 # maintainer (full env): author locally, then publish the runnable chunks' inputs
@@ -501,8 +499,6 @@ Each top-level directory carries a `README.md` describing its contents:
 [data/](data/) (candidate list, PDB cache),
 [results/](results/) (calibration outputs, ensemble, sweep),
 [bin/](bin/) (Vina binary).
-
-The [GitHub issue tracker](https://github.com/xag/asyn-oligomer-screen/issues) is the source of truth for results, objectives, open decisions, and caveats (labelled `result` / `objective` / `decision` / `caveat`; the open `objective` set is the worklist), including framework fixes, abandoned approaches, and the reasoning behind every choice. It is the natural entry point for anyone extending the work.
 
 ## 10. References
 
