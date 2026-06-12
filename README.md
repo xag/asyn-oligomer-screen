@@ -467,7 +467,14 @@ conda run -n asyn-md python screen/md_relax.py --complex-pdb <pair>_complex.pdb 
     --equil-ps 20 --prod-ps 60 --traj-out <pair>_rep00.pdb --traj-interval-ps 20
 ```
 
-**Crowdsourced result store**. Distribute the chunked sweep through a public Hugging Face Dataset repo:
+**Crowdsourced result store**. Distribute the chunked sweep through a public Hugging Face Dataset repo.
+
+> **Paused.** Contributor dispatch is switched off pending validation of the dwell-time
+> scoring method — the pilot did not separate a known destabiliser from an inert decoy, so
+> no volunteer compute is being recruited on it (the `health` `/work` endpoint returns
+> `paused` unless `SCREEN_ACTIVE=1`). The coordinator commands below also refuse to recruit
+> unless `ASYN_SCREEN_VALIDATED=1`. Re-enable only after the pre-registered validation passes
+> **and** the scored observable is updated. The pipeline below is otherwise unchanged.
 
 ```bash
 # maintainer (full env): author locally, then publish the runnable chunks' inputs

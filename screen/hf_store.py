@@ -640,6 +640,24 @@ def cmd_status(args) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+# Commands that recruit/dispatch volunteer compute. Paused pending dwell-channel
+# validation (EXPERIMENTS.md E1/E2): the readout did not separate a known
+# destabiliser from an inert decoy, so we do not put work in front of contributors.
+_RECRUIT_CMDS = {"publish", "seed-dag", "work", "submit-local", "publish-molecules", "enqueue-awaiting"}
+
+
+def _require_validated(cmd: str) -> None:
+    import os
+    val = str(os.environ.get("ASYN_SCREEN_VALIDATED", "")).strip().lower()
+    if val not in ("1", "true", "yes", "on"):
+        sys.exit(
+            f"[paused] '{cmd}' recruits volunteer compute for the dwell-time screen, which is "
+            f"unvalidated (see EXPERIMENTS.md E1/E2). Refusing.\n"
+            f"After the pre-registered validation (E3) passes AND the scored observable is "
+            f"updated, set ASYN_SCREEN_VALIDATED=1 to proceed."
+        )
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -719,6 +737,8 @@ def main() -> None:
     ppj.set_defaults(func=cmd_project)
 
     args = p.parse_args()
+    if args.cmd in _RECRUIT_CMDS:
+        _require_validated(args.cmd)
     args.func(args)
 
 
