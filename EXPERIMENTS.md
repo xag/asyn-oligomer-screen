@@ -56,7 +56,29 @@ negative.
 **Hypothesis (one-sided).** silibinin's contact-Jaccard decays faster than
 caffeine's.
 
-**Design.** Locked in [`prereg.py`](prereg.py) (blocked on conformer; matched
-seeds; within-block contrast; sequential stop). `ops/block.ps1`.
+**Design.** Locked in [`ops/prereg.py`](ops/prereg.py) (blocked on conformer;
+matched seeds; within-block contrast; sequential stop). Primary statistic
+`jaccard_decay_per_ns` = −(slope of inter-chain contact Jaccard vs time).
+Runner `ops/asyn_block.py`; pooled decision `ops/asyn_pool.py`.
 
-**Data.** None collected yet.
+**Method.** 9 blocks = 9 distinct Fusco-topology conformers (parallel/antiparallel,
+2/3/4-mer, β-core 65–83/70–88/73–91, plus seed variants). Each block: apo + silibinin
++ caffeine, 5 matched velocity seeds/arm × 2 ns; within-block contrast
+`mean_seed[decay(silibinin) − decay(caffeine)]`. Data
+`results/blocks/<conformer>/`.
+
+**Result.** Per-block matched contrast ranged −0.0256 to +0.0027 /ns; negative in
+7/9 blocks. Pooled mean **−0.0072 /ns, 95% CI [−0.0131, −0.0019], P(H1) = 0.002** —
+the destabiliser's contacts decay *no faster* than the decoy's (slightly slower).
+Two design notes surfaced: (i) the sequential H1 branch trips trivially at one
+block, where the single-value bootstrap gives a zero-width CI and P = 1.0, so only
+multi-block pooling is interpretable; (ii) the practical-null band (±0.005 /ns) is
+tighter than the between-conformer spread, so the null branch cannot fire even as
+the mean stabilises — the formal verdict stays *continue* despite a decisive
+against-H1 signal.
+
+**Conclusion.** H1 not supported. The shape-stability (dwell/rate) channel does not
+separate a known destabiliser from an inert decoy on this model, consistent with E1
+and E2 — the channel is not validated and the contributor sweep stays paused. The
+docking Δact_gated ranking and the covalent anti-target channel are independent of
+this readout and unaffected.
