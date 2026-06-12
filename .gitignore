@@ -60,5 +60,7 @@ environment.yml.local
 # Outreach
 outreach/
 
-# Scripts
-check_*
+# ops/: the generic SSH cluster tooling is tracked; only the machine-specific
+# config and the survey reports (which name the hosts) stay out of git.
+ops/local.ps1
+ops/*.txt

@@ -1,0 +1,9 @@
+# Copy to ops/local.ps1 (gitignored) and fill in your cluster.
+# Dot-source once per PowerShell session before running the ops tools:
+#     . .\ops\local.ps1
+# The committed ops/*.ps1 read these env vars, so no host/user/path is ever
+# baked into a tracked file.
+$env:CLUSTER_DOMAIN  = 'cluster.example.com'
+$env:CLUSTER_USER    = 'youruser'
+$env:CLUSTER_SCRATCH = '/data/scratch/youruser'
+$env:CLUSTER_PREFIX  = 'node'   # host-name prefix for check_cluster.sh (node{1..8})
