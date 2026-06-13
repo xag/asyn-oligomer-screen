@@ -82,3 +82,43 @@ separate a known destabiliser from an inert decoy on this model, consistent with
 and E2 — the channel is not validated and the contributor sweep stays paused. The
 docking Δact_gated ranking and the covalent anti-target channel are independent of
 this readout and unaffected.
+
+---
+
+## E4 — How much MD clears the noise? The data requirement is set by the space, not the budget (2026-06-13)
+
+**Question.** How much simulation does the dwell channel need to read a ligand
+effect beyond chance — given what E1/E2 showed about the conformational space it
+samples?
+
+**Method.** Reduce the channel to its sampled coordinate (β-core RMSD; contacts
+stay intact at Jaccard ~0.77, so RMSD is the binding constraint) and ask what the
+landscape, not the sample size, allows. Closed form on the recorded E1 dwell spread
+and E2 drift; no new MD. Calculator [`ops/power.py`](ops/power.py).
+
+**Data.** E1 apo dwell mean 0.20, per-replica 0.01–0.56 (n=10). E2 drift ~0.8 Å/ns,
+no plateau in 2 ns; β-core RMSD start 1.38 Å vs 3.0 Å basin cutoff.
+
+**Result.** Three properties of the space decide this before any budget does:
+(i) **noise shape** — the reference is not metastable, so a replica's dwell is a
+first-passage measurement (drift-diffusion crossing of the cutoff), not an
+equilibrium occupancy. Its coefficient of variation is order 1 (E1 gives CV ≈ 0.9,
+σ ≈ 0.18; mean first-passage L/v ≈ 2 ns, implied RMSD-coordinate D ≈ 0.5 Å²/ns, no
+barrier). The per-replica noise is ~the mean itself and only averages down with
+replicas. (ii) **floored range** — apo at 0.20 means the system is already ~80% out
+of the basin in 2 ns, so the destabiliser direction has a ceiling of 0.20 against
+σ ≈ 0.18: best-case SNR ≈ 1 per replica. (iii) **sign confound** — a bound ligand
+mechanically restrains the core (occupancy raises dwell), pushing true destabilisers
+toward looking like stabilisers (E1: every arm shifted positive). On this observable
+no finite replica count clears chance. *If* the observable is fixed, the cost is the
+ordinary two-arm test n/arm = (z_α+z_power)²·2σ²/δ²: ~50 replicas/arm/shape for a
+δ=0.10 shift (~1.9 µs across the 9-shape ensemble), ~200 for δ=0.05 (~7.6 µs) —
+versus the ~84 ns E1 actually spent.
+
+**Conclusion.** "How much data clears the noise" is the wrong axis: data is not the
+binding constraint. The dwell observable is floored, non-metastable, and
+occupancy-confounded, so more replicas sharpen a number that has no clean signal in
+the direction of interest. The fix is the observable, not the budget — establish a
+metastable basin (longer equilibration / restrained or better reference, so apo
+dwell → ~1 and the full 0–1 range opens at low CV) or score the first-passage rate
+directly. Only then does the ~50–200 replica/arm/shape estimate apply.
