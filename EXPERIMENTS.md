@@ -122,3 +122,47 @@ the direction of interest. The fix is the observable, not the budget — establi
 metastable basin (longer equilibration / restrained or better reference, so apo
 dwell → ~1 and the full 0–1 range opens at low CV) or score the first-passage rate
 directly. Only then does the ~50–200 replica/arm/shape estimate apply.
+
+---
+
+## E5 — The hand-built shape is not metastable, but toxic *character* survives relaxation (2026-06-13)
+
+**Question.** #56: every channel scores against one hand-built oligomer shape that
+E2 showed is not metastable. Released under unbiased dynamics, which conformations
+does the oligomer actually occupy, and does any *stable* basin remain toxic-looking?
+
+**Method.** Unbiased MD — β-core restraints **off** — from the relaxed Fusco trimer
+cores, parallel `fusco_parallel_3mer_core70-88` and antiparallel
+`fusco_antiparallel_3mer_core70-88`, on the NAC-core chunk (residues 58–102,
+~55k-atom rect box). Reuses `screen/md_relax.py`'s resumable segment path (which
+applies no position restraints) for the dynamics and `screen/shape_metrics.py` for
+per-frame β-core Cα RMSD + inter-chain contact Jaccard vs each shape's own relaxed
+reference. 3 velocity-seeded replicas/shape × (200 ps equil + 50 ns production),
+frames every 50 ps. Post-equilibration frames (second half/replica) pooled and
+clustered in standardised (RMSD, Jaccard) space (Ward; k by silhouette); each basin
+medoid scored with `oligomers/score_oligomer.py`. Baselines: each relaxed-reference
+chunk and the coil-trimer chunk (non-toxic floor). Driver + analysis
+[`ops/stable_states.py`](ops/stable_states.py). Data `results/stable_states/`.
+
+**Result.** β-core RMSD drift collapses from E2's ~0.8 Å/ns to ~0.01–0.06 Å/ns over
+the last 20 ns — the cores leave the hand-built shape and settle 6–9 Å away.
+Parallel → **1 basin** (mean RMSD 6.2 Å, Jaccard 0.61); antiparallel → **2 basins**
+(68% at 6.6 Å, 32% at 8.8 Å; Jaccard 0.51–0.56). **No** frame meets the strict
+toxic-basin gate (RMSD ≤ 3 Å *and* Jaccard ≥ 0.5): occupancy of the hand-built
+geometry is 0. Yet every stable basin's Stage-2 activity stays high — parallel
+**11.4**, antiparallel **10.4 / 11.3** — against relaxed-reference baselines (parallel
+16.3, antiparallel 13.7) and the coil floor 3.7. Both registers converge to the same
+~10–11 band regardless of starting arrangement. One antiparallel replica still drifts
+−0.06 Å/ns, so the 8.8 Å basin is the least settled.
+
+**Conclusion.** Two-part answer to #56. (i) The *specific* conformation the channels
+dock against is **not** metastable — vacated within tens of ns to a basin 6–9 Å away,
+so any ranking that turns on the precise pose/geometry is scored against a structure
+the model does not hold (confirms and extends E2). (ii) But toxic *character* is
+robust: every populated, ≈plateaued basin still scores ~65–70% of its reference
+activity, far above the coil floor, and parallel and antiparallel relax into the same
+activity band. So a stable, still-toxic-looking ensemble does exist — it is just not
+the hand-built pose. A defensible target is the relaxed ensemble (or an experimental
+structure), not the hand-built conformation; pose-dependent docking should be
+re-grounded there. Longer sampling would tighten the least-settled antiparallel basin
+but does not change the activity verdict.

@@ -1,0 +1,104 @@
+{
+  "frame_ps": 50.0,
+  "toxic_rmsd_max": 3.0,
+  "toxic_jaccard_min": 0.5,
+  "baselines": {
+    "fusco_parallel_3mer_core70-88_ref": 16.334,
+    "fusco_antiparallel_3mer_core70-88_ref": 13.724,
+    "coil_ctrl": 3.716
+  },
+  "shapes": {
+    "fusco_parallel_3mer_core70-88": {
+      "plateau": [
+        {
+          "rep": "fusco_parallel_3mer_core70-88_rep0",
+          "t_ns": 50.0,
+          "slope_last20ns": 0.05021657053475807,
+          "mean_rmsd_last20ns": 5.665063150640475
+        },
+        {
+          "rep": "fusco_parallel_3mer_core70-88_rep1",
+          "t_ns": 50.0,
+          "slope_last20ns": 0.011547488806852453,
+          "mean_rmsd_last20ns": 6.806594632529584
+        },
+        {
+          "rep": "fusco_parallel_3mer_core70-88_rep2",
+          "t_ns": 50.0,
+          "slope_last20ns": 0.010240008409886947,
+          "mean_rmsd_last20ns": 6.440473882431889
+        }
+      ],
+      "n_basins": 1,
+      "basins": [
+        {
+          "basin": 1,
+          "pop_frac": 1.0,
+          "mean_rmsd": 6.179545569825338,
+          "mean_jaccard": 0.6052196926697574,
+          "frac_in_toxic_basin": 0.0,
+          "activity": 11.403,
+          "medoid": {
+            "rep": "fusco_parallel_3mer_core70-88_rep0",
+            "seg": "seg_4.pdb",
+            "model": 94,
+            "t_ns": 44.75
+          }
+        }
+      ]
+    },
+    "fusco_antiparallel_3mer_core70-88": {
+      "plateau": [
+        {
+          "rep": "fusco_antiparallel_3mer_core70-88_rep0",
+          "t_ns": 50.0,
+          "slope_last20ns": 0.061925452619085636,
+          "mean_rmsd_last20ns": 7.200971009085439
+        },
+        {
+          "rep": "fusco_antiparallel_3mer_core70-88_rep1",
+          "t_ns": 50.0,
+          "slope_last20ns": -0.05663909365818749,
+          "mean_rmsd_last20ns": 8.72863173355037
+        },
+        {
+          "rep": "fusco_antiparallel_3mer_core70-88_rep2",
+          "t_ns": 50.0,
+          "slope_last20ns": 0.01738660929471955,
+          "mean_rmsd_last20ns": 6.083195469858937
+        }
+      ],
+      "n_basins": 2,
+      "basins": [
+        {
+          "basin": 1,
+          "pop_frac": 0.3166999334664005,
+          "mean_rmsd": 8.804563683147665,
+          "mean_jaccard": 0.507375457687665,
+          "frac_in_toxic_basin": 0.0,
+          "activity": 11.269,
+          "medoid": {
+            "rep": "fusco_antiparallel_3mer_core70-88_rep1",
+            "seg": "seg_3.pdb",
+            "model": 75,
+            "t_ns": 33.8
+          }
+        },
+        {
+          "basin": 2,
+          "pop_frac": 0.6833000665335994,
+          "mean_rmsd": 6.572708370861412,
+          "mean_jaccard": 0.558334887694852,
+          "frac_in_toxic_basin": 0.0,
+          "activity": 10.421,
+          "medoid": {
+            "rep": "fusco_antiparallel_3mer_core70-88_rep2",
+            "seg": "seg_4.pdb",
+            "model": 107,
+            "t_ns": 45.4
+          }
+        }
+      ]
+    }
+  }
+}
