@@ -1,4 +1,4 @@
-"""Test the within-class hypothesis (issue #8):
+"""Test the within-class hypothesis:
 
   "single-protofilament fibrils score higher than paired-protofilament
    fibrils within each class"

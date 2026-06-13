@@ -1,4 +1,4 @@
-"""Reference contributor runner for the dwell-time screen (#43).
+"""Reference contributor runner for the dwell-time screen.
 
 Runs on a volunteer's GPU (a free Colab/Kaggle GPU, or their own machine) and
 speaks the public contributor API:

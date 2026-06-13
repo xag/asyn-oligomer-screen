@@ -12,7 +12,7 @@ labels: caveat
      limitation needs none.
 
      Before filing, ask which of these it really is:
-       - a RISK to a specific objective ("2 ns may be too short for #14")  -> don't file a
+       - a RISK to a specific objective ("2 ns may be too short for the dwell-time channel")  -> don't file a
          caveat; fold it into that objective's "What would make this wrong" section.
        - an improvement you intend to pursue                               -> it's an
          OBJECTIVE; file it as one.

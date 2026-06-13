@@ -21,7 +21,7 @@ and backbone can rearrange, which is the only mechanism through which
 Δactivity can flip positive under the Stage 2 feature weights
 (static-pose features only ever subtract from activity).
 
-Distributed / crowdsourced split (issue #34). The OpenFF parametrisation the
+Distributed / crowdsourced split. The OpenFF parametrisation the
 docked-complex path needs is GPU-free and one-time, so it is separable from
 the per-replica GPU dynamics. Two extra modes implement that split so a
 docked-complex dwell chunk can run on a volunteer's basic GPU with no conda:
@@ -455,7 +455,7 @@ def pick_platform() -> tuple[openmm.Platform, dict]:
 # -----------------------------------------------------------------------------
 # Serialise a prepared (solvated, parametrised) system so the GPU integration
 # can run on a machine with only pip-installed OpenMM — no OpenFF, no conda.
-# This is the split (issue #34) that lets docked-complex dwell chunks be
+# This is the split that lets docked-complex dwell chunks be
 # crowdsourced: the one-time, GPU-free SMIRNOFF parametrisation (build_system)
 # happens centrally; the per-replica dynamics (run_dynamics) load the
 # serialised System and run anywhere.
@@ -637,7 +637,7 @@ def run_dynamics(
 
 
 # -----------------------------------------------------------------------------
-# Resumable chunk dynamics (portable State; distributable chunks — issue #34).
+# Resumable chunk dynamics (portable State; distributable chunks).
 #
 # A replica's production is split so it can be advanced in small, independent
 # steps that any machine can run with pip-only OpenMM:
@@ -860,7 +860,7 @@ def relax(
     t0 = time.time()
 
     # Edge path: run a pre-parametrised, serialised system with pip-only
-    # OpenMM — no OpenFF, no conda, even for a docked complex (issue #34).
+    # OpenMM — no OpenFF, no conda, even for a docked complex.
     if system_xml is not None:
         print(f"=== md_relax (prepared system): {Path(system_xml).name} ===", flush=True)
         topology, positions, system = load_prepared_system(Path(system_xml), Path(solvated_pdb))
@@ -922,7 +922,7 @@ def relax(
                                     rectangular_box=rectangular_box)
 
     # Prepare-only: serialise the parametrised, solvated system and stop. The
-    # GPU-free, OpenFF-using half of a docked-complex chunk (issue #34). The
+    # GPU-free, OpenFF-using half of a docked-complex chunk. The
     # serialised System then runs anywhere with pip-only OpenMM via
     # --system-xml/--solvated-pdb.
     if prepare_prefix is not None:
@@ -1142,7 +1142,7 @@ def main() -> None:
                         "+ padding per axis) instead of a cube sized to the largest "
                         "dimension. ~7× fewer atoms for an elongated β-strand "
                         "construct — keeps one dwell chunk on a basic GPU.")
-    # Resumable chunk modes (distributable per-replica steps; issue #34). Both
+    # Resumable chunk modes (distributable per-replica steps). Both
     # consume a built system (--system-xml + --solvated-pdb from --prepare-only).
     p.add_argument("--equilibrate", type=Path, default=None, metavar="STATE_OUT",
                    help="chunk step: minimise + NVT warm-up + NPT equilibrate the "

@@ -1,4 +1,4 @@
-"""Cross-language lease verification (#43).
+"""Cross-language lease verification.
 
 The golden token below was produced by the *real* health signer
 (``lib/screen.js`` ``signLease``) with SCREEN_LEASE_KEY='test-shared-lease-key-123'

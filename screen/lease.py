@@ -1,4 +1,4 @@
-"""Verify the work-assignment leases minted by the health front door (#43).
+"""Verify the work-assignment leases minted by the health front door.
 
 health (`lib/screen.js`) signs a lease as ``b64url(body).b64url(hmac_sha256(
 SCREEN_LEASE_KEY, body))`` where ``body`` is a compact, sorted-key JSON object.

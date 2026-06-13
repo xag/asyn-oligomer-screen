@@ -1,4 +1,4 @@
-"""Tests for the dwell-time chunk DAG (#14 pose-sampling redesign).
+"""Tests for the dwell-time chunk DAG (pose-sampling redesign).
 
 Pure structure, no MD/docking — run with the pipeline venv:
 

@@ -1,4 +1,4 @@
-"""Hugging Face Hub as the free, zero-ops result store for dwell-time chunks (#34).
+"""Hugging Face Hub as the free, zero-ops result store for dwell-time chunks.
 
 The public HF *Dataset* repo **is** the authoritative store — no server, DNS, or
 always-on host. Every contribution arrives the same way, with no privileged path:

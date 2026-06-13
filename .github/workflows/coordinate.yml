@@ -1,6 +1,6 @@
 name: coordinate dwell-time crowdsource
 
-# The unattended coordinator loop (#43): accept contributors' submissions by the
+# The unattended coordinator loop: accept contributors' submissions by the
 # reputation-weighted, distinct-pseudonym quorum, then fold the resulting
 # outcomes into reputations.json. Both steps are GPU-free, so a small hourly CI
 # job suffices. Spot-checks (which re-run MD) stay a manual/heavier step.

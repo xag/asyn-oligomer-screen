@@ -1,4 +1,4 @@
-"""Tests for the dwell-time channel (#14): shape metrics + bootstrap.
+"""Tests for the dwell-time channel: shape metrics + bootstrap.
 
 No pytest dependency required — run directly with the pipeline venv:
 
@@ -215,7 +215,7 @@ def test_bootstrap_destabiliser():
 
 
 def test_bootstrap_stabiliser_symmetric():
-    # The whole point of #14: a positive shift is detectable too (#30).
+    # A positive shift is detectable too.
     apo = [0.45, 0.5, 0.55, 0.48, 0.52]
     cpx = [0.9, 0.95, 0.88, 0.92, 0.97]
     b = bootstrap_dwell_shift(apo, cpx, seed=1)

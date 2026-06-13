@@ -1,4 +1,4 @@
-"""Tests for the reputation-folding aggregation (#43).
+"""Tests for the reputation-folding aggregation.
 
 Pure logic, no network. Run:  .venv/bin/python tests/test_reputation.py
 """

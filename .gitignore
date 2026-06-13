@@ -30,14 +30,14 @@ results/stage3/*.log
 # Run logs
 results/_logs/
 
-# Dwell-time channel (#14): replica MD trajectories are large + regenerable.
+# Dwell-time channel: replica MD trajectories are large + regenerable.
 # pilot_summary.{json,csv} are small; keep them so the pilot result is
 # inspectable without re-running the MD.
 results/dwell/**/*.pdb
 results/dwell/**/*.log
 results/dwell/_scratch/
 
-# Distributable chunk experiments (#34): per-experiment store is runtime state —
+# Distributable chunk experiments: per-experiment store is runtime state —
 # content-addressed artifacts (systems, States, frame PDBs), scratch, manifests,
 # logs — all large + regenerable from `run_chunks.py create`.
 experiments/

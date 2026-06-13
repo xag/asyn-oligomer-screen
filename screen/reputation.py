@@ -1,4 +1,4 @@
-"""Fold ingest outcomes into reputations.json (#43).
+"""Fold ingest outcomes into reputations.json.
 
 ``hf_store ingest`` writes per-contributor outcomes to ``outcomes/<ts>.jsonl``
 (one of agreed | spot_pass | outlier | spot_fail). This job accumulates them

@@ -1,4 +1,4 @@
-"""Shape metrics for the dwell-time channel (issue #14).
+"""Shape metrics for the dwell-time channel.
 
 Two structure-vs-structure measurements that quantify *how far a frame has
 moved away from a reference toxic shape*:
@@ -16,8 +16,7 @@ moved away from a reference toxic shape*:
 Both are pure geometry on Biopython structures — no MD, no force field —
 so they run in the pip venv and are testable on the existing
 ``results/oligomers/*_relaxed.pdb`` structures. ``dwell_time.py`` calls
-them once per MD trajectory frame to build the dwell-time distribution
-that issue #14 specifies.
+them once per MD trajectory frame to build the dwell-time distribution.
 
 Why these two: they are orthogonal. RMSD sees the sheet *deforming in
 place*; Jaccard sees chains *dissociating* without the surviving sheet
@@ -66,7 +65,7 @@ CONTACT_CUTOFF = 9.0
 # its β-core has not drifted past TOXIC_RMSD_MAX Å and it retains at
 # least TOXIC_JACCARD_MIN of the reference inter-chain contacts. These
 # are deliberately lenient starting points; dwell_time.py recalibrates
-# the operating point from the apo distribution (issue #30's threshold
+# the operating point from the apo distribution (the threshold
 # work depends on the apo dwell spread, not on these constants).
 TOXIC_RMSD_MAX = 3.0
 TOXIC_JACCARD_MIN = 0.5
@@ -262,7 +261,7 @@ def in_toxic_basin(
 
 
 # -----------------------------------------------------------------------------
-# Ligand-occupancy check (issue #14: don't score a diffused-off ligand as
+# Ligand-occupancy check (don't score a diffused-off ligand as
 # "no effect"). A frame counts as "bound" when some ligand heavy atom is
 # within `cutoff` Å of some β-core Cα.
 # -----------------------------------------------------------------------------

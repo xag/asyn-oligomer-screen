@@ -1,4 +1,4 @@
-"""Tests for the crowdsourced-submission acceptance gate (#43).
+"""Tests for the crowdsourced-submission acceptance gate.
 
 Pure logic, no MD and no network — run directly with the pipeline venv:
 

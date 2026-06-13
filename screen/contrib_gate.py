@@ -1,4 +1,4 @@
-"""Acceptance gate for crowdsourced chunk submissions (#43).
+"""Acceptance gate for crowdsourced chunk submissions.
 
 Pure, IO-free decision logic, unit-tested independently of the Hugging Face
 round-trip in ``hf_store.py``. It replaces the old count-based ``>=min-agree``

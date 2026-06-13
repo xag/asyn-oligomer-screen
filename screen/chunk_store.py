@@ -1,4 +1,4 @@
-"""File-based experiment store for distributable MD chunks (issue #34, local scope).
+"""File-based experiment store for distributable MD chunks (local scope).
 
 This is the local stand-in for the future crowdsource coordinator: it holds an
 *experiment* — a published spec plus a DAG of self-contained work *chunks* — and

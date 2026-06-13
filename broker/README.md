@@ -6,10 +6,10 @@ colorTo: green
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Write broker for the crowdsourced dwell-time screen (#43)
+short_description: Write broker for the crowdsourced dwell-time screen
 ---
 
-# Asyn dwell-time write broker (#43)
+# Asyn dwell-time write broker
 
 The only writer to the [dwell-time result dataset](https://huggingface.co/datasets/xagg/asyn-dwell-results),
 and the only holder of its write token — so contributors need no Hugging Face

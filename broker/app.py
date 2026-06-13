@@ -1,4 +1,4 @@
-"""Write broker for the crowdsourced dwell-time screen (#43).
+"""Write broker for the crowdsourced dwell-time screen.
 
 Runs as a free Hugging Face *Space*. It is the only writer to the dataset and
 the only holder of the dataset write token, so contributors need no Hugging Face

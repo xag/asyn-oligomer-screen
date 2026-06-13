@@ -1,4 +1,4 @@
-"""Tests for the pure plumbing helpers in hf_store ingest (#43).
+"""Tests for the pure plumbing helpers in hf_store ingest.
 
 No network, no HF — run directly with the pipeline venv:
 

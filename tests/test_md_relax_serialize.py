@@ -1,4 +1,4 @@
-"""Serialised-System round-trip for md_relax — issue #34.
+"""Serialised-System round-trip for md_relax.
 
 The crowdsourcing claim for docked-complex dwell chunks rests on one fact:
 OpenFF is needed only to *build* the force field (one-time, GPU-free), not to

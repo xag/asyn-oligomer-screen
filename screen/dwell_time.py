@@ -1,8 +1,8 @@
-"""Shape-stability (dwell-time) channel — issue #14.
+"""Shape-stability (dwell-time) channel.
 
 The static Δactivity channel (stage3.py) is sign-bound: any docked pose
 occludes SASA and adds contacts, so it can only ever see *destabilisers*
-and never *stabilisers* (anti-targets, #30). This channel removes that
+and never *stabilisers* (anti-targets). This channel removes that
 bound by asking a different question:
 
     Across many short velocity-seeded MD replicas, does the ligand keep
@@ -22,8 +22,8 @@ bootstrap the shift:
     shift < 0  → the ligand spends *less* time toxic → destabiliser
     shift > 0  → the ligand spends *more* time toxic → stabiliser / anti-target
 
-The sign is free both ways — that is the whole point, and it is what #30
-post-processes into the "what to avoid" list.
+The sign is free both ways — that is the whole point, and it is what
+gets post-processed into the "what to avoid" list.
 
 A per-replica binding-occupancy check (shape_metrics.ligand_bound) guards
 the complex side: a ligand that diffuses off the β-core is flagged (low
@@ -82,13 +82,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DWELL_DIR = ROOT / "results" / "dwell"
 
 # ---------------------------------------------------------------------------
-# Pilot configuration — the cheap "decide whether to commit" run from #14:
+# Pilot configuration — the cheap "decide whether to commit" run:
 # 4 ligands × 2 shapes × N replicas × a few ns. silibinin (top hit) and DHEA
 # (top novel) should read as destabilisers; trehalose is a chemical chaperone
 # with a different mechanism; caffeine is the negative-control decoy (the
 # static screen ranks it ~neutral, Δgat≈-0.006, so its dwell shift should
 # straddle zero). Two structurally distinct shapes (parallel vs antiparallel
-# β-core) give the multi-shape consistency check #30 requires.
+# β-core) give the multi-shape consistency check.
 # ---------------------------------------------------------------------------
 
 PILOT_SHAPES = [
@@ -101,7 +101,7 @@ PILOT_LIGANDS = ["silibinin", "dhea", "trehalose", "caffeine"]
 # 3-mer's disordered tails balloon the solvent box (~850k atoms) and are where
 # the fixed-charge force field is least reliable; cropping to this window
 # (which contains the toxic β-core 70–88 and the docked pose) lands one chunk
-# at ~55k atoms with `--rect-box`, the basic-GPU target. See issue #33.
+# at ~55k atoms with `--rect-box`, the basic-GPU target.
 CHUNK_RANGE = (58, 102)
 
 N_REPLICAS = 10
@@ -401,7 +401,7 @@ def dock_pose_cores(apo_core_pdb, smiles: str, out_dir, n_poses: int = 5,
     further truncation. CPU only (rdkit/meeko/Vina), so it runs in the pip venv.
 
     This is the distributed ``dock`` chunk's body and the pose-sampling
-    replacement for a single central dock (#14): the bound pose is a stochastic
+    replacement for a single central dock: the bound pose is a stochastic
     Vina draw, so the screen samples the ensemble instead of betting on the top
     pose. Returns the written paths."""
     import stage3
@@ -446,7 +446,7 @@ def run_pilot(
     n_replicas: int = N_REPLICAS, prod_ns: float = PROD_NS,
     skip_existing: bool = True,
 ) -> dict:
-    """The #14 pilot: shapes × ligands × replicas, apo + complex, then
+    """The pilot: shapes × ligands × replicas, apo + complex, then
     score + bootstrap. Writes results/dwell/pilot_summary.{json,csv}."""
     summary: dict = {"config": {
         "shapes": shapes, "ligands": ligands, "n_replicas": n_replicas,
@@ -616,7 +616,7 @@ def main() -> None:
     pt = sub.add_parser("selftest", help="bootstrap sanity check on synthetic data (no MD)")
     pt.set_defaults(func=_cmd_selftest)
 
-    pp = sub.add_parser("pilot", help="run the full #14 pilot (uses the conda MD env)")
+    pp = sub.add_parser("pilot", help="run the full pilot (uses the conda MD env)")
     pp.add_argument("--replicas", type=int, default=N_REPLICAS)
     pp.add_argument("--prod-ns", type=float, default=PROD_NS)
     pp.add_argument("--no-skip", action="store_true", help="re-run replicas even if cached")

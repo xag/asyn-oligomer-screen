@@ -1,4 +1,4 @@
-"""Tests for spot-check target selection (#43). Pure; no MD, no network.
+"""Tests for spot-check target selection. Pure; no MD, no network.
 
 Run:  .venv/bin/python tests/test_spotcheck.py
 """

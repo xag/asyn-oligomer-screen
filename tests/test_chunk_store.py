@@ -1,4 +1,4 @@
-"""Chunk store DAG + lease semantics (issue #34, local scope).
+"""Chunk store DAG + lease semantics (local scope).
 
 These pin the contract that makes the workload distributable and resumable, with
 no MD/OpenMM involved (pure store logic, runs in the bare pip venv):

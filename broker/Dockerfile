@@ -1,4 +1,4 @@
-# Hugging Face Docker Space for the upload broker (#43).
+# Hugging Face Docker Space for the upload broker.
 FROM python:3.12-slim
 
 WORKDIR /app

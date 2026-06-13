@@ -1,4 +1,4 @@
-"""Create/update the broker HF Space and set its secrets (#43).
+"""Create/update the broker HF Space and set its secrets.
 
     python broker/provision.py <path-to-lease-key-file>
 

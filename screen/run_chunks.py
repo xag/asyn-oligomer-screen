@@ -1,4 +1,4 @@
-"""Author + run distributable dwell-time experiments as resumable chunks (#34).
+"""Author + run distributable dwell-time experiments as resumable chunks.
 
 This is the dwell-time-specific layer on top of the generic ``chunk_store``:
 
@@ -14,7 +14,7 @@ This is the dwell-time-specific layer on top of the generic ``chunk_store``:
 
 Chunk DAG per (shape, ligand) pair:  build → {equilibrate(seed) → segment(seed, i)…}.
 Only the per-replica segment chain has an internal dependency; seeds and pairs are
-independent — the workload fans out wide. See the approved plan and #34.
+independent — the workload fans out wide. See the approved plan.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ APO = "apo"   # the ligand label for the apo baseline arm
 # pose is a stochastic Vina draw, so committing all replicas to one (the old top-
 # pose-only path) conditions the result on a single sample; spanning the ensemble
 # marginalises that uncertainty. Per-pose × per-seed replicas, aggregated across
-# poses at scoring time (#14).
+# poses at scoring time.
 DEFAULT_N_POSES = 5
 
 
@@ -112,7 +112,7 @@ def enumerate_chunks(spec: dict) -> list[dict]:
       equilibrate→segment chain per seed.
     * **complex** — the bound pose is a *sampled dimension*, not a fixed input, so
       the dwell estimate marginalises pose uncertainty instead of betting on one
-      stochastic Vina draw (see #14). Per ligand:
+      stochastic Vina draw. Per ligand:
         ``dock``   apo core (receptor) + smiles → ``n_poses`` pose cores. CPU
                    (rdkit/meeko/Vina); the pose ensemble Vina already produces,
                    instead of discarding all but the top.
@@ -201,7 +201,7 @@ def cmd_create(args) -> None:
 
     # Central CPU prep is now ONLY the apo NAC core — the apo build input and the
     # shared docking receptor. Docking is a distributed `dock` chunk (the pose
-    # ensemble, #14), so the coordinator no longer docks here; it just reads each
+    # ensemble), so the coordinator no longer docks here; it just reads each
     # ligand's SMILES from the registry so the dock chunks carry them.
     import stage3  # local: registry lookup (load_vicinity_molecule)
     scratch = store.experiment_dir(args.exp_id) / "_prep"
@@ -320,7 +320,7 @@ def execute_chunk(ch: dict, infile, scratch: Path) -> dict[str, Path]:
     if kind == "dock":
         # Dock the ligand onto the apo NAC core and emit one complex core per
         # pose. CPU only (rdkit/meeko/Vina), so it runs in the pip venv like the
-        # apo path — no conda. The pose ensemble is the #14 sampling: downstream
+        # apo path — no conda. The pose ensemble is the sampling: downstream
         # build/equilibrate/segment fan out per pose.
         import dwell_time
         core = infile(ch["consumes"][0])          # apo NAC core = docking receptor
@@ -529,7 +529,7 @@ def main() -> None:
     pc.add_argument("--apo", action="store_true",
                     help="(kept for compatibility; the apo arm is always included as the docking receptor)")
     pc.add_argument("--n-poses", type=int, default=DEFAULT_N_POSES,
-                    help="docked poses per complex ligand the dwell estimate is sampled over (#14)")
+                    help="docked poses per complex ligand the dwell estimate is sampled over")
     pc.add_argument("--replicas", type=int, default=2)
     pc.add_argument("--base-seed", type=int, default=1000)
     pc.add_argument("--equil-ps", type=float, default=DEFAULT_EQUIL_PS)

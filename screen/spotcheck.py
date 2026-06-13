@@ -1,5 +1,5 @@
 """Coordinator spot-check: independently re-run a sample of candidate chunks and
-emit ``{chunk_id: dwell}`` for ``hf_store ingest --spotcheck-file`` (#43).
+emit ``{chunk_id: dwell}`` for ``hf_store ingest --spotcheck-file``.
 
 The ground-truth anchor of the acceptance gate. Without it, acceptance rests on
 contributors agreeing *with each other*; a colluding cluster of fabrications
