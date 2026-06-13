@@ -23,8 +23,9 @@ each chain disordered) but invents the parts the experiments don't
 pin down, then lets physics-based simulation relax the model into a
 plausible shape. We make 11 such models with different choices (sheet
 direction, chain count, sheet boundaries) and all of them score
-"more toxic" than every deposited mature clump — evidence the
-ranking is not an artifact of one lucky build.
+"more toxic" than every deposited mature clump — which shows the
+toxicity score is robust to the build, not that any of these shapes
+is one the oligomer actually holds (the open question).
 </details>
 
 The Stage 2 framework (`features.py`, `classifier.py`) is otherwise

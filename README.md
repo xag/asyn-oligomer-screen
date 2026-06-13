@@ -350,7 +350,7 @@ Different metabolic conditions converge on the same molecular damage. High blood
 
 ### 8.3 Limitations
 
-1. **The receptor is a model, not a deposit.** The reference oligomer is constructed under a published topology prior, not from atomic coordinates. The DARR set in Fusco et al. (2017) is too sparse to determine the geometry uniquely; the relaxed structure is one of many compatible with the published topology. The ensemble check across 11 topologies (§3) shows that all genuine Fusco-topology builds score well above deposited anchors, indicating the ranking is not artefactual to a single seed.
+1. **The receptor is a model, and its conformational state is not established.** The reference oligomer is constructed under a published topology prior, not from atomic coordinates. The DARR set in Fusco et al. (2017) is too sparse to determine the geometry uniquely; the relaxed structure is one of many compatible with the published topology. The ensemble check across 11 topologies (§3) shows only that the *activity* score is robust to the starting build — not that this conformation is metastable. Unbiased MD shows it is not: the structure drifts off its built geometry rather than settling into a basin. All three channels depend on the receptor shape, so every ranking is conditional on a single, hand-picked, non-metastable conformation whose populated state is not yet known.
 
 2. **Activity scores are ordinal.** A `Δact_gated` of −0.24 against an apo baseline of +17.78 is a 1.4% perturbation in the framework's internal units. The framework is calibrated to rank, not to predict absolute occupancy. Comparisons across molecules are valid; the magnitudes are not.
 
@@ -367,7 +367,7 @@ Different metabolic conditions converge on the same molecular damage. High blood
 
 Six honest caveats:
 
-1. **The target is a model, not a real measurement.** No one has experimentally captured the toxic oligomer; we built it from published constraints. We checked the result against 11 alternative builds and they all scored similarly, but it could still be off.
+1. **The target is a model, and we don't yet know if it holds its shape.** No one has experimentally captured the toxic oligomer; we built it from published constraints. We checked it against 11 alternative builds, but those checks only test the toxicity *score*, not whether the structure keeps its shape on its own — and under simulation it doesn't. Whether the oligomer has a stable, toxic shape at all is the open question every ranking hangs on.
 2. **The scores rank, they don't measure.** A score difference between two molecules tells you the framework prefers one; it doesn't tell you by how much in any physical sense.
 3. **The protein was treated as rigid.** Real proteins flex when a molecule binds. Modelling that flexibility is expensive and was only piloted; molecules that work by *reshaping* the oligomer rather than just sitting on it can be under-ranked.
 4. **The scoring biases toward flat aromatic molecules** (the polyphenol shape) because that shape is what the β-sheet surface prefers. The blind test partially controls for this — three different polyphenol subclasses ranked correctly — but the bias is real.
