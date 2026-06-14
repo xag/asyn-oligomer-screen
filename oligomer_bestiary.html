@@ -233,10 +233,24 @@
     <div class="pagenum">· v ·</div>
   </section>
 
-  <!-- VII · FIBRIL -->
+  <!-- VII · FUNNEL -->
   <section class="page" data-roman="vi">
     <div class="frame"></div>
     <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VI</span></div>
+    <div class="plate-wrap"><svg id="plate-funnel" viewBox="0 0 680 420"></svg></div>
+    <div class="caption">
+      <div class="latin">probatio infundibuli — do the forms converge?</div>
+      <h2>The Funnel Test</h2>
+      <p>Eight independent starts — different coil draws, both registers, two shifted β-cores, and a disordered coil — each relaxed for 50 ns, then mapped by mutual β-core distance. They do not fall into one shape. They split by register into a few history-dependent basins: the parallel starts gather around the hand-built target, the antiparallel form a separate basin, and disorder never folds.</p>
+      <p class="stat">8 starts → <b>3 macro-basins</b> · mean spread ≈ <b>14 Å</b> · within a register independent starts converge; across registers they do not</p>
+    </div>
+    <div class="pagenum">· vi ·</div>
+  </section>
+
+  <!-- VIII · FIBRIL -->
+  <section class="page" data-roman="vii">
+    <div class="frame"></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VII</span></div>
     <div class="plate-wrap"><svg id="plate-fibril" viewBox="0 0 680 420"></svg></div>
     <div class="caption">
       <div class="latin">fibrilla matura — the end-state</div>
@@ -244,13 +258,13 @@
       <p>The destination, if nucleation is crossed: thousands of strands stacked rung upon rung along a single axis, each layer one protein. To get here the slab must lock into in-register parallel cross-β and bury the NAC — a barrier many toxic oligomers never cross.</p>
       <p class="stat">rung spacing <b>4.8&nbsp;Å</b> · width <b>5–10&nbsp;nm</b> · length <b>0.1–several&nbsp;µm</b> (~2,000 rungs per micron)</p>
     </div>
-    <div class="pagenum">· vi ·</div>
+    <div class="pagenum">· vii ·</div>
   </section>
 
-  <!-- VIII · SCALE -->
-  <section class="page" data-roman="vii">
+  <!-- IX · SCALE -->
+  <section class="page" data-roman="viii">
     <div class="frame"></div>
-    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VII</span></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VIII</span></div>
     <div class="plate-wrap" style="flex:0 0 38%"><svg id="plate-scale" viewBox="0 0 680 220"></svg></div>
     <div class="caption" style="margin-bottom:14px">
       <div class="latin">mensura — the measure of things</div>
@@ -266,7 +280,7 @@
         <tr><td class="k">Fibril width / length</td><td class="v">5–10 <span class="u">nm</span> / 0.1–&gt;1 <span class="u">µm</span></td></tr>
       </table>
     </div>
-    <div class="pagenum">· vii ·</div>
+    <div class="pagenum">· viii ·</div>
   </section>
 
   <div class="chev l hidden" id="chevL">‹</div>
@@ -289,6 +303,27 @@ function hairline(svg,d){const e=E("path",{d:d,class:"ln hair fade"});svg.append
 function txt(svg,x,y,s,o){o=o||{};const e=E("text",{x:x,y:y,"text-anchor":o.a||"middle",
   "font-size":o.s||14,"font-style":o.it?"italic":"normal",class:o.cls||""});e.textContent=s;
   if(o.ls)e.setAttribute("letter-spacing",o.ls);svg.appendChild(e);return e;}
+
+// ---- real data baked from the structures: NACore sequence + E5 basin medoids ----
+const SEQ70_88=[[70,"V","hydro"],[71,"V","hydro"],[72,"T","polar"],[73,"G","polar"],[74,"V","hydro"],[75,"T","polar"],[76,"A","hydro"],[77,"V","hydro"],[78,"A","hydro"],[79,"Q","polar"],[80,"K","charged"],[81,"T","polar"],[82,"V","hydro"],[83,"E","charged"],[84,"G","polar"],[85,"A","hydro"],[86,"G","polar"],[87,"S","polar"],[88,"I","hydro"]];
+const BASINS={"par":{"A":{"pts":[[110,286],[112,278],[109,265],[116,254],[121,243],[123,229],[134,223],[143,212],[155,205],[162,193],[165,181],[169,177],[184,175],[190,163],[204,159],[214,149],[224,153],[234,158],[232,172],[235,180],[248,185],[256,180],[269,182],[281,179],[285,165],[296,163],[309,161],[322,168],[318,181],[327,192],[342,193],[348,192],[363,192],[372,202],[369,198],[378,202],[368,205],[377,213],[388,211],[402,216],[400,230],[387,232],[386,242],[373,236],[363,241]],"core":[12,30]},"B":{"pts":[[90,244],[92,239],[90,228],[104,228],[110,215],[124,211],[129,202],[141,193],[147,182],[140,170],[153,164],[167,164],[175,165],[188,162],[188,162],[198,167],[212,169],[215,166],[229,170],[236,164],[249,169],[261,166],[272,161],[281,173],[294,174],[299,186],[302,195],[310,203],[318,192],[329,185],[336,172],[350,172],[361,173],[372,163],[381,168],[391,170],[383,182],[383,187],[391,196],[394,189],[402,186],[416,182],[424,182],[425,169],[416,164]],"core":[12,30]},"C":{"pts":[[113,236],[100,231],[105,220],[107,219],[104,206],[115,196],[117,189],[126,179],[129,178],[136,168],[144,159],[157,154],[169,151],[181,144],[188,144],[199,152],[211,150],[223,152],[234,160],[247,163],[258,173],[271,170],[279,164],[290,173],[305,169],[310,183],[316,187],[316,176],[315,166],[328,170],[342,171],[348,185],[354,189],[368,189],[382,190],[389,193],[400,203],[411,206],[420,217],[419,227],[431,229],[439,241],[451,248],[462,248],[470,258]],"core":[12,30]}},"anti1":{"A":{"pts":[[514,140],[519,140],[517,139],[515,134],[520,131],[522,133],[523,129],[529,126],[534,128],[535,124],[541,124],[544,127],[542,134],[546,138],[545,144],[547,149],[551,145],[550,148],[553,143],[556,147],[561,144],[567,147],[574,146],[579,145],[585,147],[590,145],[593,148],[598,146],[596,140],[593,141],[597,138],[599,140],[605,140],[610,145],[613,142],[620,141],[624,146],[630,143],[634,141],[636,135],[642,138],[644,139],[647,145],[653,145],[658,148]],"core":[12,30]},"B":{"pts":[[660,112],[655,116],[652,121],[647,119],[641,120],[637,118],[634,123],[635,125],[630,123],[625,128],[625,133],[618,132],[615,135],[609,136],[606,133],[600,133],[595,138],[590,140],[585,142],[580,145],[575,147],[574,153],[569,157],[562,155],[557,158],[554,157],[548,155],[543,155],[538,151],[538,144],[540,141],[539,135],[535,131],[529,129],[524,134],[523,136],[517,136],[515,134],[514,127],[508,125],[507,122],[509,127],[506,132],[500,134],[500,127]],"core":[12,30]},"C":{"pts":[[500,110],[504,105],[508,108],[514,112],[520,110],[523,112],[527,117],[532,119],[530,125],[535,129],[536,135],[534,141],[535,146],[540,150],[539,156],[543,160],[546,164],[550,169],[556,166],[561,162],[561,155],[566,152],[570,149],[571,143],[577,140],[581,135],[587,133],[591,134],[598,134],[602,130],[608,128],[611,126],[615,120],[620,123],[623,129],[627,133],[630,134],[637,133],[640,127],[644,124],[650,128],[649,132],[650,138],[649,144],[650,150]],"core":[12,30]}},"anti2":{"A":{"pts":[[510,316],[517,317],[526,319],[526,314],[529,306],[523,299],[520,290],[517,286],[509,282],[509,273],[510,267],[507,258],[505,252],[513,249],[517,248],[524,244],[530,246],[538,249],[543,255],[547,253],[555,250],[562,256],[569,251],[576,249],[583,255],[591,258],[594,261],[599,268],[607,270],[610,265],[617,259],[619,265],[622,272],[629,266],[636,267],[645,264],[648,264],[644,272],[647,280],[649,285],[648,294],[641,297],[636,300],[635,309],[628,316]],"core":[12,30]},"B":{"pts":[[651,324],[657,318],[660,313],[656,304],[660,297],[660,288],[653,283],[653,274],[645,273],[637,278],[628,277],[623,270],[622,266],[617,259],[620,251],[613,246],[604,249],[598,249],[590,248],[583,253],[574,254],[570,261],[564,267],[556,262],[548,266],[545,263],[536,262],[529,258],[527,254],[518,258],[516,261],[507,263],[505,271],[500,278],[500,286],[507,291],[510,297],[515,304],[521,301],[520,303],[528,307],[526,313],[518,315],[517,320],[522,327]],"core":[12,30]},"C":{"pts":[[501,315],[504,307],[501,304],[506,304],[506,301],[513,296],[515,289],[514,280],[521,276],[527,274],[534,268],[533,268],[529,262],[530,266],[523,269],[524,274],[533,275],[539,275],[548,273],[555,270],[559,263],[567,263],[576,262],[577,254],[584,249],[583,242],[591,239],[599,241],[605,245],[614,247],[618,255],[627,257],[632,264],[636,269],[645,270],[644,279],[639,286],[634,288],[630,296],[626,299],[626,308],[633,310],[637,319],[646,319],[650,319]],"core":[12,30]}}};
+const FUNNEL=[{x:-4.21,y:-1.68,reg:'p'},{x:-4.36,y:1.71,reg:'p'},{x:-6.06,y:-0.54,reg:'p'},{x:11.03,y:4.91,reg:'a'},{x:8.31,y:7.37,reg:'a'},{x:-4.31,y:-0.29,reg:'p'},{x:-5.12,y:0.02,reg:'p'},{x:12.59,y:-10.27,reg:'c'},{x:-7.87,y:-1.24,reg:'h'}];
+function star(svg,cx,cy,r,delay){
+  let d=""; for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5, rr=(k%2?r*0.42:r);
+    d+=(k?"L":"M")+(cx+rr*Math.cos(a)).toFixed(1)+","+(cy+rr*Math.sin(a)).toFixed(1);}
+  const e=E("path",{d:d+"Z",fill:"currentColor",stroke:"none",class:"fade"});
+  e.style.animationDelay=(delay||0)+"s"; svg.appendChild(e); return e;
+}
+function drawStruct(svg, data, delay0, lw){
+  let k=0;
+  for(const cid in data){
+    const pts=data[cid].pts, core=data[cid].core;
+    const e=poly(svg, pts, delay0 + k*0.12); e.setAttribute("stroke-width", lw||1.1);
+    const ce=poly(svg, pts.slice(core[0], core[1]+1), delay0 + k*0.12);
+    ce.setAttribute("stroke-width","3.6"); ce.setAttribute("opacity","0.5");
+    k++;
+  }
+}
 
 // pleated β-strand vertices
 function pleat(x0,x1,y,amp,step){const pts=[];const n=Math.round((x1-x0)/step);
@@ -331,16 +366,29 @@ function buildMonomer(){const s=document.getElementById("plate-monomer");_ai=0;
   txt(s,mid(96,140),ry-12,"C-terminal",{it:true,s:13});
 }
 
+function dot(svg,x,y,r,fill,stroke,sw,delay){
+  const c=E("circle",{cx:x,cy:y,r:r,fill:fill,stroke:stroke||"none","stroke-width":sw||0,class:"fade"});
+  c.style.animationDelay=(delay||0)+"s"; svg.appendChild(c); return c;
+}
 function buildStrand(){const s=document.getElementById("plate-strand");_ai=0;
-  const y=170,x0=120,x1=560;
-  poly(s,pleat(x0,x1,y,16,24),0);
-  arrow(s,x1,y,1,.6);
-  txt(s,x0-16,y+4,"N",{s:16,cls:"tnum"}); txt(s,x1+18,y+4,"C",{s:16,cls:"tnum"});
-  // dimension line
-  const dy=250;hairline(s,`M${x0},${dy} H${x1}`);
-  hairline(s,`M${x0},${dy-6} V${dy+6}`); hairline(s,`M${x1},${dy-6} V${dy+6}`);
-  txt(s,(x0+x1)/2,dy+24,"≈ 60 Å · 19 residues",{it:true,s:15});
-  txt(s,(x0+x1)/2,y-34,"the pleat = the β-sheet's rigid plank",{it:true,s:14});
+  const x0=125,x1=560,yb=210,amp=15,n=SEQ70_88.length,step=(x1-x0)/(n-1);
+  const verts=[];
+  for(let i=0;i<n;i++){const up=(i%2===0); verts.push([x0+i*step, yb+(up?-amp:amp), up]);}
+  poly(s, verts.map(v=>[v[0],v[1]]), 0);                        // backbone pleat
+  arrow(s,x1,verts[n-1][1],1,.7);
+  txt(s,x0-16,yb+4,"N",{s:15,cls:"tnum"}); txt(s,x1+16,yb+4,"C",{s:15,cls:"tnum"});
+  SEQ70_88.forEach((r,i)=>{
+    const [num,aa,cls]=r, [x,y,up]=verts[i], tlen=15, ty=y+(up?-tlen:tlen), d=0.6+i*0.03;
+    poly(s,[[x,y],[x,ty]], 0.3+i*0.03);                          // side-chain stub
+    if(cls==="hydro") dot(s,x,ty,3.2,"currentColor",null,0,d);
+    else if(cls==="charged"){ dot(s,x,ty,3.4,"none","currentColor",1,d);
+      txt(s,x+8,ty+4,aa==="K"?"+":"–",{s:12,a:"start"}); }
+    else dot(s,x,ty,1.7,"none","var(--faint)",.8,d);
+    txt(s,x, up?ty-9:ty+15, aa, {s:12,cls:"tnum"});               // exact residue
+  });
+  txt(s,verts[0][0],yb+44,"70",{s:11,cls:"tnum"}); txt(s,verts[n-1][0],yb+44,"88",{s:11,cls:"tnum"});
+  txt(s,(x0+x1)/2, yb-58, "the NACore strand — exact residues 70–88 (VVTGVTAVAQKTVEGAGSI)", {it:true,s:14});
+  txt(s,(x0+x1)/2, 300, "● hydrophobic — forms the zipper      ○ polar      ⊕ ⊖ charged — break the run", {it:true,s:13});
 }
 
 function slab(id,anti){const s=document.getElementById(id);_ai=0;
@@ -365,21 +413,44 @@ function slab(id,anti){const s=document.getElementById(id);_ai=0;
 }
 
 function buildRelaxed(){const s=document.getElementById("plate-relaxed");_ai=0;
-  // three curling, buckled strands; top one peeling away
-  path(s,"M150,150 C210,120 230,180 290,150 C350,120 370,150 430,158 C480,165 500,120 545,110",0);
-  path(s,"M150,212 C205,196 235,236 295,210 C355,184 380,224 440,212 C485,203 505,222 548,210",.25);
-  path(s,"M150,266 C208,252 236,288 296,266 C356,244 382,282 442,268 C486,258 508,278 548,268",.45);
-  // peel gap marker between strand1 and 2 on the right
-  hairline(s,"M548,118 V202");
-  hairline(s,"M543,118 H553"); hairline(s,"M543,202 H553");
-  txt(s,560,165,"edge opens",{a:"start",it:true,s:13});
-  txt(s,560,182,"5→8 Å",{a:"start",it:true,s:13,cls:"tnum"});
-  // retained contact brace bottom
-  hairline(s,"M150,300 H300").classList.add("dash");
-  txt(s,225,318,"packing retained",{it:true,s:13});
-  txt(s,350,355,"loosens — but does not dissolve",{it:true,s:15});
+  txt(s,250,52,"the real E5 relaxed basins — Cα trace, thick = β-core 70–88",{it:true,s:13});
+  drawStruct(s, BASINS.par, 0, 1.1);                     // hero: parallel basin
+  txt(s,280,360,"parallel  ·  1 basin  ·  100%  ·  6.2 Å  ·  activity 11.4",{it:true,s:13});
+  hairline(s,"M486,46 V366").classList.add("dash");       // divider
+  drawStruct(s, BASINS.anti1, 0.5, 0.85);                // inset: antiparallel basin 1
+  drawStruct(s, BASINS.anti2, 0.5, 0.85);                // inset: antiparallel basin 2
+  txt(s,580,70,"antiparallel",{it:true,s:12});
+  txt(s,580,210,"32% · 8.8 Å · act 11.3",{s:10.5,it:true});
+  txt(s,580,356,"68% · 6.6 Å · act 10.4",{s:10.5,it:true});
 }
 
+function buildFunnel(){const s=document.getElementById("plate-funnel");_ai=0;
+  const P=FUNNEL, xs=P.map(p=>p.x), ys=P.map(p=>p.y);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const bx0=165,bx1=535,by0=110,by1=300;
+  const XY=P.map(p=>[bx0+(p.x-x0)/(x1-x0)*(bx1-bx0), by1-(p.y-y0)/(y1-y0)*(by1-by0)]);
+  function loop(idxs){
+    const px=idxs.map(i=>XY[i][0]),py=idxs.map(i=>XY[i][1]);
+    const cx=(Math.min(...px)+Math.max(...px))/2, cy=(Math.min(...py)+Math.max(...py))/2;
+    const rx=(Math.max(...px)-Math.min(...px))/2+28, ry=(Math.max(...py)-Math.min(...py))/2+26;
+    const e=E("ellipse",{cx:cx.toFixed(1),cy:cy.toFixed(1),rx:rx.toFixed(1),ry:ry.toFixed(1),
+      fill:"none",stroke:"var(--faint)","stroke-width":.7,"stroke-dasharray":"2 3",class:"fade"});
+    s.appendChild(e); return [cx,cy,rx,ry];
+  }
+  const Lp=loop([0,1,2,5,6,8]), La=loop([3,4]);
+  P.forEach((p,i)=>{const x=XY[i][0], y=XY[i][1], d=0.3+i*0.06;
+    if(p.reg==='p') dot(s,x,y,3,"currentColor",null,0,d);
+    else if(p.reg==='a') dot(s,x,y,3.4,"none","currentColor",1,d);
+    else if(p.reg==='c'){poly(s,[[x-4,y-4],[x+4,y+4]],d);poly(s,[[x-4,y+4],[x+4,y-4]],d);}
+    else star(s,x,y,7,d);
+  });
+  txt(s,350,56,"each point = one start's relaxed shape · distance = β-core RMSD",{it:true,s:12.5});
+  txt(s,Lp[0],Lp[1]+Lp[3]+16,"parallel register — 5 independent starts gather here",{it:true,s:13});
+  txt(s,La[0],La[1]+La[3]+15,"antiparallel — a separate basin",{it:true,s:12.5});
+  txt(s,XY[8][0]-4,XY[8][1]+15,"★ hand-built target",{it:true,s:11.5,a:"start"});
+  txt(s,XY[7][0],XY[7][1]-12,"all-coil — never folds",{it:true,s:12.5,a:"end"});
+  txt(s,350,332,"●  parallel        ○  antiparallel        ×  coil        ★  hand-built",{s:13});
+}
 function buildFibril(){const s=document.getElementById("plate-fibril");_ai=0;
   const cx0=300,cx1=440,amp=5,step=16;
   const yTop=78,yBot=350,gap=27;const rungs=[];
@@ -430,7 +501,7 @@ function buildScale(){const s=document.getElementById("plate-scale");_ai=0;
 
 buildTitle();buildMonomer();buildStrand();
 slab("plate-parallel",false);slab("plate-antiparallel",true);
-buildRelaxed();buildFibril();buildScale();
+buildRelaxed();buildFunnel();buildFibril();buildScale();
 
 // ---- pager ----
 const pages=[...document.querySelectorAll(".page")];
