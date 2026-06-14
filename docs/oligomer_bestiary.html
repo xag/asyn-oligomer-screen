@@ -242,16 +242,30 @@
     <div class="caption">
       <div class="latin">probatio infundibuli — do the forms converge?</div>
       <h2>The Funnel Test</h2>
-      <p>Eight independent starts — different coil draws, both registers, two shifted β-cores, and a disordered coil — each relaxed for 50 ns, then mapped by mutual β-core distance. They do not fall into one shape. They split by register into a few history-dependent basins: the parallel starts gather around the hand-built target, the antiparallel form a separate basin, and disorder never folds. Repeating it at 2 and 4 chains doesn't tidy the picture — oligomer size shifts the toxic score non-monotonically without funnelling to one shape.</p>
+      <p>Eight independent starts — different coil draws, both registers, two shifted β-cores, and a disordered coil — each relaxed for 50 ns, then mapped by mutual β-core distance. They do not fall into one shape. They split by register into a few history-dependent basins: the parallel starts gather around the hand-built target, the antiparallel form a separate basin, and disorder never folds.</p>
       <p class="stat">8 starts → <b>3 macro-basins</b> · mean spread ≈ <b>14 Å</b> · within a register independent starts converge; across registers they do not</p>
     </div>
     <div class="pagenum">· vi ·</div>
   </section>
 
-  <!-- VIII · FIBRIL -->
+  <!-- VII · SIZE SWEEP -->
   <section class="page" data-roman="vii">
     <div class="frame"></div>
     <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VII</span></div>
+    <div class="plate-wrap"><svg id="plate-sweep" viewBox="0 0 680 420"></svg></div>
+    <div class="caption">
+      <div class="latin">mensura ordinis — size &amp; register</div>
+      <h2>The Size Sweep</h2>
+      <p>The same unbiased 50 ns relaxation, now at two and four chains in both registers. Size does not tidy the landscape: the parallel 2-mer keeps its toxic score, the parallel 4-mer collapses toward the floor (and was still falling), and the antiparallel forms stay mild throughout — no oligomer order settles on a single shape.</p>
+      <p class="stat">non-monotonic in size · parallel 2-mer holds (+15) · parallel 4-mer 16 → 7 · antiparallel ~5–9</p>
+    </div>
+    <div class="pagenum">· vii ·</div>
+  </section>
+
+  <!-- IX · FIBRIL -->
+  <section class="page" data-roman="viii">
+    <div class="frame"></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VIII</span></div>
     <div class="plate-wrap"><svg id="plate-fibril" viewBox="0 0 680 420"></svg></div>
     <div class="caption">
       <div class="latin">fibrilla matura — the end-state</div>
@@ -259,13 +273,13 @@
       <p>The destination, if nucleation is crossed: thousands of strands stacked rung upon rung along a single axis, each layer one protein. To get here the slab must lock into in-register parallel cross-β and bury the NAC — a barrier many toxic oligomers never cross.</p>
       <p class="stat">rung spacing <b>4.8&nbsp;Å</b> · width <b>5–10&nbsp;nm</b> · length <b>0.1–several&nbsp;µm</b> (~2,000 rungs per micron)</p>
     </div>
-    <div class="pagenum">· vii ·</div>
+    <div class="pagenum">· viii ·</div>
   </section>
 
   <!-- IX · SCALE -->
-  <section class="page" data-roman="viii">
+  <section class="page" data-roman="ix">
     <div class="frame"></div>
-    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VIII</span></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;IX</span></div>
     <div class="plate-wrap" style="flex:0 0 38%"><svg id="plate-scale" viewBox="0 0 680 220"></svg></div>
     <div class="caption" style="margin-bottom:14px">
       <div class="latin">mensura — the measure of things</div>
@@ -281,7 +295,7 @@
         <tr><td class="k">Fibril width / length</td><td class="v">5–10 <span class="u">nm</span> / 0.1–&gt;1 <span class="u">µm</span></td></tr>
       </table>
     </div>
-    <div class="pagenum">· viii ·</div>
+    <div class="pagenum">· ix ·</div>
   </section>
 
   <div class="chev l hidden" id="chevL">‹</div>
@@ -452,6 +466,23 @@ function buildFunnel(){const s=document.getElementById("plate-funnel");_ai=0;
   txt(s,XY[7][0],XY[7][1]-12,"all-coil — never folds",{it:true,s:12.5,a:"end"});
   txt(s,350,332,"●  parallel        ○  antiparallel        ×  coil        ★  hand-built",{s:13});
 }
+const SWEEP=[{lab:"2-mer parallel",s:17.5,e:15.4},{lab:"2-mer antiparallel",s:4.6,e:6.8},{lab:"4-mer parallel",s:16.1,e:6.9},{lab:"4-mer antiparallel",s:9.2,e:9.1}];
+function buildSizeSweep(){const s=document.getElementById("plate-sweep");_ai=0;
+  const x0=205,dx=108,y0=82,y1=300,vmax=24,floor=3.7, py=v=>y1-(v/vmax)*(y1-y0);
+  hairline(s,`M168,${y0} V${y1} H560`);
+  [0,10,20].forEach(v=>{hairline(s,`M164,${py(v)} H168`); txt(s,158,py(v)+4,v,{a:"end",s:11,cls:"tnum"});});
+  hairline(s,`M168,${py(floor)} H560`).classList.add("dash");
+  txt(s,564,py(floor)+4,"coil floor",{a:"start",it:true,s:10.5});
+  const yl=txt(s,138,(y0+y1)/2,"activity",{it:true,s:12}); yl.setAttribute("transform",`rotate(-90 138 ${(y0+y1)/2})`);
+  SWEEP.forEach((c,i)=>{const x=x0+i*dx,d=0.3+i*0.15,sy=py(c.s),ey=py(c.e),up=c.e>=c.s;
+    poly(s,[[x,sy],[x,ey]],d);
+    poly(s,[[x-4,ey+(up?7:-7)],[x,ey],[x+4,ey+(up?7:-7)]],d);
+    dot(s,x,sy,3.2,"none","currentColor",1,d+0.2);
+    dot(s,x,ey,3.6,"currentColor",null,0,d+0.2);
+    c.lab.split(' ').forEach((w,k)=>txt(s,x,322+k*13,w,{s:11}));
+  });
+  txt(s,360,62,"each column: built shape (○) → after 50 ns unbiased (●)",{it:true,s:12.5});
+}
 function buildFibril(){const s=document.getElementById("plate-fibril");_ai=0;
   const cx0=300,cx1=440,amp=5,step=16;
   const yTop=78,yBot=350,gap=27;const rungs=[];
@@ -502,7 +533,7 @@ function buildScale(){const s=document.getElementById("plate-scale");_ai=0;
 
 buildTitle();buildMonomer();buildStrand();
 slab("plate-parallel",false);slab("plate-antiparallel",true);
-buildRelaxed();buildFunnel();buildFibril();buildScale();
+buildRelaxed();buildFunnel();buildSizeSweep();buildFibril();buildScale();
 
 // ---- pager ----
 const pages=[...document.querySelectorAll(".page")];
