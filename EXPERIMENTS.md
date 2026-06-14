@@ -207,3 +207,33 @@ antiparallel s123 start fell to the coil floor). For #56 the open question is no
 longer whether a toxic-scoring basin exists (several do) but *which register/basin is
 biologically real* — which these single-replica, single-quench, trimer-scale,
 membrane-free simulations cannot decide; only an experimental oligomer structure can.
+
+---
+
+## E7 — Oligomer size does not simplify the landscape: non-monotonic and still rugged (2026-06-14)
+
+**Question.** E5/E6 mapped basins only at trimer size. Does the register-split,
+history-dependent landscape persist, sharpen, or break with oligomer order? (Follows #56.)
+
+**Method.** Unbiased 50 ns MD (no restraints, `screen/md_relax.py` segment path) from
+2-mer and 4-mer cores, both registers, 1–3 velocity seeds each (10 replicas), NAC-core
+chunk. Per (size,register) cell: plateau slope, drift from own start, end-basin activity
+(`score_oligomer`, per-chain mean ⇒ size-comparable) and within-cell basin count.
+Cross-size structural RMSD is not comparable (different chain counts), so size is compared
+via activity. Driver + analysis [`ops/size_sweep.py`](ops/size_sweep.py). Data
+`results/size_sweep_states/`.
+
+**Result.** Non-monotonic in size (end activity after 50 ns; coil floor ≈ 3.7):
+parallel 2-mer is the *most* robustly toxic-scoring (+17.5 → **+15.4**, one basin,
+plateaued); parallel 4-mer degrades *most* (+16.1 → **+6.9**) and had **not** plateaued
+(slope +0.18 Å/ns, still falling); antiparallel stays consistently mild across sizes
+(2-mer +4.6 → +6.8; 4-mer +9.2 → +9.1). Seeds within a single size×register cell sometimes
+split into two basins.
+
+**Conclusion.** Widening the size axis confirms and deepens E5/E6: no oligomer order
+funnels to a single dominant shape — the landscape is rugged and history-dependent across
+size, register, *and* seed. This reframes the objective: the useful target is not a "toxic
+shape" but the conformations the oligomer *most occupies* when unperturbed — an
+occupancy/free-energy question that single-quench MD cannot answer (it measures kinetic
+relaxation endpoints, not equilibrium populations; see #57). Caveats: 4-mer parallel un-plateaued
+(endpoint unsettled); antiparallel 2-mer single-seed; water-only.

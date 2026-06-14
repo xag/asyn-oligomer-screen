@@ -1,0 +1,74 @@
+{
+  "cells": [
+    {
+      "size": "2mer",
+      "register": "parallel",
+      "shape": "fusco_parallel_2mer_core70-88",
+      "n_seeds": 3,
+      "start_activity": 17.518,
+      "end_activity_mean": 15.370666666666667,
+      "end_activity_min": 11.109,
+      "end_activity_max": 22.64,
+      "end_activity_per_seed": [
+        22.64,
+        12.363,
+        11.109
+      ],
+      "drift_mean": 8.45654724152579,
+      "slope_mean": -0.01810499069446923,
+      "within_cell_basins": 1
+    },
+    {
+      "size": "2mer",
+      "register": "antiparallel",
+      "shape": "fusco_antiparallel_2mer_core70-88",
+      "n_seeds": 1,
+      "start_activity": 4.617,
+      "end_activity_mean": 6.799,
+      "end_activity_min": 6.799,
+      "end_activity_max": 6.799,
+      "end_activity_per_seed": [
+        6.799
+      ],
+      "drift_mean": 9.10030563834235,
+      "slope_mean": -0.03892138937920997,
+      "within_cell_basins": 2
+    },
+    {
+      "size": "4mer",
+      "register": "parallel",
+      "shape": "fusco_parallel_4mer_core70-88",
+      "n_seeds": 3,
+      "start_activity": 16.139,
+      "end_activity_mean": 6.869666666666667,
+      "end_activity_min": 4.509,
+      "end_activity_max": 8.305,
+      "end_activity_per_seed": [
+        4.509,
+        8.305,
+        7.795
+      ],
+      "drift_mean": 8.087579833613825,
+      "slope_mean": 0.1773129346016935,
+      "within_cell_basins": 2
+    },
+    {
+      "size": "4mer",
+      "register": "antiparallel",
+      "shape": "fusco_antiparallel_4mer_core70-88",
+      "n_seeds": 3,
+      "start_activity": 9.21,
+      "end_activity_mean": 9.057,
+      "end_activity_min": 7.865,
+      "end_activity_max": 10.361,
+      "end_activity_per_seed": [
+        10.361,
+        7.865,
+        8.945
+      ],
+      "drift_mean": 6.704230262937105,
+      "slope_mean": 0.014748638889804338,
+      "within_cell_basins": 1
+    }
+  ]
+}
