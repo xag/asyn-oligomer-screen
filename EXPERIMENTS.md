@@ -166,3 +166,44 @@ the hand-built pose. A defensible target is the relaxed ensemble (or an experime
 structure), not the hand-built conformation; pose-dependent docking should be
 re-grounded there. Longer sampling would tighten the least-settled antiparallel basin
 but does not change the activity verdict.
+
+---
+
+## E6 — Diverse starts do not funnel to one shape: a register-split, history-dependent landscape (2026-06-14)
+
+**Question.** E5 used a single starting region. Do *independent* starting
+conformations converge to a common ensemble (a real attractor), or to distinct
+basins (rugged, history-dependent)? Directly tests the "would another shape
+converge to it?" gap left open by E5. (Follows #56.)
+
+**Method.** 8 independent starts, each relaxed 50 ns unbiased (no restraints,
+`screen/md_relax.py` segment path) on the NAC-core chunk, one replica each:
+parallel core70-88 (seeds 42/123/777), antiparallel core70-88 (seeds 42/123),
+parallel core65-83, parallel core73-91, and the all-coil trimer (a disordered
+start). Per start: β-core RMSD/Jaccard vs its own start (plateau slope, drift)
+and end-basin activity (`oligomers/score_oligomer.py`). Cross-start: pairwise
+β-core RMSD among the relaxed medoids (+ the hand-built target), hierarchical
+cluster counts, and a classical-MDS map. Driver + analysis
+[`ops/funnel.py`](ops/funnel.py). Data `results/funnel_states/`.
+
+**Result.** The end-basins do not coincide: mean pairwise β-core RMSD **14.1 Å**
+(min 6.0, max 21.5); cluster counts 8 / 4 / **3** at 4 / 8 / 12 Å cuts. **Register
+is the dominant split.** All 5 parallel starts — including the shifted cores
+65-83/73-91 and different coil draws — relax into one loose ~7–9 Å neighbourhood
+that *contains the hand-built target*; the 2 antiparallel starts cluster with each
+other but **15–18 Å** from every parallel one; the coil start never organises
+(still drifting +0.23 Å/ns, isolated). End-basin activity is itself
+start-dependent: parallel 7.5–16.0, antiparallel 8.4 and **4.6**, coil 4.4 (floor
+≈ 3.7).
+
+**Conclusion.** No single global attractor. *Within* a register, independent starts
+converge — the parallel family reproducibly relaxes to ~the hand-built region, so
+the parallel target is not arbitrary *within its register*; *across* registers they
+settle into distinct, non-interconverting basins on this timescale, and disorder
+does not fold in 50 ns. The landscape is rugged and history-dependent: which basin —
+and how toxic — depends on the starting register. This **qualifies E5's "toxic
+character is robust" reading**: with broader sampling toxicity is not uniform (the
+antiparallel s123 start fell to the coil floor). For #56 the open question is no
+longer whether a toxic-scoring basin exists (several do) but *which register/basin is
+biologically real* — which these single-replica, single-quench, trimer-scale,
+membrane-free simulations cannot decide; only an experimental oligomer structure can.
