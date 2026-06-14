@@ -8,6 +8,8 @@
 
 **▶ [Wet-lab handoff package](https://github.com/xag/asyn-oligomer-screen/blob/main/docs/HANDOFF.md)** — the 7 novel protective candidates + 4 reactive metabolites packaged for orthogonal-mechanism assays, with predicted mechanism, suggested readout, and actionable category per molecule. Generated from the live sweep with `node docs/build_handoff.mjs`.
 
+**▶ [A bestiary of the oligomer](https://xag.github.io/asyn-oligomer-screen/oligomer_bestiary.html)** — an illustrated field guide to the oligomer's forms (monomer → strand → slabs → relaxed basins → fibril) and what the simulations found about which shapes hold.
+
 ## Plain English Summary
 
 A computational search for dietary, endogenous, and lifestyle-accessible small molecules that bind the toxic α-synuclein oligomer implicated in Parkinson's disease and shift its stability — in either direction. A molecule that destabilises the toxic shape is a protective hypothesis (to seek out); one that stabilises it is a harmful anti-target (to limit). Both directions are first-class outputs. No atomic structure of that oligomer has been deposited, so the receptor is built from the published topology constraints; ~190 candidates are then docked against it and ranked.
