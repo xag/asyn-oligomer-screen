@@ -1,0 +1,6 @@
+register,macro,occupancy,n_frames,beta_core_rmsd,contact_jaccard,interchain_contacts,beta_core_rg,activity,medoid_pdb,medoid_from
+parallel,4,0.3703,3384,6.05,0.398,305.6,15.87,9.557,parallel_macro4_occ0.37_medoid.pdb,par_c6583_rep04/seg_1.pdb#6
+parallel,3,0.363,3479,5.76,0.61,318.7,15.42,11.572,parallel_macro3_occ0.36_medoid.pdb,par_basin1_rep02/seg_1.pdb#99
+parallel,2,0.1458,908,7.81,0.459,295.3,14.59,12.739,parallel_macro2_occ0.15_medoid.pdb,par_basin1_rep00/seg_1.pdb#9
+parallel,0,0.0737,1841,4.18,0.464,330.0,17.1,13.241,parallel_macro0_occ0.07_medoid.pdb,par_c7088_s777_rep06/seg_1.pdb#77
+parallel,1,0.0472,888,4.31,0.749,335.7,16.83,13.139,parallel_macro1_occ0.05_medoid.pdb,par_c7088_rep00/seg_1.pdb#50

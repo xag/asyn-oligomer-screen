@@ -1,0 +1,144 @@
+{
+  "parallel": {
+    "n_frames": 10500,
+    "n_replicas": 35,
+    "macrostates": [
+      {
+        "register": "parallel",
+        "macro": 4,
+        "occupancy": 0.3703,
+        "n_frames": 3384,
+        "beta_core_rmsd": 6.05,
+        "contact_jaccard": 0.398,
+        "interchain_contacts": 305.6,
+        "beta_core_rg": 15.87,
+        "activity": 9.557,
+        "medoid_pdb": "parallel_macro4_occ0.37_medoid.pdb",
+        "medoid_from": "par_c6583_rep04/seg_1.pdb#6"
+      },
+      {
+        "register": "parallel",
+        "macro": 3,
+        "occupancy": 0.363,
+        "n_frames": 3479,
+        "beta_core_rmsd": 5.76,
+        "contact_jaccard": 0.61,
+        "interchain_contacts": 318.7,
+        "beta_core_rg": 15.42,
+        "activity": 11.572,
+        "medoid_pdb": "parallel_macro3_occ0.36_medoid.pdb",
+        "medoid_from": "par_basin1_rep02/seg_1.pdb#99"
+      },
+      {
+        "register": "parallel",
+        "macro": 2,
+        "occupancy": 0.1458,
+        "n_frames": 908,
+        "beta_core_rmsd": 7.81,
+        "contact_jaccard": 0.459,
+        "interchain_contacts": 295.3,
+        "beta_core_rg": 14.59,
+        "activity": 12.739,
+        "medoid_pdb": "parallel_macro2_occ0.15_medoid.pdb",
+        "medoid_from": "par_basin1_rep00/seg_1.pdb#9"
+      },
+      {
+        "register": "parallel",
+        "macro": 0,
+        "occupancy": 0.0737,
+        "n_frames": 1841,
+        "beta_core_rmsd": 4.18,
+        "contact_jaccard": 0.464,
+        "interchain_contacts": 330.0,
+        "beta_core_rg": 17.1,
+        "activity": 13.241,
+        "medoid_pdb": "parallel_macro0_occ0.07_medoid.pdb",
+        "medoid_from": "par_c7088_s777_rep06/seg_1.pdb#77"
+      },
+      {
+        "register": "parallel",
+        "macro": 1,
+        "occupancy": 0.0472,
+        "n_frames": 888,
+        "beta_core_rmsd": 4.31,
+        "contact_jaccard": 0.749,
+        "interchain_contacts": 335.7,
+        "beta_core_rg": 16.83,
+        "activity": 13.139,
+        "medoid_pdb": "parallel_macro1_occ0.05_medoid.pdb",
+        "medoid_from": "par_c7088_rep00/seg_1.pdb#50"
+      }
+    ]
+  },
+  "antiparallel": {
+    "n_frames": 7200,
+    "n_replicas": 24,
+    "macrostates": [
+      {
+        "register": "antiparallel",
+        "macro": 2,
+        "occupancy": 0.5433,
+        "n_frames": 3792,
+        "beta_core_rmsd": 7.69,
+        "contact_jaccard": 0.506,
+        "interchain_contacts": 342.0,
+        "beta_core_rg": 15.09,
+        "activity": 14.525,
+        "medoid_pdb": "antiparallel_macro2_occ0.54_medoid.pdb",
+        "medoid_from": "anti_basin1_rep06/seg_0.pdb#69"
+      },
+      {
+        "register": "antiparallel",
+        "macro": 4,
+        "occupancy": 0.2176,
+        "n_frames": 1377,
+        "beta_core_rmsd": 4.21,
+        "contact_jaccard": 0.678,
+        "interchain_contacts": 328.3,
+        "beta_core_rg": 17.2,
+        "activity": 8.884,
+        "medoid_pdb": "antiparallel_macro4_occ0.22_medoid.pdb",
+        "medoid_from": "anti_c7088_rep07/seg_2.pdb#43"
+      },
+      {
+        "register": "antiparallel",
+        "macro": 1,
+        "occupancy": 0.1057,
+        "n_frames": 782,
+        "beta_core_rmsd": 7.43,
+        "contact_jaccard": 0.512,
+        "interchain_contacts": 369.3,
+        "beta_core_rg": 14.97,
+        "activity": 9.504,
+        "medoid_pdb": "antiparallel_macro1_occ0.11_medoid.pdb",
+        "medoid_from": "anti_basin2_rep03/seg_2.pdb#45"
+      },
+      {
+        "register": "antiparallel",
+        "macro": 3,
+        "occupancy": 0.0887,
+        "n_frames": 1019,
+        "beta_core_rmsd": 3.39,
+        "contact_jaccard": 0.735,
+        "interchain_contacts": 364.3,
+        "beta_core_rg": 17.63,
+        "activity": 13.973,
+        "medoid_pdb": "antiparallel_macro3_occ0.09_medoid.pdb",
+        "medoid_from": "anti_c7088_rep03/seg_2.pdb#55"
+      },
+      {
+        "register": "antiparallel",
+        "macro": 0,
+        "occupancy": 0.0447,
+        "n_frames": 230,
+        "beta_core_rmsd": 8.85,
+        "contact_jaccard": 0.434,
+        "interchain_contacts": 297.2,
+        "beta_core_rg": 14.71,
+        "activity": 10.688,
+        "medoid_pdb": "antiparallel_macro0_occ0.04_medoid.pdb",
+        "medoid_from": "anti_basin1_rep04/seg_2.pdb#90"
+      }
+    ]
+  }
+}

@@ -262,10 +262,24 @@
     <div class="pagenum">· vii ·</div>
   </section>
 
-  <!-- IX · FIBRIL -->
+  <!-- VIII · OCCUPANCY -->
   <section class="page" data-roman="viii">
     <div class="frame"></div>
     <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;VIII</span></div>
+    <div class="plate-wrap"><svg id="plate-occupancy" viewBox="0 0 680 420"></svg></div>
+    <div class="caption">
+      <div class="latin">census formarum — how often each shape</div>
+      <h2>The Occupancy Census</h2>
+      <p>How often is each basin actually occupied? A swarm of short trajectories, seeded across the known basins and read as a Markov state model, gives the populations the slow single relaxations could not. The mass does not sit on the hand-built pose: each register concentrates 4–8&nbsp;Å away, in one or two dominant basins — and every populated basin still scores toxic. The catch: the most toxic-scoring frames are the <em>least</em> occupied.</p>
+      <p class="stat">parallel → two basins <b>37%+36%</b> (act 9.6 / 11.6) · antiparallel → one basin <b>54%</b> (act 14.5) · all ≫ floor 3.7 · blob area ∝ occupancy</p>
+    </div>
+    <div class="pagenum">· viii ·</div>
+  </section>
+
+  <!-- IX · FIBRIL -->
+  <section class="page" data-roman="ix">
+    <div class="frame"></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;IX</span></div>
     <div class="plate-wrap"><svg id="plate-fibril" viewBox="0 0 680 420"></svg></div>
     <div class="caption">
       <div class="latin">fibrilla matura — the end-state</div>
@@ -273,13 +287,13 @@
       <p>The destination, if nucleation is crossed: thousands of strands stacked rung upon rung along a single axis, each layer one protein. To get here the slab must lock into in-register parallel cross-β and bury the NAC — a barrier many toxic oligomers never cross.</p>
       <p class="stat">rung spacing <b>4.8&nbsp;Å</b> · width <b>5–10&nbsp;nm</b> · length <b>0.1–several&nbsp;µm</b> (~2,000 rungs per micron)</p>
     </div>
-    <div class="pagenum">· viii ·</div>
+    <div class="pagenum">· ix ·</div>
   </section>
 
-  <!-- IX · SCALE -->
-  <section class="page" data-roman="ix">
+  <!-- X · SCALE -->
+  <section class="page" data-roman="x">
     <div class="frame"></div>
-    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;IX</span></div>
+    <div class="runhead"><span>the bestiary</span><span class="num">Plate&nbsp;X</span></div>
     <div class="plate-wrap" style="flex:0 0 38%"><svg id="plate-scale" viewBox="0 0 680 220"></svg></div>
     <div class="caption" style="margin-bottom:14px">
       <div class="latin">mensura — the measure of things</div>
@@ -295,7 +309,7 @@
         <tr><td class="k">Fibril width / length</td><td class="v">5–10 <span class="u">nm</span> / 0.1–&gt;1 <span class="u">µm</span></td></tr>
       </table>
     </div>
-    <div class="pagenum">· ix ·</div>
+    <div class="pagenum">· x ·</div>
   </section>
 
   <div class="chev l hidden" id="chevL">‹</div>
@@ -483,6 +497,35 @@ function buildSizeSweep(){const s=document.getElementById("plate-sweep");_ai=0;
   });
   txt(s,360,62,"each column: built shape (○) → after 50 ns unbiased (●)",{it:true,s:12.5});
 }
+// E8 occupancy MSM macrostates: [β-core RMSD from relaxed ref, activity, occupancy]
+const OCC_PAR=[[6.05,9.56,0.370],[5.76,11.57,0.363],[7.81,12.74,0.146],[4.18,13.24,0.074],[4.31,13.14,0.047]];
+const OCC_ANT=[[7.69,14.53,0.543],[4.21,8.88,0.218],[7.43,9.50,0.106],[3.39,13.97,0.089],[8.85,10.69,0.045]];
+function buildOccupancy(){const s=document.getElementById("plate-occupancy");_ai=0;
+  const bx0=150,bx1=560,by0=92,by1=330,vmax=16,floor=3.7;
+  const px=r=>bx0+(r-3)/6*(bx1-bx0), py=v=>by1-(v/vmax)*(by1-by0);
+  hairline(s,`M${bx0},${by0} V${by1} H${bx1}`);
+  [0,4,8,12,16].forEach(v=>{hairline(s,`M${bx0-4},${py(v)} H${bx0}`);txt(s,bx0-9,py(v)+4,v,{a:"end",s:11,cls:"tnum"});});
+  [3,5,7,9].forEach(r=>{hairline(s,`M${px(r)},${by1} V${by1+4}`);txt(s,px(r),by1+18,r,{s:11,cls:"tnum"});});
+  txt(s,(bx0+bx1)/2,by1+34,"β-core RMSD from relaxed reference (Å)",{it:true,s:12.5});
+  const yl=txt(s,116,(by0+by1)/2,"toxic activity",{it:true,s:12});yl.setAttribute("transform",`rotate(-90 116 ${(by0+by1)/2})`);
+  hairline(s,`M${bx0},${py(floor)} H${bx1}`).classList.add("dash");
+  txt(s,bx1-4,py(floor)-6,"harmless floor 3.7",{a:"end",it:true,s:10.5});
+  hairline(s,`M${bx0},${py(13.7)} H${bx1}`).classList.add("dash");
+  txt(s,bx0+6,py(13.7)-6,"built-pose refs 13.7–16.3",{a:"start",it:true,s:10.5});
+  function blob(p,anti,delay){const x=px(p[0]),y=py(p[1]),rr=4+44*Math.sqrt(p[2]);
+    const e=E("circle",{cx:x.toFixed(1),cy:y.toFixed(1),r:rr.toFixed(1),
+      fill:anti?"none":"currentColor","fill-opacity":anti?0:0.13,
+      stroke:"currentColor","stroke-width":anti?1.4:1,class:"fade"});
+    e.style.animationDelay=delay+"s";s.appendChild(e);return [x,y,rr];}
+  OCC_PAR.forEach((p,i)=>blob(p,false,0.3+i*0.1));
+  const aD=OCC_ANT.map((p,i)=>blob(p,true,0.5+i*0.1));
+  // annotate the dominant basins
+  const pd=blob(OCC_PAR[0],false,0); // parallel co-dominant pair sits here
+  txt(s,pd[0]+4,pd[1]+pd[2]+15,"parallel · two basins 37%+36%",{it:true,s:11.5});
+  txt(s,aD[0][0],aD[0][1]-aD[0][2]-8,"antiparallel · one basin 54%",{it:true,s:11.5});
+  txt(s,(bx0+bx1)/2,72,"each blob = an occupancy macrostate · area ∝ population",{it:true,s:12.5});
+  txt(s,(bx0+bx1)/2,350,"●  parallel        ○  antiparallel",{s:13});
+}
 function buildFibril(){const s=document.getElementById("plate-fibril");_ai=0;
   const cx0=300,cx1=440,amp=5,step=16;
   const yTop=78,yBot=350,gap=27;const rungs=[];
@@ -533,7 +576,7 @@ function buildScale(){const s=document.getElementById("plate-scale");_ai=0;
 
 buildTitle();buildMonomer();buildStrand();
 slab("plate-parallel",false);slab("plate-antiparallel",true);
-buildRelaxed();buildFunnel();buildSizeSweep();buildFibril();buildScale();
+buildRelaxed();buildFunnel();buildSizeSweep();buildOccupancy();buildFibril();buildScale();
 
 // ---- pager ----
 const pages=[...document.querySelectorAll(".page")];

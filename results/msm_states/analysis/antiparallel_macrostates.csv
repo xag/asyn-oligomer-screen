@@ -1,0 +1,6 @@
+register,macro,occupancy,n_frames,beta_core_rmsd,contact_jaccard,interchain_contacts,beta_core_rg,activity,medoid_pdb,medoid_from
+antiparallel,2,0.5433,3792,7.69,0.506,342.0,15.09,14.525,antiparallel_macro2_occ0.54_medoid.pdb,anti_basin1_rep06/seg_0.pdb#69
+antiparallel,4,0.2176,1377,4.21,0.678,328.3,17.2,8.884,antiparallel_macro4_occ0.22_medoid.pdb,anti_c7088_rep07/seg_2.pdb#43
+antiparallel,1,0.1057,782,7.43,0.512,369.3,14.97,9.504,antiparallel_macro1_occ0.11_medoid.pdb,anti_basin2_rep03/seg_2.pdb#45
+antiparallel,3,0.0887,1019,3.39,0.735,364.3,17.63,13.973,antiparallel_macro3_occ0.09_medoid.pdb,anti_c7088_rep03/seg_2.pdb#55
+antiparallel,0,0.0447,230,8.85,0.434,297.2,14.71,10.688,antiparallel_macro0_occ0.04_medoid.pdb,anti_basin1_rep04/seg_2.pdb#90
