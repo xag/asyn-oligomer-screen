@@ -23,12 +23,15 @@ $probe = @"
 done=`$(find $Work/traj -name DONE 2>/dev/null | wc -l)
 started=`$(ls -d $Work/traj/*/ 2>/dev/null | wc -l)
 total=`$(grep -c '"rep"' $Work/manifest.json 2>/dev/null)
-alive=`$(pgrep -fc e8_swarm_runner.py)
-md=`$(pgrep -fc md_relax.py)
+alive=`$(pgrep -fc 'e8_swarm_[r]unner.py')
+md=`$(pgrep -fc '[m]d_relax.py')
 echo "  runner_alive=`$alive  md_relax=`$md  replicas: `$done DONE / `$started started / `$total total"
 tail -1 $Work/runner.log 2>/dev/null | sed 's/^/  last: /'
 "@
-$allDone = $true
+# "active" = at least one runner still alive on some host (work in flight).
+# Replica counts below total just mean a host was stopped early (e.g. the slow
+# node) — not that anything is still running.
+$active = $false
 foreach ($h in $Hosts) {
   "######## $h ########"
   try {
@@ -36,10 +39,8 @@ foreach ($h in $Hosts) {
     try {
       $r = (Invoke-SSHCommand -SessionId $s.SessionId -Command $probe -TimeOut 40).Output
       $r
-      $rt = ($r -join "`n")
-      if ($rt -match 'runner_alive=([1-9])') { $allDone = $false }
-      if ($rt -match 'replicas: (\d+) DONE / \d+ started / (\d+) total' -and $Matches[1] -ne $Matches[2]) { $allDone = $false }
+      if (($r -join "`n") -match 'runner_alive=([1-9])') { $active = $true }
     } finally { Remove-SSHSession -SessionId $s.SessionId | Out-Null }
-  } catch { "  !! $h : $($_.Exception.Message)"; $allDone = $false }
+  } catch { "  !! $h : $($_.Exception.Message)"; $active = $true }
 }
-if ($allDone) { "`nALL HOSTS COMPLETE" } else { "`nstill running" }
+if ($active) { "`nstill running" } else { "`nno E8 runners active" }
