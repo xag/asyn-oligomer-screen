@@ -228,8 +228,8 @@
     <div class="caption">
       <div class="latin">forma laxata — the buckled beast</div>
       <h2>The Relaxed Basin</h2>
-      <p>Released into unbiased physics, the tidy slab will not hold. The strands curl, the sheet buckles, one edge peels open — yet it does not dissolve. It settles into a looser shape that is no longer the hand-built target but keeps much of its menace.</p>
-      <p class="stat">after <b>50&nbsp;ns</b> · edge opens <b>5&nbsp;→&nbsp;8&nbsp;Å</b> · β-core drift <b>~6&nbsp;Å</b> · activity <b>16.3&nbsp;→&nbsp;11.4</b> (floor of harmless ≈ 3.7)</p>
+      <p>Released into unbiased physics, the tidy slab will not hold. The strands curl, the sheet buckles, one edge peels open — yet it does not dissolve. It settles into a looser shape that is no longer the hand-built target but keeps much of its activity score.</p>
+      <p class="stat">after <b>50&nbsp;ns</b> · edge opens <b>5&nbsp;→&nbsp;8&nbsp;Å</b> · β-core drift <b>~6&nbsp;Å</b> · activity <b>16.3&nbsp;→&nbsp;11.4</b> (coil floor ≈ 3.7)</p>
     </div>
     <div class="pagenum">· v ·</div>
   </section>
@@ -256,7 +256,7 @@
     <div class="caption">
       <div class="latin">mensura ordinis — size &amp; register</div>
       <h2>The Size Sweep</h2>
-      <p>The same unbiased 50 ns relaxation, now at two and four chains in both registers. Size does not tidy the landscape: the parallel 2-mer keeps its toxic score, the parallel 4-mer collapses toward the floor (and was still falling), and the antiparallel forms stay mild throughout — no oligomer order settles on a single shape.</p>
+      <p>The same unbiased 50 ns relaxation, now at two and four chains in both registers. Size does not tidy the landscape: the parallel 2-mer keeps its high score, the parallel 4-mer collapses toward the floor (and was still falling), and the antiparallel forms stay low throughout — no oligomer order settles on a single shape.</p>
       <p class="stat">non-monotonic in size · parallel 2-mer holds (+15) · parallel 4-mer 16 → 7 · antiparallel ~5–9</p>
     </div>
     <div class="pagenum">· vii ·</div>
@@ -270,7 +270,7 @@
     <div class="caption">
       <div class="latin">census formarum — how often each shape</div>
       <h2>The Occupancy Census</h2>
-      <p>How often is each basin actually occupied? A swarm of short trajectories, seeded across the known basins and read as a Markov state model, gives the populations the slow single relaxations could not. The mass does not sit on the hand-built pose: each register concentrates 4–8&nbsp;Å away, in one or two dominant basins — and every populated basin still scores toxic. The catch: the most toxic-scoring frames are the <em>least</em> occupied.</p>
+      <p>How often is each basin actually occupied? A swarm of short trajectories, seeded across the known basins and read as a Markov state model, gives the populations the slow single relaxations could not. The mass does not sit on the hand-built pose: each register concentrates 4–8&nbsp;Å away, in one or two dominant basins — and every populated basin still scores high. The catch: the highest-scoring frames are the <em>least</em> occupied.</p>
       <p class="stat">parallel → two basins <b>37%+36%</b> (act 9.6 / 11.6) · antiparallel → one basin <b>54%</b> (act 14.5) · all ≫ floor 3.7 · blob area ∝ occupancy</p>
     </div>
     <div class="pagenum">· viii ·</div>
@@ -507,9 +507,9 @@ function buildOccupancy(){const s=document.getElementById("plate-occupancy");_ai
   [0,4,8,12,16].forEach(v=>{hairline(s,`M${bx0-4},${py(v)} H${bx0}`);txt(s,bx0-9,py(v)+4,v,{a:"end",s:11,cls:"tnum"});});
   [3,5,7,9].forEach(r=>{hairline(s,`M${px(r)},${by1} V${by1+4}`);txt(s,px(r),by1+18,r,{s:11,cls:"tnum"});});
   txt(s,(bx0+bx1)/2,by1+34,"β-core RMSD from relaxed reference (Å)",{it:true,s:12.5});
-  const yl=txt(s,116,(by0+by1)/2,"toxic activity",{it:true,s:12});yl.setAttribute("transform",`rotate(-90 116 ${(by0+by1)/2})`);
+  const yl=txt(s,116,(by0+by1)/2,"activity score",{it:true,s:12});yl.setAttribute("transform",`rotate(-90 116 ${(by0+by1)/2})`);
   hairline(s,`M${bx0},${py(floor)} H${bx1}`).classList.add("dash");
-  txt(s,bx1-4,py(floor)-6,"harmless floor 3.7",{a:"end",it:true,s:10.5});
+  txt(s,bx1-4,py(floor)-6,"coil floor 3.7",{a:"end",it:true,s:10.5});
   hairline(s,`M${bx0},${py(13.7)} H${bx1}`).classList.add("dash");
   txt(s,bx0+6,py(13.7)-6,"built-pose refs 13.7–16.3",{a:"start",it:true,s:10.5});
   function blob(p,anti,delay){const x=px(p[0]),y=py(p[1]),rr=4+44*Math.sqrt(p[2]);
