@@ -265,26 +265,29 @@ macrostate medoid scored with `oligomers/score_oligomer.py`. Driver + analysis
 **Result.** 59 replicas, 17,700 frames (parallel 35 / antiparallel 24; coil floor ≈ 3.7,
 relaxed-ref baselines parallel 16.3 / antiparallel 13.7). **Each register concentrates occupancy
 in one or two basins, all 4–8 Å from the relaxed reference, and every populated basin still
-scores toxic.** Parallel splits into two co-dominant basins — 37% at RMSD 6.0 Å, Jaccard 0.40,
-activity **9.6**, and 36% at RMSD 5.8 Å, Jaccard 0.61, activity **11.6** — with minor basins
-(15/7/5%) at higher activity (12.7–13.2); occupancy-weighted activity **11.2**. Antiparallel
-concentrates harder: one dominant basin at **54%** (RMSD 7.7 Å, Jaccard 0.51) that is also the
-single most toxic-scoring state found, activity **14.5** (above its own relaxed-ref 13.7), then
-22% at RMSD 4.2 Å / activity 8.9; occupancy-weighted activity **12.6**. **Toxicity and
-occupancy are anti-correlated within the parallel register:** the most toxic-scoring frames sit
-in low-occupancy near-native basins (5–7%, Jaccard 0.75, activity ~13), while the bulk
-population sits in contact-rearranged basins of moderate activity.
+scores toxic-looking.** Parallel splits into two
+co-dominant basins — 37% at RMSD 6.0 Å, Jaccard 0.40, activity **9.6**, and 36% at RMSD 5.8 Å,
+Jaccard 0.61, activity **11.6** — with minor basins (15/7/5%) at higher activity (12.7–13.2);
+occupancy-weighted activity **11.2**. Antiparallel concentrates harder: one dominant basin at
+**54%** (RMSD 7.7 Å, Jaccard 0.51) that is also the single highest-scoring state found, activity
+**14.5** (above its own relaxed-ref 13.7), then 22% at RMSD 4.2 Å / activity 8.9;
+occupancy-weighted activity **12.6**. **Activity and occupancy are anti-correlated within the
+parallel register:** the highest-scoring frames sit in low-occupancy near-native basins (5–7%,
+Jaccard 0.75, activity ~13), while the bulk population sits in contact-rearranged basins of
+moderate activity.
 
-**Conclusion.** Answers the occupancy half of #57. A stable, populated, still-toxic target
-ensemble *does* exist, and it is now quantified: the trimer's mass sits 4–8 Å from the
+**Conclusion.** Answers the occupancy half of #57. A stable, populated, still-toxic-looking
+target ensemble *does* exist, and it is now quantified: the trimer's mass sits 4–8 Å from the
 hand-built pose, in one (antiparallel) or two (parallel) dominant basins that score 65–90% of
 the relaxed-reference activity and far above the coil floor. So channels 1 & 2 can be
 re-grounded on the occupancy-weighted medoid ensemble (the five macrostate PDBs per register)
-rather than a single pose — and *should* be, because docking the single most-toxic pose targets
-a state the parallel oligomer occupies only ~5% of the time. The register asymmetry sharpens
-E6/E7: by occupancy (not single-quench endpoint) the antiparallel dominant basin is both the
-most populated and the most toxic single state, so "antiparallel is mild" was an artifact of
-reading one relaxation endpoint. Caveats: in-model populations only (this force field, water,
-trimer, 15 ns/replica, lag 200 ps, Laplace-smoothed); the slow node dropped seed par_c7391 and
-thinned par_c7088_s123, so the parallel map is built from 4 of 6 intended seeds; which register
-is biologically real still needs an experimental structure (E6).
+rather than a single pose — and *should* be, because docking the single highest-scoring pose
+targets a state the parallel oligomer occupies only ~5% of the time. The register asymmetry
+sharpens E6/E7: by occupancy (not single-quench endpoint) the antiparallel dominant basin is
+both the most populated and the highest-scoring single state, so "antiparallel is mild" was an
+artifact of reading one relaxation endpoint. Caveats: the activity score is a static-shape
+proxy, ordinal — it ranks shapes, it is not a toxicity prediction for the free oligomer (which
+reshapes on contact with a membrane or ligand); in-model populations only (this force field,
+water, trimer, 15 ns/replica, lag 200 ps, Laplace-smoothed); the slow node dropped seed
+par_c7391 and thinned par_c7088_s123, so the parallel map is built from 4 of 6 intended seeds;
+which register is biologically real still needs an experimental structure (E6).
