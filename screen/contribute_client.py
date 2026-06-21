@@ -33,7 +33,7 @@ import requests
 
 import run_chunks
 
-DEFAULT_BASE_URL = "https://health-two-iota.vercel.app"
+DEFAULT_BASE_URL = "https://health.poietic.studio"
 
 
 def _fmt(seconds: float) -> str:
